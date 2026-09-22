@@ -1,0 +1,151 @@
+"""
+Lo que se enseña de una publicación por dentro: de dónde llegó una ficha y qué dio cada post.
+
+Son esquemas de **lectura**. Ninguno entra por el cuerpo de una petición, así que no llevan
+validadores de entrada: lo que traen ya pasó por el registro de actividad o por el alta de
+la campaña.
+
+Dos decisiones que se ven en los campos:
+
+* `de_otros_asesores` es un número y nunca una lista. Un asesor ve sus prospectos y cuántos
+  más hay; los nombres del resto de la cartera no salen del servidor, ni siquiera
+  recortados. Un nombre y una empresa bastan para reconstruir a quién atiende la
+  competencia interna, y ese era justo el agujero que cerró el alcance de cartera.
+* La tarjeta «Llegó por» no tiene versión «vacía». Cuando no hay solicitudes es `None` y la
+  ficha no pinta nada, en lugar de una tarjeta con guiones que hace pensar que se perdió un
+  dato.
+"""
+import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
+from app.models.entities import LeadStatus, ScoreCategory
+
+
+class SolicitudDeLaFicha(BaseModel):
+    """
+    Una solicitud recibida por una publicación, tal como se le enseña al asesor.
+
+    `aviso_aceptado_en` es el de **esta** solicitud, no el de la ficha. La ficha guarda el
+    primero (no se pisa nunca); aquí interesa el de cada envío, porque cada uno se hizo
+    aceptando el aviso por separado y esa es la pregunta que llega desde fuera: «¿cuándo
+    consintió esta persona que le escribiéramos por esto?».
+    """
+    publicacion_id: Optional[int] = None
+    titulo: Optional[str] = None
+    enlace: Optional[str] = None
+    recibida_en: datetime.datetime
+    necesidad: Optional[str] = None
+    aviso_aceptado_en: Optional[datetime.datetime] = None
+
+
+class LlegoPor(BaseModel):
+    """
+    De dónde salió esta ficha. Solo existe si hubo al menos una solicitud por la página.
+
+    El perfil de LinkedIn va aquí y no en cada solicitud porque es de la persona, no del
+    envío: la ficha guarda el que llegó primero y los envíos posteriores no lo pisan
+    (`actualiza_prospecto=False`). Enseñar uno por fila sugeriría un historial de perfiles
+    que el sistema no tiene.
+    """
+    perfil_de_linkedin: Optional[str] = None
+    solicitudes: List[SolicitudDeLaFicha] = Field(default_factory=list)
+
+
+class PublicacionDelInforme(BaseModel):
+    id: int
+    titulo: str
+    enlace: str
+    activa: bool
+    estado: str = "activa"
+    # El post ya publicado en LinkedIn, comprobado como de linkedin.com al guardarlo.
+    url_del_post: Optional[str] = None
+    responsable: Optional[str] = None
+
+
+class ResumenDePublicacion(BaseModel):
+    """
+    La cabecera del informe, **calculada sobre lo que ve quien pregunta**.
+
+    Para el líder y el administrador eso es la publicación entera. Para un asesor son sus
+    prospectos, y `de_otros_asesores` dice cuántos más hay sin decir quiénes. La alternativa
+    —enseñarle la media global— repetiría el fallo que ya se corrigió en el resumen del
+    tablero: un total y una media describen el tamaño y la salud de la cartera ajena sin
+    abrir una sola ficha.
+    """
+    perfiles_recibidos: int
+    avanzaron_de_etapa: int
+    score_medio: float
+    de_otros_asesores: int = 0
+    alcance_completo: bool = True
+    # Totales de la publicación en el periodo, sin nombres: cuántas veces se abrió la página
+    # y cuántas solicitudes se enviaron **desde que se cuentan visitas**. `tasa_de_envio` es
+    # envíos entre visitas, en tanto por ciento; `None` sin visitas, porque dividir entre cero
+    # no es un 0 %. Puede pasar de 100: quien corrige un error y vuelve a enviar lo hace sin
+    # volver a abrir la página.
+    visitas: int = 0
+    envios: int = 0
+    tasa_de_envio: Optional[float] = None
+
+
+class DiaDelInforme(BaseModel):
+    """Un día del gráfico: perfiles recibidos (los que ve quien pregunta) y visitas."""
+    dia: datetime.date
+    perfiles: int = 0
+    visitas: int = 0
+
+
+class FilaDelInforme(BaseModel):
+    lead_id: int
+    nombre: str
+    empresa: Optional[str] = None
+    cargo: Optional[str] = None
+    score: float
+    categoria: ScoreCategory
+    etapa: LeadStatus
+    asesor: Optional[str] = None
+    recibida_en: datetime.datetime
+    # Lo que dijo necesitar en su última solicitud a esta publicación. Informa; no puntúa.
+    necesidad: Optional[str] = None
+
+
+class InformeDePublicacion(BaseModel):
+    publicacion: PublicacionDelInforme
+    resumen: ResumenDePublicacion
+    filas: List[FilaDelInforme] = Field(default_factory=list)
+    total: int
+    limit: int
+    offset: int
+    # Perfiles recibidos por día. Como mucho los últimos `MAX_DIAS_DEL_GRAFICO`; si el
+    # periodo es más largo, `grafico_recortado` lo dice.
+    por_dia: List[DiaDelInforme] = Field(default_factory=list)
+    grafico_recortado: bool = False
+
+
+class FilaDeComparativa(BaseModel):
+    publicacion_id: int
+    titulo: str
+    activa: bool
+    estado: str = "activa"
+    perfiles_recibidos: int
+    avanzaron_de_etapa: int
+    score_medio: float
+    visitas: int = 0
+    envios: int = 0
+    tasa_de_envio: Optional[float] = None
+
+
+class ComparativaDePublicaciones(BaseModel):
+    items: List[FilaDeComparativa] = Field(default_factory=list)
+
+
+class NuevosSinAsesor(BaseModel):
+    """
+    Cuántos prospectos de LinkedIn están esperando a que alguien los atienda.
+
+    Es el contador del líder: la página de interés crea fichas sin asesor a propósito
+    —repartir cartera es una decisión suya, no del formulario— y sin este número nadie se
+    entera de que hay trabajo sin repartir hasta que alguien mira el listado.
+    """
+    total: int

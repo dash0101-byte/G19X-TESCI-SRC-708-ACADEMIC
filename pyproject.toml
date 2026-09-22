@@ -1,0 +1,60 @@
+[tool.pytest.ini_options]
+minversion = "8.0"
+
+# Fija el rootdir del proyecto. Sin este archivo, pytest deducía la raíz a partir del
+# directorio desde el que se invocaba, así que `pytest` desde `backend/` o desde
+# `backend/tests/` fallaba con ModuleNotFoundError: los tests importan tanto `app.*`
+# (que vive en backend/) como `ml_pipeline.*` (que vive en la raíz).
+# `ml_pipeline/src` entra en la ruta porque las pruebas del bucle de realimentacion
+# importan `feedback_dataset` y `synthetic_generator`. Declararlo aqui evita que un
+# test funcione solo cuando otro anterior ha manipulado sys.path antes que el.
+pythonpath = [".", "backend", "ml_pipeline/src"]
+testpaths = ["backend/tests"]
+
+addopts = "--strict-markers --strict-config"
+
+# pytest-asyncio en modo estricto: las corrutinas de test se marcan explícitamente.
+# En modo automático, un `async def test_` sin marcar se recolecta y se omite en
+# silencio, que es la peor forma de perder cobertura.
+asyncio_mode = "strict"
+
+filterwarnings = [
+    "error::DeprecationWarning:app.*",
+    "error::DeprecationWarning:ml_pipeline.*",
+]
+
+
+[tool.ruff]
+# El frontend, los artefactos compilados y las dependencias no se analizan.
+extend-exclude = ["frontend", "docs", ".venv", "venv"]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle: errores de formato
+    "F",    # pyflakes: nombres sin definir, imports y variables sin usar
+    "W",    # pycodestyle: avisos
+    "I",    # isort: orden de imports
+    "B",    # flake8-bugbear: fallos lógicos frecuentes
+    "S",    # flake8-bandit: patrones inseguros
+    "C4",   # comprensiones innecesarias
+]
+# `UP` (pyupgrade) queda fuera a propósito: reescribe `Optional[X]` como `X | None` y
+# `Dict` como `dict` en más de doscientos puntos del código. Es un cambio de estilo que
+# no detecta ningún defecto, y meterlo en la misma tanda que las correcciones reales
+# haría ilegible la revisión. Se puede activar por separado cuando se decida modernizar.
+ignore = [
+    "E501",  # La longitud de línea la gobierna `line-length`, no el linter de estilo
+    "B008",  # `Depends(...)` en valores por defecto es el idioma de FastAPI
+    "S104",  # El bind a 0.0.0.0 es deliberado dentro del contenedor
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Las pruebas usan `assert` (S101) por definición y contienen credenciales de prueba
+# (S105/S106) que son literales inventados, no secretos reales.
+"backend/tests/*" = ["S101", "S105", "S106", "S311"]
+# El generador sintético usa `random` para datos de entrenamiento, no para criptografía.
+"ml_pipeline/*" = ["S311"]
+"scripts/*" = ["S311", "T201"]
+"backend/scripts/*" = ["S311", "T201"]

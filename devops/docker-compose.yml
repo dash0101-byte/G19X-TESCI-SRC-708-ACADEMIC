@@ -1,0 +1,690 @@
+# ==============================================================================
+# SISTEMA INTELIGENTE DE LEAD SCORING - PILA DE DESPLIEGUE
+# ==============================================================================
+# Arranque, siempre por el lanzador y con el entorno fuera del repositorio (capítulo 22):
+#   python devops/pila.py iniciar         # una vez: crea ~/.plurione/pila.env con los secretos
+#   python devops/pila.py up -d --build
+#
+# El servicio `migrate` aplica `alembic upgrade head` antes de que el backend arranque, de
+# modo que la pila funciona sobre un volumen vacío sin ningún paso manual.
+#
+# El archivo de entorno necesita, como mínimo, SECRET_KEY y POSTGRES_PASSWORD. Llamar a
+# `docker compose` directamente no arranca, y es a propósito: sin `--env-file` Compose aborta
+# por las variables obligatorias, y el lanzador se niega si encuentra un `.env` dentro del
+# repositorio, que Compose cargaría por su cuenta.
+#
+# ATENCION: Postgres solo aplica POSTGRES_PASSWORD al inicializar un directorio de
+# datos vacio. Si el volumen `pgdata` ya existe, cambiar la contrasena en el archivo de
+# entorno no hace nada y el backend fallara con `password authentication failed`. Para
+# rotarla de verdad sobre una pila ya desplegada:
+#   python devops/pila.py exec postgres psql -U plurione -c "ALTER USER plurione PASSWORD '<nueva>'"
+# y despues actualizar el archivo de entorno. Empezar de cero (perdiendo los datos) seria:
+#   python devops/pila.py down -v
+#
+# IMÁGENES FIJADAS POR HUELLA (capítulo 22)
+#
+# Las imágenes de terceros van como `nombre:etiqueta@sha256:<huella>`: la huella decide lo
+# que se descarga y la etiqueta, qué seguir al renovar. Renovar es explícito y deja un diff:
+#   python scripts/renovar_imagenes.py --aplicar
+#
+# ENDURECIMIENTO DE LOS CONTENEDORES (N-12)
+#
+# Todos los servicios llevan cuatro cosas que antes no tenía ninguno:
+#
+#   * `deploy.resources.limits` — techo de CPU y memoria. Sin él, un recálculo masivo o
+#     una consulta desbocada consumen toda la memoria del anfitrión y se lleva por delante
+#     a los DEMÁS contenedores, incluida la base de datos. Con techo, el que se pasa muere
+#     él solo. Compose V2 los aplica en `docker compose up`; bajo Swarm significan otra
+#     cosa (reserva del planificador), y conviene saberlo antes de reutilizar este archivo.
+#     ATENCIÓN: un techo de memoria demasiado justo hace que el núcleo mate el proceso sin
+#     avisar —código de salida 137, ningún renglón en el log—, así que los valores llevan
+#     holgura y se pueden subir por variable de entorno.
+#   * `security_opt: no-new-privileges` — impide que un proceso dentro del contenedor gane
+#     privilegios ejecutando un binario con setuid. Es lo que convierte «entré como
+#     usuario sin privilegios» en un callejón sin salida en vez de en un primer paso.
+#   * `cap_drop: [ALL]` y solo las capacidades que cada imagen necesita de verdad. Un
+#     contenedor arranca por defecto con una quincena de capacidades del núcleo que casi
+#     ninguna aplicación usa.
+#   * `read_only: true` donde la imagen lo tolera, con `tmpfs` para lo poco que sí escribe.
+#     Un sistema de ficheros de solo lectura no impide una intrusión, pero sí que lo que
+#     el atacante deje escrito sobreviva al reinicio del contenedor.
+#   * `logging` con rotación. Por defecto el driver `json-file` crece SIN LÍMITE: los
+#     registros de esta fase son más verbosos (un objeto JSON por petición) y un disco
+#     lleno tumba la base de datos, que es el peor sitio por el que quedarse sin espacio.
+#     Estas opciones son las del driver `json-file`; con otro driver configurado en el
+#     demonio, `docker compose up` las rechaza.
+#
+# Las herramientas de desarrollo (pgAdmin y el puerto de Postgres publicado) viven en un
+# archivo aparte y NO forman parte de esta pila:
+#   python devops/pila.py --dev up -d
+#
+# Se separan en un overlay y no en un `profiles:` dentro de este archivo porque compose
+# interpola TODO el fichero aunque el perfil esté inactivo: las variables obligatorias de
+# pgAdmin habrían bloqueado el arranque de la pila de producción.
+# ==============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: plurione_leadscoring_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plurione}
+      # Sin valor por defecto a propósito. "postgres/postgres" es la primera credencial
+      # que prueba cualquier escaneo automatizado, y un default cómodo acaba llegando a
+      # producción porque nunca obliga a nadie a cambiarlo.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD en el archivo de entorno de la pila (python devops/pila.py iniciar)}
+      POSTGRES_DB: ${POSTGRES_DB:-lead_scoring_db}
+    # El puerto NO se publica. La base solo es alcanzable desde la red interna de la
+    # pila; publicarla exponía PostgreSQL a toda la red del anfitrión, donde el único
+    # control que queda es la contraseña. Para inspeccionarla:
+    #   python devops/pila.py exec postgres psql -U plurione -d lead_scoring_db
+    # o usar el overlay de desarrollo, que la publica solo en 127.0.0.1.
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plurione} -d ${POSTGRES_DB:-lead_scoring_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # NO lleva `read_only`. El entrypoint de la imagen ajusta permisos y escribe fuera del
+    # volumen mientras inicializa el directorio de datos, y una base de datos es, por
+    # definición, un proceso que escribe. Se compensa con lo demás: sin privilegios nuevos,
+    # sin capacidades más allá de las que necesita para dejar de ser root, y sin puerto
+    # publicado.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # Las cuatro que gasta el entrypoint para dejar el directorio de datos en manos del
+      # usuario `postgres` y pasar a ejecutarse como él. Sin ellas la imagen no arranca.
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    deploy:
+      resources:
+        limits:
+          cpus: "${LIMITE_CPU_POSTGRES:-1.0}"
+          memory: ${LIMITE_MEM_POSTGRES:-1g}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - plurione_network
+
+  # Aplica las migraciones de Alembic UNA vez y termina. El backend no arranca hasta que
+  # este servicio sale con código 0.
+  #
+  # Existe porque la pila no arrancaba sobre un volumen nuevo: el backend verifica al
+  # iniciar que el esquema esté sellado por Alembic y aborta si no lo está —esa guarda es
+  # correcta y se queda—, pero nadie aplicaba las migraciones. El fallo no se veía
+  # levantando la pila sobre una base ya migrada a mano, que es como se había probado.
+  #
+  # Es un servicio aparte y no un `alembic upgrade` dentro del arranque del backend a
+  # propósito: el backend sirve con dos workers y puede escalarse, y varios procesos
+  # migrando la misma base a la vez es una carrera con un final que nadie quiere depurar.
+  # Aquí se ejecuta una sola vez, en un contenedor que muere al terminar.
+  migrate:
+    # Misma imagen que el backend —mismo código, mismas migraciones, mismas dependencias—,
+    # nombrada explícitamente para que compose la construya una sola vez.
+    image: plurione/leadscoring-backend:local
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: plurione_leadscoring_migrate
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    working_dir: /app
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY (python -c "import secrets; print(secrets.token_urlsafe(64))")}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-plurione}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lead_scoring_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Misma imagen que el backend, así que corre igual como usuario sin privilegios y no
+    # necesita escribir en el sistema de ficheros: alembic solo habla con la base.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${LIMITE_CPU_MIGRATE:-1.0}"
+          memory: ${LIMITE_MEM_MIGRATE:-512m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  backend:
+    image: plurione/leadscoring-backend:local
+    build:
+      # Contexto en la raíz del repositorio: la imagen necesita `ml_pipeline/models/`
+      # para incluir el artefacto entrenado (A-5).
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: plurione_leadscoring_backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      # Obligatoria: compose aborta si no está definida en el archivo de entorno de la pila
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY (python -c "import secrets; print(secrets.token_urlsafe(64))")}
+      # Esta pila se publica en http://localhost:3000 (sin TLS), y el navegador descarta
+      # las cookies `Secure` sobre HTTP: el refresco de sesión no funcionaría.
+      # PÓNGALO EN true en cuanto sirva el despliegue detrás de HTTPS.
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+      # Sin secreto, el webhook CRM queda deshabilitado (503) en lugar de abierto
+      CRM_WEBHOOK_SECRET: ${CRM_WEBHOOK_SECRET:-}
+      # --- Integraciones (Fase 15) ---
+      # Cada una con su secreto, su interruptor y su limite, y ninguno compartido: revocar
+      # una es vaciar su secreto o apagarla, y no toca a las demas. Apagadas mientras no
+      # haya nadie al otro lado; el CRM sigue encendido porque ya lo estaba.
+      INTEGRACION_CRM_ACTIVA: ${INTEGRACION_CRM_ACTIVA:-true}
+      INTEGRACION_CALENDLY_ACTIVA: ${INTEGRACION_CALENDLY_ACTIVA:-false}
+      INTEGRACION_CALENDLY_SECRETO: ${INTEGRACION_CALENDLY_SECRETO:-}
+      INTEGRACION_CALENDLY_LIMITE: ${INTEGRACION_CALENDLY_LIMITE:-60/minute}
+      INTEGRACION_WHATSAPP_ACTIVA: ${INTEGRACION_WHATSAPP_ACTIVA:-false}
+      INTEGRACION_WHATSAPP_SECRETO: ${INTEGRACION_WHATSAPP_SECRETO:-}
+      INTEGRACION_WHATSAPP_LIMITE: ${INTEGRACION_WHATSAPP_LIMITE:-120/minute}
+      INTEGRACION_LINKEDIN_LEAD_GEN_ACTIVA: ${INTEGRACION_LINKEDIN_LEAD_GEN_ACTIVA:-false}
+      INTEGRACION_LINKEDIN_LEAD_GEN_SECRETO: ${INTEGRACION_LINKEDIN_LEAD_GEN_SECRETO:-}
+      INTEGRACION_LINKEDIN_LEAD_GEN_LIMITE: ${INTEGRACION_LINKEDIN_LEAD_GEN_LIMITE:-60/minute}
+      INTEGRACION_FORMULARIO_WEB_ACTIVA: ${INTEGRACION_FORMULARIO_WEB_ACTIVA:-false}
+      INTEGRACION_FORMULARIO_WEB_SECRETO: ${INTEGRACION_FORMULARIO_WEB_SECRETO:-}
+      INTEGRACION_FORMULARIO_WEB_LIMITE: ${INTEGRACION_FORMULARIO_WEB_LIMITE:-30/minute}
+      # Dirección pública bajo la que se sirve el enlace de cada publicación de LinkedIn.
+      PUBLICACIONES_URL_BASE: ${PUBLICACIONES_URL_BASE:-http://localhost:3000/interes}
+      # Página de interés: la única ruta sin sesión que escribe en la base.
+      INTERES_LIMITE_POR_IP: ${INTERES_LIMITE_POR_IP:-10/hour}
+      INTERES_LIMITE_POR_PUBLICACION: ${INTERES_LIMITE_POR_PUBLICACION:-120/hour}
+      INTERES_LIMITE_DE_LECTURAS_POR_IP: ${INTERES_LIMITE_DE_LECTURAS_POR_IP:-120/hour}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-plurione}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lead_scoring_db}
+      # --- Integridad del artefacto de ML (A-10) ---
+      # `joblib.load` deserializa con pickle, que ejecuta codigo al cargar. Con esta
+      # huella fijada, un artefacto sustituido NO se deserializa. El valor lo imprime
+      # `train_model.py` al terminar y queda tambien en ml_pipeline/models/metrics.json.
+      ML_MODEL_SHA256: ${ML_MODEL_SHA256:-}
+      # --- Observabilidad (N-14) ---
+      # Un objeto JSON por evento, con el `request_id` de la petición que lo provocó. En
+      # `auto` este entorno ya elegiría JSON por ser `production`; se declara explícito
+      # para que el archivo diga qué formato tienen los registros que va a producir.
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      # Sin este testigo, `/metrics` NO se publica en producción: responde 404. El volcado
+      # dice cuántos prospectos hay y cómo se reparten, y eso no debe quedar abierto por
+      # descuido. La ruta tampoco es alcanzable desde el puerto público —nginx solo hace
+      # de pasarela para `/api/`—, de modo que el recolector la consulta por la red
+      # interna de la pila.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      # --- Limitación de tasa ---
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-10/minute}
+      RATE_LIMIT_PREDICT: ${RATE_LIMIT_PREDICT:-60/minute}
+      RATE_LIMIT_WEBHOOK: ${RATE_LIMIT_WEBHOOK:-120/minute}
+      # Contador compartido entre todos los workers de uvicorn y entre instancias. Con
+      # `memory://` cada worker contaba por su lado y el tope real que veia un cliente era
+      # el declarado MULTIPLICADO por el numero de workers, asi que "10/minute" dejaba
+      # pasar 11-20 intentos de login. El servicio `redis` de esta misma pila lo resuelve.
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-redis://redis:6379/0}
+      # El unico origen que llega al backend es el nginx de esta pila, que SOBRESCRIBE
+      # X-Forwarded-For con la IP real del cliente (`proxy_set_header X-Forwarded-For
+      # $remote_addr` en frontend/nginx.conf). Ese detalle es la condicion entera de esta
+      # linea: mientras nginx solo ANADIA la IP real al final de la cadena, el backend
+      # seguia leyendo como cliente el primer elemento, escrito por quien llamaba, y
+      # activar esta variable no protegia de nada. Se declara AQUI y no por defecto en el
+      # codigo porque solo es cierto detras de un proxy que sobrescriba.
+      #
+      # Si se despliega el backend SIN ese nginx delante, esta variable debe volver a
+      # "false" o el tope por IP se esquiva rotando una cabecera.
+      TRUST_PROXY_HEADERS: "true"
+      # Ventana durante la que un mismo evento de CRM se considera repetido. La firma HMAC
+      # no acredita novedad: reenviar una entrega capturada volvia a ingerirla entera.
+      CRM_IDEMPOTENCY_WINDOW_SECONDS: ${CRM_IDEMPOTENCY_WINDOW_SECONDS:-900}
+      # En esta pila nginx sirve la SPA y hace de proxy de `/api/`, así que el navegador
+      # habla siempre con el mismo origen y CORS no interviene: la lista vacía es la
+      # configuración correcta. Solo hay que rellenarla si el frontend se despliega en
+      # otro dominio, y entonces con los orígenes exactos —el comodín junto a las cookies
+      # de sesión autoriza a cualquier sitio a leer respuestas autenticadas (A-8) y el
+      # backend se niega a arrancar con él—.
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+      AI_MODE: ${AI_MODE:-native}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_ML_ENDPOINT: ${AZURE_ML_ENDPOINT:-}
+      AZURE_ML_API_KEY: ${AZURE_ML_API_KEY:-}
+      # Solo se consultan con AI_MODE=azure; el adaptador las exige para construirse.
+      AZURE_AI_SEARCH_ENDPOINT: ${AZURE_AI_SEARCH_ENDPOINT:-}
+      AZURE_AI_SEARCH_KEY: ${AZURE_AI_SEARCH_KEY:-}
+      AZURE_AI_SEARCH_INDEX: ${AZURE_AI_SEARCH_INDEX:-plurione-leads-index}
+    # Solo en el bucle local: el acceso público entra por nginx (puerto 3000), que añade
+    # las cabeceras de seguridad y el tope de tamaño de cuerpo.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Sin esquema migrado el backend aborta el arranque a propósito. Esperar a que el
+      # servicio de migración TERMINE BIEN —no a que exista— es lo que convierte
+      # `docker compose up` sobre un volumen vacío en un despliegue que funciona.
+      migrate:
+        condition: service_completed_successfully
+    # La imagen ya corre como `plurione` (uid 1001) y no escribe en disco: el código, el
+    # modelo y el bundle van dentro de la imagen y `PYTHONDONTWRITEBYTECODE` evita los
+    # `.pyc`. Lo único que necesita es un `/tmp` en memoria.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          # Dos workers de uvicorn con scikit-learn y xgboost cargados, más el recálculo
+          # masivo por lotes. 2 GB es holgado a propósito: quedarse corto aquí no da un
+          # error legible, da un proceso muerto por el núcleo a mitad de un recálculo.
+          cpus: "${LIMITE_CPU_BACKEND:-2.0}"
+          memory: ${LIMITE_MEM_BACKEND:-2g}
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - plurione_network
+
+  # ==========================================================================
+  # Monitoreo de deriva del modelo (N-23)
+  # ==========================================================================
+  # `drift_monitor.py` existia desde la fase 8 y solo se documentaba como orden manual.
+  # Un monitor que hay que acordarse de lanzar detecta la deriva el dia que a alguien se
+  # le ocurre mirar, que suele ser el dia despues de que importara.
+  #
+  # Corre aqui y no en integracion continua por una razon que no tiene vuelta: lo que hay
+  # que comparar contra el perfil de referencia son las instantaneas de variables que
+  # produjo ESTA base al puntuar prospectos reales. CI no las tiene ni debe tenerlas. Un
+  # trabajo programado en el pipeline daria la sensacion de vigilancia sin ninguna.
+  #
+  # Es un bucle en el propio proceso y no `cron`: la imagen del backend no lleva demonio
+  # de tareas, y anadirlo significaria un proceso mas que supervisar y un formato de
+  # registro distinto del resto del sistema.
+  monitor-deriva:
+    image: plurione/leadscoring-backend:local
+    container_name: plurione_leadscoring_monitor_deriva
+    restart: unless-stopped
+    command:
+      - python
+      - /app/observabilidad/drift_monitor.py
+      - --alertar
+      - --cada
+      - "${ML_DRIFT_INTERVALO_S:-21600}"
+      - --salida
+      - /var/lib/plurione/deriva/informe_deriva.json
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY (python -c "import secrets; print(secrets.token_urlsafe(64))")}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-plurione}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lead_scoring_db}
+      # El perfil viaja en la imagen, junto al .joblib que lo produjo. Que los dos salgan
+      # del mismo `train_model.py` es lo que hace que el PSI signifique algo: un perfil de
+      # un entrenamiento y un modelo de otro comparan produccion contra una referencia que
+      # no corresponde a lo que esta puntuando. Desde la Fase 13 el perfil lleva la huella
+      # del artefacto y el monitor lo COMPRUEBA al arrancar: si no corresponden, no evalua
+      # y sale con 1, de modo que el reinicio en bucle queda a la vista en `docker compose ps`.
+      ML_REFERENCE_PROFILE: /opt/plurione/models/reference_profile.json
+      # Estado de las alertas. Va en un VOLUMEN y no en tmpfs a proposito: con tmpfs, cada
+      # reinicio del contenedor olvidaria que ya aviso y volveria a avisar de la misma
+      # deriva. Una alerta que se repite sola se aprende a ignorar.
+      ML_DRIFT_ESTADO: /var/lib/plurione/deriva/estado_deriva.json
+      # Cuanto callar antes de repetir un aviso que sigue vigente.
+      ML_DRIFT_SILENCIO_S: ${ML_DRIFT_SILENCIO_S:-21600}
+      # Opcional. Sin el, la alerta vive en la salida del contenedor —que es donde vive
+      # todo el registro del sistema— pero no despierta a nadie.
+      ML_DRIFT_WEBHOOK: ${ML_DRIFT_WEBHOOK:-}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - deriva:/var/lib/plurione/deriva
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          # Lee unas miles de instantaneas y calcula PSI sobre ellas. No entrena nada.
+          cpus: "${LIMITE_CPU_MONITOR:-0.5}"
+          memory: ${LIMITE_MEM_MONITOR:-512m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  # Purga programada del historial de puntuacion (R-3). Resume por prospecto y mes el
+  # detalle que supera SCORE_HISTORY_RETENTION_MONTHS y lo borra; conserva siempre la
+  # instantanea de entrada de cada prospecto —el ejemplo de entrenamiento del bucle de
+  # realimentacion— y la puntuacion vigente. Cada pasada queda en la bitacora.
+  #
+  # Desde el capitulo 22 la misma pasada aplica tambien los plazos de lo que no tenia
+  # ninguno (§20.5): sesiones caducadas, recalculos terminados, registros del CRM y avisos
+  # de la bandeja «Sin asociar». Un asiento por plazo, y un fallo en uno no impide los demas.
+  # Es el mismo servicio y no uno nuevo a proposito: un proceso mas que supervisar es un
+  # proceso mas que puede quedarse parado sin que nadie lo vea.
+  #
+  # Es un servicio aparte y no una tarea dentro del backend: con varios workers de uvicorn,
+  # una tarea programada en el proceso correria una vez por worker. Aqui hay un unico
+  # proceso, y aun asi la purga se protege sola si alguien levanta dos (ver
+  # `retencion_service`).
+  retencion-historial:
+    image: plurione/leadscoring-backend:local
+    container_name: plurione_leadscoring_retencion_historial
+    restart: unless-stopped
+    command:
+      - python
+      - /app/scripts/retencion_historial.py
+      - --cada
+      - "${RETENCION_HISTORIAL_INTERVALO_S:-86400}"
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY (python -c "import secrets; print(secrets.token_urlsafe(64))")}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-plurione}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lead_scoring_db}
+      # Meses completos de detalle ademas del mes en curso. Minimo 3: por debajo, el
+      # servicio sale con codigo 2 al arrancar en lugar de purgar.
+      SCORE_HISTORY_RETENTION_MONTHS: ${SCORE_HISTORY_RETENTION_MONTHS:-12}
+      # Plazos de conservacion en dias (capitulo 22). Por debajo de su minimo —7, 7, 30 y
+      # 30— el servicio no arranca: un 0 escrito por error no puede vaciar una tabla.
+      CONSERVACION_SESIONES_DIAS: ${CONSERVACION_SESIONES_DIAS:-30}
+      CONSERVACION_TRABAJOS_DIAS: ${CONSERVACION_TRABAJOS_DIAS:-90}
+      CONSERVACION_REGISTROS_CRM_DIAS: ${CONSERVACION_REGISTROS_CRM_DIAS:-90}
+      CONSERVACION_SIN_ASOCIAR_DIAS: ${CONSERVACION_SIN_ASOCIAR_DIAS:-90}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          # Lotes de doscientos prospectos por transaccion; no carga el modelo.
+          cpus: "${LIMITE_CPU_RETENCION:-0.25}"
+          memory: ${LIMITE_MEM_RETENCION:-256m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    container_name: plurione_leadscoring_redis
+    restart: unless-stopped
+    # Solo lleva contadores de limitacion de tasa: son datos derivados y efimeros, y
+    # perderlos al reiniciar no tiene consecuencia. Se desactiva la persistencia a disco
+    # para no pagar por escribir en un fichero algo que caduca en un minuto.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    # El puerto NO se publica, por la misma razon que el de PostgreSQL: solo lo necesita
+    # el backend, y Redis sin contrasena en la red del anfitrion es acceso directo.
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # Sin persistencia configurada, Redis no escribe nada en disco: el sistema de ficheros
+    # puede ser de solo lectura sin pérdida ninguna.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # El entrypoint de la imagen cambia al usuario `redis` con `su-exec`.
+      - SETGID
+      - SETUID
+    deploy:
+      resources:
+        limits:
+          cpus: "${LIMITE_CPU_REDIS:-0.5}"
+          # `--maxmemory 128mb` acota lo que Redis guarda; este techo acota el proceso
+          # entero. El segundo debe ser mayor que el primero, o el núcleo mata el proceso
+          # antes de que la política `allkeys-lru` llegue a actuar.
+          memory: ${LIMITE_MEM_REDIS:-256m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: plurione_leadscoring_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    # nginx escribe el PID y sus cachés temporales; con esos cuatro montajes en memoria no
+    # necesita nada más del disco. El contenido servido está dentro de la imagen.
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # El maestro arranca como root para poder escuchar en el 80 y luego baja los workers
+      # a `nginx`; esas tres son las que gasta en hacerlo.
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    deploy:
+      resources:
+        limits:
+          cpus: "${LIMITE_CPU_FRONTEND:-0.5}"
+          memory: ${LIMITE_MEM_FRONTEND:-128m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  # ============================================================================
+  # COPIAS DE SEGURIDAD (N-13)
+  # ============================================================================
+  # Los tres llevan `profiles: [respaldo]`, así que NO arrancan con `docker compose up`:
+  # se invocan a mano cuando toca.
+  #
+  #   python devops/pila.py --profile respaldo run --rm respaldo
+  #   python devops/pila.py --profile respaldo run --rm prueba-de-restauracion
+  #   python devops/pila.py --profile respaldo run --rm -e VOLCADO=... -e CONFIRMO_SOBRESCRIBIR=si restaurar
+  #
+  # Aquí sí se usa `profiles:` —y no un archivo aparte como con pgAdmin— porque ninguno
+  # declara variables obligatorias con `:?`, que era lo que hacía que un perfil inactivo
+  # bloqueara el arranque de la pila entera: compose interpola TODO el archivo aunque el
+  # perfil no se pida.
+  #
+  # Usan la MISMA imagen que el servidor. `pg_dump` se niega a volcar un servidor más nuevo
+  # que él, y esa negativa aparece el día que alguien actualiza PostgreSQL y no el cliente.
+  respaldo:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: plurione_leadscoring_respaldo
+    profiles: ["respaldo"]
+    restart: "no"
+    entrypoint: ["/bin/sh"]
+    command: ["/scripts/respaldo.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-plurione}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-lead_scoring_db}
+      RETENCION_DIAS: ${RETENCION_DIAS:-14}
+    volumes:
+      - ./backup:/scripts:ro
+      - pgrespaldos:/respaldos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  # Restaura el volcado más reciente en una base desechable y compara los recuentos con la
+  # base real. Es lo que separa «tenemos copias» de «tenemos copias que sirven».
+  prueba-de-restauracion:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: plurione_leadscoring_prueba_restauracion
+    profiles: ["respaldo"]
+    restart: "no"
+    entrypoint: ["/bin/sh"]
+    command: ["/scripts/prueba_de_restauracion.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-plurione}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-lead_scoring_db}
+    volumes:
+      - ./backup:/scripts:ro
+      - pgrespaldos:/respaldos:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+  # La operación destructiva. Exige el archivo exacto y una confirmación explícita; el
+  # script no continúa sin las dos.
+  restaurar:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: plurione_leadscoring_restaurar
+    profiles: ["respaldo"]
+    restart: "no"
+    entrypoint: ["/bin/sh"]
+    command: ["/scripts/restaurar.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-plurione}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-lead_scoring_db}
+      VOLCADO: ${VOLCADO:-}
+      CONFIRMO_SOBRESCRIBIR: ${CONFIRMO_SOBRESCRIBIR:-}
+    volumes:
+      - ./backup:/scripts:ro
+      - pgrespaldos:/respaldos:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - plurione_network
+
+volumes:
+  # Estado de las alertas de deriva y ultimo informe. Sobrevive a los reinicios del
+  # contenedor para que la misma deriva no vuelva a avisar cada vez que el servicio
+  # arranca.
+  deriva:
+    driver: local
+
+  pgdata:
+    driver: local
+  # Volumen aparte para las copias. Separado de `pgdata` a propósito: un `docker compose
+  # down -v` para reinicializar la base no debe llevarse por delante los respaldos, y
+  # tenerlos en el mismo volumen que protegen es la definición de no tener respaldos.
+  #
+  # Aun así siguen en el MISMO disco que el original, de modo que protegen de un borrado
+  # accidental o de una migración que salió mal, no de que se muera el disco. Sacarlos de
+  # esta máquina es un paso de operación y está anotado en el README.
+  pgrespaldos:
+    driver: local
+
+networks:
+  plurione_network:
+    driver: bridge

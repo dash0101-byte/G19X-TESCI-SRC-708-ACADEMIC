@@ -1,0 +1,50 @@
+# ==============================================================================
+# Contexto de build del frontend — todo lo listado aquí NUNCA entra en la imagen
+# ==============================================================================
+
+# Dependencias y salidas intermedias
+node_modules/
+build/
+.vite/
+.cache/
+coverage/
+
+# `dist/` NO se excluye, a propósito. El destino `desde-artefacto` del Dockerfile lo
+# copia del contexto: es el bundle que el pipeline ya compiló, probó y publicó como
+# artefacto, y meter ESE en la imagen —en vez de compilar uno nuevo— es lo que hace que
+# lo verificado y lo desplegado sean el mismo archivo (N-17). El destino por defecto,
+# que sí compila, hace `rm -rf dist` antes de `npm run build` para que un `dist/` viejo
+# del portátil no pueda colarse.
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Control de versiones y CI
+.git/
+.gitignore
+.github/
+
+# IDE / SO
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs y cobertura
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+coverage/
+
+# Contenedores
+Dockerfile
+.dockerignore

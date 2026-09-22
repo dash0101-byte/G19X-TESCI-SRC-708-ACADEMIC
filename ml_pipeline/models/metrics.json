@@ -1,0 +1,55 @@
+{
+  "roc_auc": 0.946904,
+  "roc_auc_ic95": {
+    "inferior": 0.9275,
+    "superior": 0.9635,
+    "remuestreos_validos": 2000
+  },
+  "delta_sobre_heuristico_ic95": {
+    "inferior": 0.0296,
+    "superior": 0.0761,
+    "remuestreos_validos": 2000
+  },
+  "f1": 0.840517,
+  "accuracy": 0.876667,
+  "brier": 0.087197,
+  "auc_threshold": 0.82,
+  "min_delta_sobre_heuristico": 0.01,
+  "passed_auc": true,
+  "passed_delta": true,
+  "passed": true,
+  "publicable": true,
+  "motivo_no_publicable": null,
+  "publicado": true,
+  "lineas_base": {
+    "azar": 0.5,
+    "regla_trivial": {
+      "variable": "days_since_last_activity",
+      "roc_auc": 0.905325
+    },
+    "heuristico_icp": 0.894993,
+    "modelo": 0.946904,
+    "delta_sobre_heuristico": 0.051911,
+    "delta_sobre_regla_trivial": 0.041579
+  },
+  "version_del_vector": 2,
+  "origen_de_los_datos": "sinteticos",
+  "huella_datos_sha256": "a4a84ad4fc727c7d3406e6ff9bd3c822c610831c24e0271843e80bdde650dff3",
+  "filas_totales": 3000,
+  "filas_entrenamiento": 2400,
+  "filas_prueba": 600,
+  "procedencia": {
+    "generador": "synthetic_generator.generate_synthetic_leads_dataset",
+    "semilla": 42,
+    "filas_generadas": 3000
+  },
+  "naturaleza_de_los_datos": "sinteticos: la etiqueta `converted` se genera con una formula conocida a partir de las propias variables mas ruido gaussiano. Estas metricas verifican la INTEGRIDAD DEL PIPELINE (que las variables llegan, que el preprocesado no las corrompe, que la calibracion funciona), no el rendimiento esperable en produccion, que solo puede medirse con conversiones reales.",
+  "entorno": {
+    "python": "3.13.15",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "joblib": "1.6.0"
+  },
+  "model_sha256": "98ed8bd179414ea724102600fffcc5db4adeb753e15161eea5c3df80e49d2a63"
+}

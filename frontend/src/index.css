@@ -1,0 +1,432 @@
+@import "./fuentes.css";
+
+:root {
+  /* Paleta Corporativa Minimalista Formal (Executive Obsidian & Slate) */
+  --bg-base: #090a0f;
+  --bg-surface: #10131a;
+  --bg-surface-elevated: #151922;
+  --bg-surface-hover: #1c212d;
+  --bg-subtle: rgba(255, 255, 255, 0.025);
+  
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(255, 255, 255, 0.35);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  /* Acentos de Marca Sobrios y Minimalistas (Monochrome High-Contrast) */
+  --color-primary: #ffffff;
+  --color-primary-hover: #e2e8f0;
+  --color-primary-text: #090a0f;
+  --color-primary-subtle: rgba(255, 255, 255, 0.05);
+  
+  /* Cuadrantes de Scoring Formales y Muted (B2B Enterprise) */
+  --hot-bg: rgba(244, 63, 94, 0.08);
+  --hot-border: rgba(244, 63, 94, 0.22);
+  --hot-text: #f87171;
+  --hot-dot: #ef4444;
+
+  --warm-bg: rgba(245, 158, 11, 0.08);
+  --warm-border: rgba(245, 158, 11, 0.22);
+  --warm-text: #fbbf24;
+  --warm-dot: #f59e0b;
+
+  --cold-bg: rgba(148, 163, 184, 0.08);
+  --cold-border: rgba(148, 163, 184, 0.20);
+  --cold-text: #94a3b8;
+  --cold-dot: #64748b;
+
+  --success-text: #34d399;
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.22);
+
+  /* Los nombres son los de las familias variables autoalojadas (ver fuentes.css).
+     Antes ponía 'Inter' y 'JetBrains Mono' a secas: la primera no se descargaba en
+     ningún sitio y la segunda venía de Google, que la CSP bloquea. La lista de
+     reserva se conserva para el intervalo previo a que llegue el .woff2. */
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* Tipografía */
+h1, h2, h3, h4, h5 {
+  color: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Tarjetas y Paneles Minimalistas */
+.glass-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.glass-panel:hover {
+  border-color: var(--border-medium);
+}
+
+/* Badges y Etiquetas */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.725rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-hot {
+  background: var(--hot-bg);
+  border: 1px solid var(--hot-border);
+  color: var(--hot-text);
+}
+
+.badge-warm {
+  background: var(--warm-bg);
+  border: 1px solid var(--warm-border);
+  color: var(--warm-text);
+}
+
+.badge-cold {
+  background: var(--cold-bg);
+  border: 1px solid var(--cold-border);
+  color: var(--cold-text);
+}
+
+.badge-status {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* Botones */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  text-decoration: none;
+  line-height: 1.25;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-text);
+  border-color: #ffffff;
+}
+
+.btn-secondary {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.75rem;
+}
+
+/* Inputs y Formularios */
+.input-field {
+  width: 100%;
+  background: #0b0d14;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.input-field:focus {
+  border-color: var(--border-focus);
+  background: #11141e;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* Tablas de Datos */
+.data-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+
+.data-table th {
+  padding: 10px 14px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+
+.data-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.data-table tr:hover td {
+  background-color: var(--bg-subtle);
+}
+
+/* Modales */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  max-width: 760px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-medium);
+}
+
+/* ==========================================================================
+   Página de interés (pública): un formulario de treinta segundos en un teléfono
+   ========================================================================== */
+/* Una sola columna. Los campos a 16 px de letra: por debajo, Safari en iPhone amplía la
+   página al tocar el campo y la persona tiene que volver a alejarla. */
+.interes-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.interes-formulario .input-field {
+  font-size: 16px;
+  min-height: 44px;
+}
+.interes-formulario .form-label {
+  margin-bottom: 2px;
+}
+.interes-descripcion {
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+.interes-descripcion.recortada {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.interes-leer-mas {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.interes-pareja {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+.interes-error {
+  color: var(--hot-text);
+  font-size: 0.8rem;
+  margin-top: 3px;
+}
+.interes-aviso {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--hot-text);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+.interes-ayuda {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* «¿Qué necesitas?»: radios nativos con aspecto de botón, dos por fila. El radio queda
+   encima del botón, transparente: sigue recibiendo el foco y las flechas del teclado. */
+.interes-necesidades {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.interes-botones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.interes-boton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: #0b0d14;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.interes-boton input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.interes-boton.elegido {
+  border-color: var(--color-primary);
+  color: var(--text-primary);
+  background: #161b2b;
+  font-weight: 600;
+}
+.interes-boton:has(input:focus-visible) {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.interes-mas summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 6px 0;
+}
+.interes-aviso-privacidad {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.interes-aviso-privacidad input {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.interes-enviar {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Texto solo para lectores de pantalla: una etiqueta que la vista no necesita. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

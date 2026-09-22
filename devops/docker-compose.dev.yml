@@ -1,0 +1,52 @@
+# ==============================================================================
+# OVERLAY DE DESARROLLO — herramientas que NO deben existir en producción
+# ==============================================================================
+#   python devops/pila.py --dev up -d
+#
+# Añade dos cosas al stack base:
+#   * pgAdmin, la consola web de administración de la base de datos.
+#   * Un túnel que publica el puerto de Postgres, solo en 127.0.0.1.
+#
+# Ambas exigen credenciales propias en el archivo de entorno de la pila (fuera del
+# repositorio, ver `devops/pila.py`); no hay valores por defecto. La versión anterior
+# levantaba pgAdmin siempre, accesible en el puerto 5050 de cualquier interfaz, con
+# `admin@plurione.com` / `admin` escritas en el propio archivo: quien llegara a ese puerto
+# obtenía una consola SQL con permisos totales sobre la base.
+#
+# Las dos imágenes siguen `latest` y aun así van fijadas por huella (capítulo 22): son
+# herramientas de desarrollo sin versión que importe, pero lo que se descarga en un
+# portátil tampoco debe cambiar solo. `scripts/renovar_imagenes.py` las renueva con el resto.
+# ==============================================================================
+
+services:
+  # Publica Postgres únicamente en el bucle local del anfitrión. Se hace con un túnel
+  # aparte en vez de añadir `ports:` al servicio `postgres` para que la definición de la
+  # base de datos sea idéntica en desarrollo y en producción.
+  postgres-expose:
+    image: alpine/socat:latest@sha256:c5a091e1e735a90aa941a5828529dbe6c6157407a8047a9aa473faa133361b82
+    container_name: plurione_pg_tunel_dev
+    restart: unless-stopped
+    command: tcp-listen:5432,fork,reuseaddr tcp-connect:postgres:5432
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - plurione_network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest@sha256:2f4ce946ddf8360680d7eff4eaba1d91859eb6b4003e6623bad5c63a322c2f4d
+    container_name: plurione_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:?defina PGADMIN_EMAIL en el archivo de entorno de la pila}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?defina PGADMIN_PASSWORD en el archivo de entorno de la pila (contraseña fuerte, no reutilizada)}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - plurione_network

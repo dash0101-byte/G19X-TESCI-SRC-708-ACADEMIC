@@ -1,0 +1,208 @@
+[
+  {
+    "registrado_en": "2026-09-09T16:36:00.437859+00:00",
+    "model_sha256": "0a2632a2f496fd188e610aecf3f6452154916a1bed7781b65370d2d9401925fd",
+    "roc_auc": 0.952394,
+    "delta_sobre_heuristico": 0.041411,
+    "passed": true,
+    "filas_entrenamiento": 2400,
+    "columnas": [
+      "job_title",
+      "industry",
+      "company_size",
+      "annual_revenue",
+      "source_channel",
+      "page_views",
+      "email_opens",
+      "email_clicks",
+      "content_downloads",
+      "attended_webinar",
+      "requested_demo",
+      "meeting_scheduled",
+      "proposal_sent",
+      "phone_calls",
+      "whatsapp_messages",
+      "days_since_last_activity"
+    ],
+    "huella_datos_sha256": null,
+    "origen_de_los_datos": "sinteticos"
+  },
+  {
+    "registrado_en": "2026-09-10T20:19:09.421076+00:00",
+    "model_sha256": "0a2632a2f496fd188e610aecf3f6452154916a1bed7781b65370d2d9401925fd",
+    "roc_auc": 0.952394,
+    "delta_sobre_heuristico": 0.041411,
+    "passed": true,
+    "filas_entrenamiento": 2400,
+    "columnas": [
+      "job_title",
+      "industry",
+      "company_size",
+      "annual_revenue",
+      "source_channel",
+      "page_views",
+      "email_opens",
+      "email_clicks",
+      "content_downloads",
+      "attended_webinar",
+      "requested_demo",
+      "meeting_scheduled",
+      "proposal_sent",
+      "phone_calls",
+      "whatsapp_messages",
+      "days_since_last_activity"
+    ],
+    "huella_datos_sha256": "cd42cf4f04961d23828b0dde0d42b8b8d898a3bb80c4aab55d9cdb6e6328a410",
+    "origen_de_los_datos": "sinteticos",
+    "publicado": true,
+    "roc_auc_ic95": {
+      "inferior": 0.9354,
+      "superior": 0.9681,
+      "remuestreos_validos": 2000
+    },
+    "procedencia": {
+      "generador": "synthetic_generator.generate_synthetic_leads_dataset",
+      "semilla": 42,
+      "filas_generadas": 3000
+    }
+  },
+  {
+    "registrado_en": "2026-09-10T23:00:33.606140+00:00",
+    "model_sha256": "0a2632a2f496fd188e610aecf3f6452154916a1bed7781b65370d2d9401925fd",
+    "roc_auc": 0.952394,
+    "delta_sobre_heuristico": 0.041411,
+    "passed": true,
+    "filas_entrenamiento": 2400,
+    "columnas": [
+      "job_title",
+      "industry",
+      "company_size",
+      "annual_revenue",
+      "source_channel",
+      "page_views",
+      "email_opens",
+      "email_clicks",
+      "content_downloads",
+      "attended_webinar",
+      "requested_demo",
+      "meeting_scheduled",
+      "proposal_sent",
+      "phone_calls",
+      "whatsapp_messages",
+      "days_since_last_activity"
+    ],
+    "huella_datos_sha256": "cd42cf4f04961d23828b0dde0d42b8b8d898a3bb80c4aab55d9cdb6e6328a410",
+    "origen_de_los_datos": "sinteticos",
+    "publicado": true,
+    "roc_auc_ic95": {
+      "inferior": 0.9354,
+      "superior": 0.9681,
+      "remuestreos_validos": 2000
+    },
+    "procedencia": {
+      "generador": "synthetic_generator.generate_synthetic_leads_dataset",
+      "semilla": 42,
+      "filas_generadas": 3000
+    }
+  },
+  {
+    "registrado_en": "2026-09-11T01:59:46.445282+00:00",
+    "model_sha256": "372d843ebe72ab27f40b6839d57d702eda87891c6c97a69b0ae3b0012ef2fabd",
+    "roc_auc": 0.952394,
+    "delta_sobre_heuristico": 0.041411,
+    "passed": true,
+    "filas_entrenamiento": 2400,
+    "columnas": [
+      "job_title",
+      "industry",
+      "company_size",
+      "annual_revenue",
+      "source_channel",
+      "page_views",
+      "email_opens",
+      "email_clicks",
+      "content_downloads",
+      "attended_webinar",
+      "requested_demo",
+      "meeting_scheduled",
+      "proposal_sent",
+      "phone_calls",
+      "whatsapp_messages",
+      "days_since_last_activity"
+    ],
+    "huella_datos_sha256": "cd42cf4f04961d23828b0dde0d42b8b8d898a3bb80c4aab55d9cdb6e6328a410",
+    "origen_de_los_datos": "sinteticos",
+    "publicado": true,
+    "roc_auc_ic95": {
+      "inferior": 0.9354,
+      "superior": 0.9681,
+      "remuestreos_validos": 2000
+    },
+    "procedencia": {
+      "generador": "synthetic_generator.generate_synthetic_leads_dataset",
+      "semilla": 42,
+      "filas_generadas": 3000
+    },
+    "entorno": {
+      "python": "3.13.15",
+      "scikit-learn": "1.9.1",
+      "numpy": "2.5.3",
+      "pandas": "3.0.5",
+      "joblib": "1.6.0"
+    }
+  },
+  {
+    "registrado_en": "2026-09-17T01:33:47.631347+00:00",
+    "model_sha256": "98ed8bd179414ea724102600fffcc5db4adeb753e15161eea5c3df80e49d2a63",
+    "roc_auc": 0.946904,
+    "delta_sobre_heuristico": 0.051911,
+    "passed": true,
+    "filas_entrenamiento": 2400,
+    "columnas": [
+      "job_title",
+      "industry",
+      "company_size",
+      "annual_revenue",
+      "source_channel",
+      "page_views",
+      "email_opens",
+      "email_clicks",
+      "content_downloads",
+      "attended_webinar",
+      "requested_demo",
+      "meeting_scheduled",
+      "proposal_sent",
+      "phone_calls_connected",
+      "phone_calls_unanswered",
+      "whatsapp_messages",
+      "linkedin_messages",
+      "days_since_last_activity"
+    ],
+    "huella_datos_sha256": "a4a84ad4fc727c7d3406e6ff9bd3c822c610831c24e0271843e80bdde650dff3",
+    "origen_de_los_datos": "sinteticos",
+    "publicado": true,
+    "roc_auc_ic95": {
+      "inferior": 0.9275,
+      "superior": 0.9635,
+      "remuestreos_validos": 2000
+    },
+    "delta_sobre_heuristico_ic95": {
+      "inferior": 0.0296,
+      "superior": 0.0761,
+      "remuestreos_validos": 2000
+    },
+    "version_del_vector": 2,
+    "procedencia": {
+      "generador": "synthetic_generator.generate_synthetic_leads_dataset",
+      "semilla": 42,
+      "filas_generadas": 3000
+    },
+    "entorno": {
+      "python": "3.13.15",
+      "scikit-learn": "1.9.1",
+      "numpy": "2.5.3",
+      "pandas": "3.0.5",
+      "joblib": "1.6.0"
+    }
+  }
+]

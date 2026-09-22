@@ -1,0 +1,625 @@
+// ============================================================================
+// El módulo de sesión (N-9)
+// ============================================================================
+//
+// Es la parte del cliente donde un fallo no se ve: un refresco de más no rompe la
+// pantalla, solo multiplica peticiones; una sesión que revive tras cerrarla tampoco
+// avisa. Por eso se prueba primero, y por eso las pruebas miran las llamadas que se
+// hacen, no solo lo que devuelve la función.
+//
+// Cada `it` importa el módulo de nuevo con `vi.resetModules()`: el token vive en una
+// variable de módulo, así que sin eso la sesión de una prueba se filtraría a la
+// siguiente y el orden de ejecución cambiaría el resultado.
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const USUARIO = {
+  id: 1,
+  email: 'ana@plurione.test',
+  role: 'Sales_Lead',
+  full_name: 'Ana Ruiz',
+};
+
+/** Carga una instancia limpia del módulo. */
+async function moduloLimpio() {
+  vi.resetModules();
+  return import('./api.js');
+}
+
+/** Construye una respuesta como la que devuelve `fetch`. */
+function respuesta(status, cuerpo) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => cuerpo,
+  };
+}
+
+/**
+ * Un `fetch` de mentira gobernado por una tabla de rutas.
+ *
+ * Cada entrada puede ser una respuesta fija o una función que recibe el número de
+ * llamada, para poder decir «el primer intento falla y el segundo funciona».
+ */
+function fetchSimulado(rutas) {
+  const llamadas = [];
+  const cuentas = {};
+  const fn = vi.fn(async (url, opciones = {}) => {
+    llamadas.push({ url, opciones });
+    const clave = Object.keys(rutas).find((r) => url.includes(r));
+    if (!clave) throw new Error(`Ruta no prevista en la prueba: ${url}`);
+    cuentas[clave] = (cuentas[clave] || 0) + 1;
+    const valor = rutas[clave];
+    return typeof valor === 'function' ? valor(cuentas[clave], opciones) : valor;
+  });
+  fn.llamadas = llamadas;
+  fn.vecesDe = (ruta) => llamadas.filter((l) => l.url.includes(ruta)).length;
+  globalThis.fetch = fn;
+  return fn;
+}
+
+let api;
+
+beforeEach(async () => {
+  api = await moduloLimpio();
+});
+
+// ----------------------------------------------------------------- almacenamiento
+describe('dónde vive el token', () => {
+  it('no escribe nada en localStorage ni en sessionStorage al iniciar sesión', async () => {
+    const escrituras = [];
+    for (const almacen of [globalThis.localStorage, globalThis.sessionStorage]) {
+      vi.spyOn(almacen, 'setItem').mockImplementation((k, v) => escrituras.push([k, v]));
+    }
+    fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'tk-1', user: USUARIO }),
+    });
+
+    await api.login('ana@plurione.test', 'secreta');
+
+    // Es la propiedad que sostiene toda la decisión de la Fase 3: un XSS puede leer
+    // esos almacenes, y lo que hay allí sobrevive al cierre de la pestaña.
+    expect(escrituras).toEqual([]);
+    expect(api.isAuthenticated()).toBe(true);
+  });
+
+  it('el token acompaña a la petición pero no es legible desde fuera del módulo', async () => {
+    const f = fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'tk-secreta', user: USUARIO }),
+      '/leads': respuesta(200, []),
+    });
+    await api.login('ana@plurione.test', 'secreta');
+    await api.fetchLeads();
+
+    const cabeceras = f.llamadas.at(-1).opciones.headers;
+    expect(cabeceras.Authorization).toBe('Bearer tk-secreta');
+    // El módulo no exporta ninguna forma de leerlo.
+    expect(Object.keys(api)).not.toContain('accessToken');
+    expect(Object.keys(api)).not.toContain('getAccessToken');
+  });
+
+  it('todas las llamadas viajan con credentials para que la cookie de refresco vaya y vuelva', async () => {
+    const f = fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'tk', user: USUARIO }),
+      '/leads': respuesta(200, []),
+    });
+    await api.login('a@b.c', 'x');
+    await api.fetchLeads();
+
+    for (const llamada of f.llamadas) {
+      expect(llamada.opciones.credentials).toBe('same-origin');
+    }
+  });
+});
+
+// ----------------------------------------------------------------- 401 y reintento
+describe('401 y renovación', () => {
+  it('renueva el token y reintenta la petición una vez', async () => {
+    const f = fetchSimulado({
+      '/auth/refresh': respuesta(200, { access_token: 'tk-nuevo', user: USUARIO }),
+      '/leads': (n) => (n === 1 ? respuesta(401, {}) : respuesta(200, [{ id: 7 }])),
+    });
+
+    const leads = await api.fetchLeads();
+
+    expect(leads).toEqual([{ id: 7 }]);
+    expect(f.vecesDe('/auth/refresh')).toBe(1);
+    expect(f.vecesDe('/leads')).toBe(2);
+    // El reintento debe llevar el token NUEVO, no el que acababa de ser rechazado.
+    const reintento = f.llamadas.at(-1);
+    expect(reintento.opciones.headers.Authorization).toBe('Bearer tk-nuevo');
+  });
+
+  it('no reintenta indefinidamente: si el segundo intento vuelve a dar 401, la sesión expira', async () => {
+    const expirada = vi.fn();
+    api.setSessionExpiredHandler(expirada);
+    const f = fetchSimulado({
+      '/auth/refresh': respuesta(200, { access_token: 'tk-nuevo', user: USUARIO }),
+      '/leads': respuesta(401, {}),
+    });
+
+    await expect(api.fetchLeads()).rejects.toThrow(/sesión ha expirado/i);
+
+    expect(f.vecesDe('/leads')).toBe(2);
+    expect(expirada).toHaveBeenCalledTimes(1);
+    expect(api.isAuthenticated()).toBe(false);
+    expect(api.getCurrentUser()).toBeNull();
+  });
+
+  it('si el propio refresco falla, no se reintenta la petición y la sesión se cierra', async () => {
+    const expirada = vi.fn();
+    api.setSessionExpiredHandler(expirada);
+    const f = fetchSimulado({
+      '/auth/refresh': respuesta(401, {}),
+      '/leads': respuesta(401, {}),
+    });
+
+    await expect(api.fetchLeads()).rejects.toThrow(/sesión ha expirado/i);
+
+    // Una sola llamada al listado: sin token nuevo, repetirla solo añade ruido.
+    expect(f.vecesDe('/leads')).toBe(1);
+    expect(expirada).toHaveBeenCalledTimes(1);
+  });
+
+  it('un refresco que revienta por red se trata como refresco fallido, no como excepción', async () => {
+    api.setSessionExpiredHandler(vi.fn());
+    fetchSimulado({
+      '/auth/refresh': () => {
+        throw new TypeError('Failed to fetch');
+      },
+      '/leads': respuesta(401, {}),
+    });
+
+    // Lo que llega a quien llama es el mensaje de sesión, no un `TypeError` crudo.
+    await expect(api.fetchLeads()).rejects.toThrow(/sesión ha expirado/i);
+  });
+
+  it('un 403 no dispara renovación: el token es válido, lo que falta es permiso', async () => {
+    const f = fetchSimulado({
+      '/users': respuesta(403, { detail: 'Requiere rol ADMIN' }),
+    });
+
+    await expect(api.fetchUsers()).rejects.toThrow('Requiere rol ADMIN');
+    expect(f.vecesDe('/auth/refresh')).toBe(0);
+  });
+});
+
+// ----------------------------------------------------------------- concurrencia
+describe('refresco concurrente', () => {
+  it('cinco peticiones que reciben 401 a la vez comparten un único refresco', async () => {
+    let resolverRefresco;
+    const refrescoPendiente = new Promise((r) => {
+      resolverRefresco = r;
+    });
+
+    const f = fetchSimulado({
+      '/auth/refresh': async () => {
+        await refrescoPendiente;
+        return respuesta(200, { access_token: 'tk-nuevo', user: USUARIO });
+      },
+      '/leads': (n) => (n <= 5 ? respuesta(401, {}) : respuesta(200, [])),
+      '/analytics/summary': (n) => (n <= 1 ? respuesta(401, {}) : respuesta(200, {})),
+    });
+
+    const enVuelo = [
+      api.fetchLeads(),
+      api.fetchLeads(),
+      api.fetchLeads(),
+      api.fetchLeads(),
+      api.fetchLeads(),
+      api.fetchAnalyticsSummary(),
+    ];
+    // Se deja avanzar la cola de microtareas para que las seis lleguen al 401.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    resolverRefresco();
+    await Promise.all(enVuelo);
+
+    // UNA renovación, no seis. Sin la promesa compartida, cada 401 abriría la suya y el
+    // backend recibiría una tormenta de refrescos por cada caducidad del token.
+    expect(f.vecesDe('/auth/refresh')).toBe(1);
+  });
+
+  it('tras completarse un refresco, un 401 posterior puede pedir otro', async () => {
+    const f = fetchSimulado({
+      '/auth/refresh': (n) => respuesta(200, { access_token: `tk-${n}`, user: USUARIO }),
+      '/leads': (n) => (n % 2 === 1 ? respuesta(401, {}) : respuesta(200, [])),
+    });
+
+    await api.fetchLeads();
+    // La promesa compartida se libera en el siguiente tick; sin esta espera la segunda
+    // tanda reutilizaría la primera y el token nunca se renovaría de nuevo.
+    await new Promise((r) => setTimeout(r, 0));
+    await api.fetchLeads();
+
+    expect(f.vecesDe('/auth/refresh')).toBe(2);
+  });
+});
+
+// ----------------------------------------------------------------- restaurar y salir
+describe('restaurar la sesión y cerrarla', () => {
+  it('restoreSession devuelve el usuario cuando la cookie sigue siendo válida', async () => {
+    fetchSimulado({
+      '/auth/refresh': respuesta(200, { access_token: 'tk', user: USUARIO }),
+    });
+
+    await expect(api.restoreSession()).resolves.toEqual(USUARIO);
+    expect(api.getCurrentUserRole()).toBe('Sales_Lead');
+  });
+
+  it('restoreSession devuelve null sin cookie, y no deja media sesión montada', async () => {
+    fetchSimulado({ '/auth/refresh': respuesta(401, {}) });
+
+    await expect(api.restoreSession()).resolves.toBeNull();
+    expect(api.isAuthenticated()).toBe(false);
+    expect(api.getCurrentUserRole()).toBeNull();
+  });
+
+  it('logout limpia la sesión aunque la llamada al servidor falle', async () => {
+    fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'tk', user: USUARIO }),
+      '/auth/logout': () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    await api.login('a@b.c', 'x');
+
+    await api.logout();
+
+    // Quien pulsa «salir» ha decidido salir. Que el servidor no conteste no puede
+    // dejar el token vivo en la pestaña.
+    expect(api.isAuthenticated()).toBe(false);
+    expect(api.getCurrentUser()).toBeNull();
+  });
+
+  it('logout sin sesión activa no llama al servidor', async () => {
+    const f = fetchSimulado({ '/auth/logout': respuesta(204, null) });
+    await api.logout();
+    expect(f.vecesDe('/auth/logout')).toBe(0);
+  });
+
+  it('tras cerrar sesión, la renovación vuelve a funcionar en la sesión siguiente', async () => {
+    // Este caso lo encontró la comprobación de que ninguna prueba es vacía: quitar la
+    // línea que descarta la renovación en curso al cerrar sesión no hacía fallar NADA.
+    //
+    // El detalle: la promesa compartida se libera en un `setTimeout` que solo actúa si
+    // la sesión sigue siendo la misma. Si al cerrar sesión no se descarta a mano, ese
+    // temporizador ya no la libera nunca —la época cambió—, y queda pegada una promesa
+    // ya resuelta a `false`. A partir de ahí, cada 401 la reutiliza y da por fallada la
+    // renovación sin llegar a pedirla: la sesión nueva se cae a los cinco minutos, al
+    // caducar su primer token, y no hay forma de seguir trabajando sin recargar.
+    let resolverPrimera;
+    const f = fetchSimulado({
+      '/auth/login': (n) => respuesta(200, { access_token: `tk-${n}`, user: USUARIO }),
+      '/auth/logout': respuesta(204, null),
+      '/auth/refresh': (n) =>
+        n === 1
+          ? new Promise((r) => {
+              resolverPrimera = () => r(respuesta(401, {}));
+            })
+          : respuesta(200, { access_token: 'tk-renovado', user: USUARIO }),
+      // Un 401 en cada sesión: el primero abre la renovación que se queda colgada, y el
+      // segundo —ya en la sesión nueva— es el que tiene que provocar una renovación
+      // NUEVA. El tercero es el reintento, que ya funciona.
+      '/leads': (n) => (n <= 2 ? respuesta(401, {}) : respuesta(200, [])),
+    });
+
+    await api.login('a@b.c', 'x');
+    api.setSessionExpiredHandler(vi.fn());
+
+    // Un 401 abre la renovación...
+    const enVuelo = api.fetchLeads().catch(() => {});
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // ...y en mitad de ella, la persona cierra sesión y vuelve a entrar.
+    await api.logout();
+    resolverPrimera();
+    await enVuelo;
+    await new Promise((r) => setTimeout(r, 0));
+
+    await api.login('a@b.c', 'x');
+    f.llamadas.length = 0;
+
+    // El 401 de la sesión NUEVA tiene que pedir una renovación nueva.
+    await api.fetchLeads();
+
+    expect(f.vecesDe('/auth/refresh')).toBe(1);
+    expect(api.isAuthenticated()).toBe(true);
+  });
+
+  it('un refresco en vuelo no puede resucitar una sesión ya cerrada', async () => {
+    let resolverRefresco;
+    const refrescoPendiente = new Promise((r) => {
+      resolverRefresco = r;
+    });
+    fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'tk-viejo', user: USUARIO }),
+      '/auth/logout': respuesta(204, null),
+      '/auth/refresh': async () => {
+        await refrescoPendiente;
+        return respuesta(200, { access_token: 'tk-renovado', user: USUARIO });
+      },
+      // El primer intento da 401 y el reintento posterior al refresco SI funciona. Es
+      // importante: si el reintento tambien diera 401, el propio apiFetch volveria a
+      // limpiar la sesion y la prueba pasaria sin haber comprobado nada.
+      '/leads': (n) => (n === 1 ? respuesta(401, {}) : respuesta(200, [])),
+    });
+
+    await api.login('a@b.c', 'x');
+    api.setSessionExpiredHandler(vi.fn());
+
+    // Una petición tropieza con un 401 y arranca la renovación...
+    const enVuelo = api.fetchLeads().catch(() => {});
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // ...y mientras esa renovación sigue en el aire, la persona cierra sesión.
+    await api.logout();
+    expect(api.isAuthenticated()).toBe(false);
+
+    // El refresco termina DESPUÉS del logout.
+    resolverRefresco();
+    await enVuelo;
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Si el refresco escribiera el token sin mirar, la pestaña volvería a estar dentro
+    // sin que nadie haya vuelto a entrar: la sesión se cerró y sigue cerrada.
+    expect(api.isAuthenticated()).toBe(false);
+    expect(api.getCurrentUser()).toBeNull();
+  });
+});
+
+// ----------------------------------------------------------------- errores
+describe('traducción de errores de la API', () => {
+  it('un detalle de texto llega tal cual', async () => {
+    fetchSimulado({ '/leads': respuesta(400, { detail: 'Correo ya registrado' }) });
+    await expect(api.fetchLeads()).rejects.toThrow('Correo ya registrado');
+  });
+
+  it('los errores de validación de Pydantic se leen campo a campo', async () => {
+    fetchSimulado({
+      '/leads': respuesta(422, {
+        detail: [
+          { loc: ['body', 'email'], msg: 'no es un correo válido' },
+          { loc: ['body', 'company_size'], msg: 'debe ser mayor que 0' },
+        ],
+      }),
+    });
+    await expect(api.createLead({})).rejects.toThrow(
+      'email: no es un correo válido\ncompany_size: debe ser mayor que 0',
+    );
+  });
+
+  it('«Value error,» no llega a la pantalla: es el nombre de la excepción, no el mensaje', async () => {
+    fetchSimulado({
+      '/interes/abc123': respuesta(422, {
+        detail: [
+          {
+            loc: ['body', 'linkedin'],
+            msg: 'Value error, El perfil tiene que ser una dirección de LinkedIn como https://www.linkedin.com/in/su-perfil',
+          },
+        ],
+      }),
+    });
+    await expect(api.enviarInteres('abc123', {})).rejects.toThrow(
+      'linkedin: El perfil tiene que ser una dirección de LinkedIn como https://www.linkedin.com/in/su-perfil',
+    );
+  });
+
+  it('el 409 del recálculo masivo muestra el mensaje y conserva el detalle', async () => {
+    const detalle = {
+      mensaje: 'Ya hay un recálculo masivo en curso.',
+      job_id: 'abc-123',
+      estado: 'RUNNING',
+      procesados: 40,
+      total: 120,
+      solicitado_por: 'ana@plurione.test',
+    };
+    fetchSimulado({ '/batch/recalculate-all': respuesta(409, { detail: detalle }) });
+
+    const error = await api.recalculateAllScores().catch((e) => e);
+
+    // Antes se volcaba el objeto con JSON.stringify y en pantalla salía el JSON entero.
+    expect(error.message).toBe('Ya hay un recálculo masivo en curso.');
+    // Y el detalle sigue disponible para que la pantalla muestre el avance.
+    expect(error.status).toBe(409);
+    expect(error.detalle).toEqual(detalle);
+  });
+
+  it('un cuerpo que no es JSON no tapa el error con un fallo de parseo', async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError('Unexpected token < in JSON');
+      },
+    }));
+
+    const error = await api.fetchLeads().catch((e) => e);
+    expect(error.message).toBe('Error al cargar prospectos');
+    expect(error.status).toBe(502);
+  });
+
+  it('un 204 devuelve null en vez de reventar al leer un cuerpo vacío', async () => {
+    fetchSimulado({ '/campaigns': respuesta(204, null) });
+    await expect(api.deactivateCampaign(3)).resolves.toBeNull();
+  });
+});
+
+// ----------------------------------------------------------------- construcción de URLs
+describe('construcción de peticiones', () => {
+  it('los filtros del listado viajan como parámetros y se omiten los vacíos', async () => {
+    const f = fetchSimulado({ '/leads': respuesta(200, []) });
+    await api.fetchLeads({ category: 'HOT', search: 'acme s.a. & co', limit: 50, status: '' });
+
+    const url = f.llamadas[0].url;
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('score_category')).toBe('HOT');
+    expect(params.get('search')).toBe('acme s.a. & co');
+    expect(params.get('limit')).toBe('50');
+    expect(params.has('status')).toBe(false);
+  });
+
+  it('el rol se escapa al cambiarlo, para que no se pueda inyectar otro parámetro', async () => {
+    const f = fetchSimulado({ '/users': respuesta(200, {}) });
+    await api.changeUserRole(4, 'ADMIN&forzar=1');
+
+    expect(f.llamadas[0].url).toContain('rol=ADMIN%26forzar%3D1');
+    expect(f.llamadas[0].url).not.toContain('&forzar=1');
+  });
+
+  it('las peticiones sin cuerpo no declaran Content-Type', async () => {
+    const f = fetchSimulado({ '/leads': respuesta(200, []) });
+    await api.fetchLeads();
+    expect(f.llamadas[0].opciones.headers['Content-Type']).toBeUndefined();
+  });
+});
+
+// ----------------------------------------------------------------- catálogo de rutas
+describe('el catálogo de endpoints', () => {
+  // Cada envoltorio de esta lista es una línea que nadie vuelve a mirar, y en la que un
+  // error —un plural de más, un PUT donde iba un POST— no se nota al escribirla: la
+  // llamada sale, el backend devuelve 404 o 405 y en pantalla aparece un mensaje
+  // genérico. Esta tabla fija el contrato del cliente con la API en un solo sitio.
+  const RUTAS = [
+    ['fetchAnalyticsSummary', [], 'GET', '/api/v1/analytics/summary'],
+    ['fetchCampaigns', [], 'GET', '/api/v1/analytics/campaigns'],
+    ['fetchLeadDetail', [7], 'GET', '/api/v1/leads/7'],
+    ['createLead', [{ email: 'a@b.c' }], 'POST', '/api/v1/leads'],
+    ['updateLead', [7, { status: 'WON' }], 'PUT', '/api/v1/leads/7'],
+    ['addLeadActivity', [7, { kind: 'CALL' }], 'POST', '/api/v1/leads/7/activities'],
+    ['recalculateLeadScore', [7], 'POST', '/api/v1/leads/7/recalculate-score'],
+    ['recalculateAllScores', [50], 'POST', '/api/v1/leads/batch/recalculate-all'],
+    ['getRecalculationJob', ['j-1'], 'GET', '/api/v1/leads/batch/jobs/j-1'],
+    ['predictScoreLive', [{ job_title: 'CTO' }], 'POST', '/api/v1/scoring/predict'],
+    ['fetchSalesReps', [], 'GET', '/api/v1/sales-reps'],
+    ['createUser', [{ email: 'a@b.c' }], 'POST', '/api/v1/users'],
+    ['updateUser', [3, { full_name: 'X' }], 'PUT', '/api/v1/users/3'],
+    ['deactivateUser', [3], 'DELETE', '/api/v1/users/3'],
+    ['activateUser', [3], 'POST', '/api/v1/users/3/activate'],
+    ['resetUserPassword', [3, 'nueva-frase-larga'], 'POST', '/api/v1/users/3/reset-password'],
+    ['changeOwnPassword', ['vieja', 'nueva'], 'POST', '/api/v1/auth/change-password'],
+    ['transferPortfolio', [7, 3], 'POST', '/api/v1/sales-reps/7/cartera'],
+    ['fetchCampaignList', [], 'GET', '/api/v1/campaigns'],
+    ['createCampaign', [{ name: 'Q4' }], 'POST', '/api/v1/campaigns'],
+    ['updateCampaign', [2, { name: 'Q1' }], 'PUT', '/api/v1/campaigns/2'],
+    ['deactivateCampaign', [2], 'DELETE', '/api/v1/campaigns/2'],
+    ['activateCampaign', [2], 'PUT', '/api/v1/campaigns/2'],
+    ['fetchInformeDePublicacion', [2], 'GET', '/api/v1/publicaciones/2/informe'],
+    ['fetchVistaPreviaDePublicacion', [2], 'GET', '/api/v1/publicaciones/2/vista-previa'],
+    ['duplicateCampaign', [2], 'POST', '/api/v1/campaigns/2/duplicar'],
+    ['cambiarEstadoDePublicacion', [2, 'pausada'], 'PUT', '/api/v1/campaigns/2'],
+    ['fetchComparativaDePublicaciones', [], 'GET', '/api/v1/publicaciones/comparativa'],
+    ['fetchNuevosSinAsesor', [], 'GET', '/api/v1/publicaciones/nuevos-sin-asesor'],
+    ['fetchPublicacionDeInteres', ['abc123'], 'GET', '/api/v1/interes/abc123'],
+    ['enviarInteres', ['abc123', { correo: 'a@b.c' }], 'POST', '/api/v1/interes/abc123'],
+    ['fetchEventosSinAsociar', [], 'GET', '/api/v1/eventos-sin-asociar'],
+    ['vincularEventoSinAsociar', [11, 7], 'POST', '/api/v1/eventos-sin-asociar/11/vincular'],
+    ['descartarEventoSinAsociar', [11], 'DELETE', '/api/v1/eventos-sin-asociar/11'],
+  ];
+
+  it.each(RUTAS)('%s → %s %s', async (nombre, argumentos, metodo, ruta) => {
+    const f = vi.fn(async () => respuesta(200, {}));
+    globalThis.fetch = f;
+
+    await api[nombre](...argumentos);
+
+    const [url, opciones] = f.mock.calls[0];
+    expect(url.split('?')[0]).toBe(ruta);
+    // `apiFetch` no pone `method` en las lecturas: `fetch` usa GET por defecto.
+    expect(opciones.method ?? 'GET').toBe(metodo);
+  });
+
+  it('los listados con «incluir inactivos» solo mandan el parámetro cuando se pide', async () => {
+    const f = fetchSimulado({ '/sales-reps': respuesta(200, []), '/campaigns': respuesta(200, []) });
+
+    await api.fetchSalesReps();
+    await api.fetchSalesReps({ incluirInactivos: true });
+    await api.fetchCampaignList();
+    await api.fetchCampaignList({ incluirInactivas: true });
+
+    const urls = f.llamadas.map((l) => l.url);
+    expect(urls[0]).not.toContain('incluir_inactivos');
+    expect(urls[1]).toContain('incluir_inactivos=true');
+    expect(urls[2]).not.toContain('incluir_inactivas');
+    expect(urls[3]).toContain('incluir_inactivas=true');
+  });
+
+  it('las publicaciones se piden por canal y reactivar solo manda el estado', async () => {
+    const f = fetchSimulado({ '/campaigns': () => respuesta(200, {}) });
+
+    await api.fetchCampaignList({ incluirInactivas: true, canal: 'LinkedIn' });
+    await api.activateCampaign(4);
+
+    expect(f.llamadas[0].url).toContain('incluir_inactivas=true');
+    expect(f.llamadas[0].url).toContain('canal=LinkedIn');
+    expect(JSON.parse(f.llamadas[1].opciones.body)).toEqual({ is_active: true });
+  });
+
+  it('cambiar el estado de una publicación solo manda el estado', async () => {
+    const f = fetchSimulado({ '/campaigns': () => respuesta(200, {}) });
+
+    await api.cambiarEstadoDePublicacion(4, 'pausada');
+
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({ estado: 'pausada' });
+  });
+
+  it('dos aperturas simultáneas de la página son una sola petición (y una visita)', async () => {
+    // En desarrollo React monta dos veces: sin esto cada apertura contaba dos visitas.
+    const f = fetchSimulado({ '/interes/abc123': () => respuesta(200, { titulo: 'X' }) });
+
+    const [a, b] = await Promise.all([api.fetchPublicacionDeInteres('abc123'), api.fetchPublicacionDeInteres('abc123')]);
+    expect(a).toEqual(b);
+    expect(f.vecesDe('/interes/abc123')).toBe(1);
+
+    // Una apertura posterior sí vuelve a pedir: es otra visita.
+    await api.fetchPublicacionDeInteres('abc123');
+    expect(f.vecesDe('/interes/abc123')).toBe(2);
+  });
+
+  it('una carga fallida de la página no se queda guardada', async () => {
+    const f = fetchSimulado({ '/interes/abc123': (n) => (n === 1 ? respuesta(429, { detail: 'Demasiadas' }) : respuesta(200, { titulo: 'X' })) });
+
+    await expect(api.fetchPublicacionDeInteres('abc123')).rejects.toThrow('Demasiadas');
+    await expect(api.fetchPublicacionDeInteres('abc123')).resolves.toEqual({ titulo: 'X' });
+    expect(f.vecesDe('/interes/abc123')).toBe(2);
+  });
+
+  it('el filtro de rol del listado de cuentas viaja como parámetro', async () => {
+    const f = fetchSimulado({ '/users': respuesta(200, []) });
+    await api.fetchUsers({ rol: 'System_Admin', incluirInactivos: true });
+    expect(f.llamadas[0].url).toContain('rol=System_Admin');
+    expect(f.llamadas[0].url).toContain('incluir_inactivos=true');
+  });
+
+  it('el recálculo masivo sin tamaño de lote manda un cuerpo vacío, no «undefined»', async () => {
+    const f = fetchSimulado({ '/batch/recalculate-all': respuesta(202, {}) });
+    await api.recalculateAllScores();
+    expect(f.llamadas[0].opciones.body).toBe('{}');
+  });
+
+  it('con tamaño de lote lo manda en el cuerpo', async () => {
+    const f = fetchSimulado({ '/batch/recalculate-all': respuesta(202, {}) });
+    await api.recalculateAllScores(25);
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({ batch_size: 25 });
+  });
+
+  it('el cambio de contraseña propia manda los nombres que espera el backend', async () => {
+    const f = fetchSimulado({ '/auth/change-password': respuesta(200, {}) });
+    await api.changeOwnPassword('la-vieja', 'la-nueva');
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({
+      contrasena_actual: 'la-vieja',
+      nueva_contrasena: 'la-nueva',
+    });
+  });
+
+  it('el restablecimiento por un administrador también', async () => {
+    const f = fetchSimulado({ '/reset-password': respuesta(200, {}) });
+    await api.resetUserPassword(3, 'una-frase-larga');
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({
+      nueva_contrasena: 'una-frase-larga',
+    });
+  });
+});

@@ -1,0 +1,19 @@
+# ==============================================================================
+# Dependencias de desarrollo y CI. NO entran en la imagen de producción: un runtime
+# con pytest instalado carga código y utilidades que nadie necesita en el servidor y
+# amplía sin motivo la superficie de dependencias que hay que auditar.
+# ==============================================================================
+-r requirements.txt
+
+pytest>=8.1.1
+pytest-asyncio>=0.23.5
+pytest-cov>=5.0.0
+
+# Calidad y auditoría de seguridad en el pipeline
+ruff>=0.6.0
+pip-audit>=2.7.0
+
+# Las pruebas de la pila de despliegue leen devops/docker-compose.yml y comprueban que
+# el arranque sobre una base vacía siga estando resuelto. Solo se usa en la suite: la
+# aplicación no lee YAML en ningún punto.
+PyYAML>=6.0

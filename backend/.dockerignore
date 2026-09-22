@@ -1,0 +1,61 @@
+# ==============================================================================
+# Contexto de build del backend — todo lo listado aquí NUNCA entra en la imagen
+# ==============================================================================
+
+# Secretos y configuración local (se inyectan por variables de entorno)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Bases de datos locales y volcados
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# Artefactos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Pruebas y herramientas de desarrollo
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Control de versiones y CI
+.git/
+.gitignore
+.github/
+
+# IDE / SO
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Contenedores
+Dockerfile
+.dockerignore

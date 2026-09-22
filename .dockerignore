@@ -1,0 +1,95 @@
+# ==============================================================================
+# Contexto de build de la RAÍZ del repositorio.
+#
+# El backend se construye desde aquí (y no desde `backend/`) para poder copiar
+# `ml_pipeline/models/` dentro de la imagen. Eso significa que este archivo, y no
+# `backend/.dockerignore`, decide qué llega al daemon de Docker.
+#
+# Los patrones van ANCLADOS a la raíz del contexto (`/docs`) o marcados como
+# recursivos (`**/__pycache__`). Un patrón suelto como `scripts` es ambiguo de leer
+# y hace fácil excluir sin querer una ruta que un COPY sí necesita.
+# ==============================================================================
+
+# --- Secretos y estado local: nunca deben entrar en una imagen ---
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/*.crt
+/_lead_scoring_local
+
+# --- Bases de datos y volcados ---
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.sql
+!/devops/init_db.sql
+
+# --- Artefactos de Python ---
+**/__pycache__
+**/*.py[cod]
+**/*.so
+**/.venv
+**/venv
+**/*.egg-info
+**/.eggs
+
+# --- Pruebas y herramientas de calidad: no forman parte del runtime ---
+/backend/tests
+/backend/requirements-dev.txt
+/backend/requirements-dev.lock
+/backend/requirements.txt
+**/.pytest_cache
+**/.coverage
+**/coverage.xml
+**/htmlcov
+**/.mypy_cache
+**/.ruff_cache
+
+# --- Frontend: solo entra `dist/`, que es lo que sirve el backend ---
+/frontend/node_modules
+/frontend/src
+/frontend/public
+/frontend/index.html
+/frontend/package.json
+/frontend/package-lock.json
+/frontend/vite.config.js
+/frontend/nginx.conf
+/frontend/Dockerfile
+
+# --- Pipeline de ML: entra `models/` y las dos herramientas de observabilidad ---
+# Ni el dataset ni el codigo de entrenamiento tienen nada que hacer en la imagen del
+# servicio. El monitor de deriva si: en la pila de compose PostgreSQL no publica puerto,
+# asi que el unico sitio desde el que puede leer la base es un contenedor de esa red.
+/ml_pipeline/data
+/ml_pipeline/src
+!/ml_pipeline/src/drift_monitor.py
+!/ml_pipeline/src/model_registry.py
+!/ml_pipeline/src/feedback_dataset.py
+/ml_pipeline/README.md
+
+# --- Documentación, scripts de demostración y despliegue ---
+/docs
+/scripts
+/devops
+/README.md
+/pyproject.toml
+
+# --- Control de versiones, CI y configuración de herramientas ---
+/.git
+/.gitignore
+/.github
+/.claude
+/.dockerignore
+
+# --- IDE y sistema operativo ---
+**/.idea
+**/.vscode
+**/*.swp
+**/.DS_Store
+**/Thumbs.db
+
+# --- Logs ---
+**/logs
+**/*.log

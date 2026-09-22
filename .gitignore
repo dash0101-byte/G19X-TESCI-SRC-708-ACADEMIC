@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Cachés de test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+build/
+dist/
+.next/
+out/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs & Artifacts
+logs/
+*.log
+# --- Datos de clientes reales ---
+# El bucle de realimentacion exporta desenlaces comerciales: cargo, facturacion y rastro
+# de actividad de prospectos concretos, con su `lead_id`. Es el unico archivo del proyecto
+# con datos de clientes y sale en el MISMO directorio que `leads_historical.csv`, que es
+# sintetico y si se versiona. Esa vecindad es justo lo que hace probable el descuido.
+ml_pipeline/data/leads_reales*
+ml_pipeline/data/*_manifiesto.json
+
+ml_pipeline/models/*.joblib
+ml_pipeline/models/*.pkl
+!ml_pipeline/models/.gitkeep
+
+# --- Documentacion administrativa de residencias ---
+# NDA, cartas de aceptacion y termino, organigrama y contactos de la empresa: papeles
+# del tramite academico con datos de personas y de la empresa. No son parte del sistema
+# y no se publican.
+docs/docs_residencias/
+
+# Informe de cobertura del cliente: se regenera con `npm run test:coverage`.
+frontend/coverage/

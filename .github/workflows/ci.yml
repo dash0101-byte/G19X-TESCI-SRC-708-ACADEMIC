@@ -1,0 +1,2384 @@
+name: CI - Sistema Inteligente de Lead Scoring
+
+# Cada trabajo verifica una propiedad distinta y falla por su cuenta: así el informe dice
+# *qué* se rompió sin obligar a leer un tronco de log único. Solo el build de imágenes
+# depende de los demás, porque necesita sus artefactos.
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+# Una ráfaga de pushes a la misma rama no debe encolar ejecuciones que ya nacen obsoletas.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mínimo privilegio para el GITHUB_TOKEN: este pipeline solo lee el código.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "20"
+  # Suelo de cobertura del paquete de aplicacion. La medicion actual es del 88 %; se
+  # deja el suelo tres puntos por debajo para absorber diferencias de plataforma sin
+  # convertirlo en un sello de goma. Es un trinquete: solo deberia subir.
+  COBERTURA_MINIMA: "85"
+  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (92/86/94/94 sobre los
+  # cuatro modulos con logica). No se repite aqui a proposito: dos numeros para lo mismo
+  # se desincronizan, y el que manda es el que corre.
+
+jobs:
+
+  # ============================================================================
+  # Estilo y errores estáticos
+  # ============================================================================
+  estilo:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      # Desde el lock (R-2). `pip install ruff` a secas instalaba la version publicada ese
+      # dia, y una regla nueva de ruff podia poner el pipeline en rojo sin que nadie
+      # hubiera tocado el codigo.
+      - name: Instalar ruff desde el lock
+        run: pip install --require-hashes -r backend/requirements-dev.lock
+
+      # La configuración (reglas activas, exclusiones, longitud de línea) vive en
+      # pyproject.toml, no aquí: así `ruff check .` en local y en CI son lo mismo.
+      - name: Comprobar reglas de estilo y errores estáticos
+        run: ruff check . --output-format=github
+
+  # ============================================================================
+  # Secretos filtrados
+  # ============================================================================
+  secretos:
+    name: Fuga de secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historial completo: una clave borrada en el último commit sigue siendo una
+          # clave filtrada. Este proyecto ya tuvo una en el árbol, y de nada sirve
+          # revisar solo la punta de la rama.
+          fetch-depth: 0
+
+      # Se usa la imagen oficial en lugar de la acción de marketplace: la acción exige
+      # licencia para cuentas de organización y aquí no aporta nada a cambio.
+      - name: Escanear el historial en busca de secretos
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source=/repo --redact --no-banner --verbose
+
+  # ============================================================================
+  # Vulnerabilidades conocidas en las dependencias
+  # ============================================================================
+  dependencias:
+    name: Vulnerabilidades (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      # R-2. Hasta la Fase 14 se auditaban los RANGOS: `pip-audit --requirement
+      # requirements.txt` resolvia versiones en el momento de auditar, y esas no tenian por
+      # que ser las que llevaba la imagen construida una hora antes. Ahora cada lock se
+      # instala en un entorno limpio, se comprueba que lo instalado es exactamente lo fijado
+      # y se audita ESA lista, sin volver a resolver nada (`--no-deps --disable-pip`).
+      - name: Instalar cada lock en su propio entorno
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/produccion
+          /tmp/produccion/bin/pip install --require-hashes -r backend/requirements.lock
+          python -m venv /tmp/desarrollo
+          /tmp/desarrollo/bin/pip install --require-hashes -r backend/requirements-dev.lock
+
+      # `pip` lo pone el propio venv y no viaja a la imagen de produccion —el Dockerfile lo
+      # retira—, asi que se ignora en ese entorno y solo en ese.
+      - name: Lo instalado es exactamente lo fijado
+        run: |
+          set -euo pipefail
+          /tmp/produccion/bin/python scripts/comprobar_instalado.py backend/requirements.lock --ignorar pip
+          /tmp/desarrollo/bin/python scripts/comprobar_instalado.py backend/requirements-dev.lock
+          /tmp/produccion/bin/python scripts/comprobar_instalado.py backend/requirements.lock --ignorar pip --listar > instalado-produccion.txt
+          /tmp/desarrollo/bin/python scripts/comprobar_instalado.py backend/requirements-dev.lock --listar > instalado-desarrollo.txt
+
+      # Una vulnerabilidad en pytest no tiene el mismo peso que una en FastAPI, pero
+      # ninguna de las dos deberia pasar sin que alguien la vea.
+      #
+      # SIN excepciones (capitulo 23). Hasta entonces se ignoraba PYSEC-2026-1325, un aviso
+      # sin arreglo sobre `ecdsa`, que llegaba con python-jose. Se retiro la causa en lugar
+      # de seguir justificando la excepcion: los JWT se firman con PyJWT, que para HMAC no
+      # necesita `ecdsa` ni `cryptography`. La guarda de configuracion peligrosa exige que no
+      # vuelva a ignorarse ningun aviso; si aparece uno sin arreglo, se decide aqui a la vista.
+      - name: Auditar lo instalado para produccion
+        run: /tmp/desarrollo/bin/pip-audit --requirement instalado-produccion.txt --no-deps --disable-pip --strict --progress-spinner=off
+
+      - name: Auditar lo instalado para desarrollo
+        run: /tmp/desarrollo/bin/pip-audit --requirement instalado-desarrollo.txt --no-deps --disable-pip --strict --progress-spinner=off
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias del cliente
+        working-directory: frontend
+        run: npm ci
+
+      # El backend tenia pip-audit desde la Fase 1 y el cliente no tenia nada (N-10). Al
+      # instalar el utillaje de pruebas de esta fase, `npm audit` senalo cinco avisos —dos
+      # criticos y uno alto— en vite y vitest. Se cerraron subiendo a vite 8 y vitest 5;
+      # esta puerta es lo que impide que vuelvan a entrar sin que nadie lo vea.
+      #
+      # `--audit-level=high` y no `moderate`: un aviso moderado en una herramienta que
+      # solo corre en el portatil no justifica dejar el pipeline en rojo hasta que
+      # alguien publique el arreglo, y un pipeline que esta en rojo por costumbre deja de
+      # informar de nada.
+      - name: Auditar dependencias del cliente
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      # Informe completo, incluidos los avisos bajos y moderados que la puerta deja
+      # pasar: que no tumben el pipeline no significa que nadie deba mirarlos.
+      - name: Publicar el informe completo de npm audit
+        if: always()
+        working-directory: frontend
+        run: npm audit --json > npm-audit.json || true
+
+      - name: Guardar el informe de npm audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit
+          path: frontend/npm-audit.json
+          retention-days: 14
+
+  # ============================================================================
+  # Modelo de machine learning
+  # ============================================================================
+  modelo:
+    name: Modelo ML (gate ROC-AUC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias desde el lock
+        run: pip install --require-hashes -r backend/requirements-dev.lock
+
+      # El umbral (0.82) vive en train_model.py, no en este workflow: bajarlo debe ser
+      # una decisión visible en el código, no un retoque de configuración de CI.
+      # El script sale con código 1 si el AUC no lo alcanza, y en ese caso NO reescribe
+      # el .joblib.
+      - name: Entrenar y validar el modelo
+        run: python ml_pipeline/src/train_model.py
+
+      # El artefacto que se despliega tiene que poder rastrearse hasta el entrenamiento
+      # que lo produjo. Un `.joblib` cuya huella no aparece en el registro es un fichero
+      # de procedencia desconocida, y `joblib.load` deserializa con pickle.
+      - name: El modelo queda registrado y con perfil de referencia
+        run: |
+          set -euo pipefail
+          test -f ml_pipeline/models/registry.json
+          test -f ml_pipeline/models/reference_profile.json
+          python - <<'PY'
+          import json
+          import sys
+
+          metricas = json.load(open("ml_pipeline/models/metrics.json", encoding="utf-8"))
+          registro = json.load(open("ml_pipeline/models/registry.json", encoding="utf-8"))
+          huella = metricas.get("model_sha256")
+          if not huella:
+              sys.exit("El entrenamiento no produjo artefacto; no hay nada que registrar.")
+          if not any(e.get("model_sha256") == huella for e in registro):
+              sys.exit(f"El artefacto {huella[:12]} no aparece en el registro de modelos.")
+
+          perfil = json.load(open("ml_pipeline/models/reference_profile.json", encoding="utf-8"))
+          if not perfil.get("columnas"):
+              sys.exit("El perfil de referencia para el monitoreo de deriva salio vacio.")
+          print(f"Artefacto {huella[:12]} registrado; perfil con {len(perfil['columnas'])} variables.")
+          PY
+
+      # ----------------------------------------------------------------------
+      # N-15: el artefacto atado a los datos que lo produjeron.
+      #
+      # La guarda anterior comprobaba que el `.joblib` apareciera en el registro, y eso ya
+      # pasaba: lo que valia `null` en TODAS las entradas era `huella_datos_sha256`, el
+      # campo que responde «¿con que datos?». El registro declaraba una trazabilidad que no
+      # tenia y el CI lo daba por bueno.
+      #
+      # No basta con exigir que el campo no sea nulo: una constante tambien serviria. Se
+      # RECALCULA desde el CSV y se exige que coincida.
+      - name: El artefacto se puede rastrear hasta sus datos
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          sys.path.insert(0, "ml_pipeline/src")
+          import pandas as pd
+          from model_registry import ProcedenciaIncompleta, huella_de_datos, leer_registro, registrar_modelo
+          from train_model import FEATURE_COLS
+
+          entrada = leer_registro("ml_pipeline/models/registry.json")[-1]
+          huella = entrada.get("huella_datos_sha256")
+          if not huella:
+              sys.exit("El registro vuelve a anotar el entrenamiento sin huella de datos (N-15).")
+
+          df = pd.read_csv("ml_pipeline/data/leads_historical.csv")
+          recalculada = huella_de_datos(df, FEATURE_COLS + ["converted"])
+          if recalculada != huella:
+              sys.exit(
+                  "La huella registrada no se reproduce desde el dataset:\n"
+                  f"  registrada  : {huella}\n"
+                  f"  recalculada : {recalculada}\n"
+                  "Una huella que solo sabe producir quien la escribe no distingue un "
+                  "valor real de una constante."
+              )
+
+          if entrada.get("origen_de_los_datos") != "sinteticos":
+              sys.exit(
+                  f"CI entrena con el generador sintetico y el registro dice "
+                  f"{entrada.get('origen_de_los_datos')!r}. El origen se declara; deducirlo "
+                  "es lo que hacia que un entrenamiento sintetico pudiera quedar anotado "
+                  "como realimentacion."
+              )
+
+          # Y que siga siendo IMPOSIBLE registrar sin procedencia. Se comprueba llamando,
+          # no leyendo la firma: un valor por defecto reintroducido no se ve en un `grep`.
+          try:
+              registrar_modelo({}, 1, ["a"], huella_datos="", origen="sinteticos",
+                               ruta="/tmp/registro-de-prueba.json")
+          except ProcedenciaIncompleta:
+              pass
+          else:
+              sys.exit("registrar_modelo vuelve a aceptar un modelo sin huella de datos (N-15).")
+
+          print(f"Artefacto atado a {huella[:16]} ({entrada['origen_de_los_datos']}, "
+                f"{entrada['filas_entrenamiento']} filas).")
+          PY
+
+      # ----------------------------------------------------------------------
+      # El bucle de realimentacion, ejercitado de punta a punta.
+      #
+      # Hoy no hay ningun prospecto en WON ni en LOST: el bucle esta completo y no tiene
+      # nada que procesar. Un camino que no se ejecuta hasta dentro de un ciclo comercial
+      # entero no llega vivo a ese dia —llega con una firma cambiada y un import roto, y se
+      # descubre justo cuando por fin hay datos—. El ensayo lo recorre sobre una base
+      # desechable con etiquetas sinteticas: no mide el negocio, mide que el camino existe.
+      # El dataset de realimentacion NO puede versionarse. Contiene cargo, facturacion y
+      # rastro de actividad de prospectos concretos, y sale en el mismo directorio que
+      # `leads_historical.csv`, que es sintetico y si se versiona. Esa vecindad es lo que
+      # hace probable el descuido.
+      #
+      # Se comprueban las dos mitades, como con `frontend/dist` en la fase anterior: que la
+      # regla siga en .gitignore y que nadie la haya anulado con una negacion posterior
+      # —que deja la regla intacta y la desactiva igual—; y ademas que el archivo no este
+      # ya en el arbol, que es la unica comprobacion que atrapa un `git add -f`.
+      - name: Los desenlaces de clientes no se versionan
+        run: |
+          set -euo pipefail
+          grep -qE '^ml_pipeline/data/leads_reales' .gitignore || {
+            echo "FALLO: el dataset de realimentacion ya no esta en .gitignore."
+            echo "Es el unico archivo del proyecto con datos de clientes reales."
+            exit 1
+          }
+          if grep -qE '^!.*leads_reales' .gitignore; then
+            echo "FALLO: una negacion en .gitignore vuelve a versionar los desenlaces."
+            grep -nE '^!.*leads_reales' .gitignore
+            exit 1
+          fi
+          # Lo unico que atrapa un `git add -f`: mirar lo que el indice tiene de verdad.
+          # Se comprueba que haya repositorio antes de preguntarle, para que este guion
+          # pueda ejecutarse tambien fuera de CI —si no, fallaria por no encontrar .git y
+          # ese fallo se confundiria con el que la guarda vigila—.
+          if ! git rev-parse --git-dir >/dev/null 2>&1; then
+            echo "  (sin repositorio git: no se puede consultar el indice)"
+            exit 0
+          fi
+          encontrados=$(git ls-files 'ml_pipeline/data/leads_reales*' 'ml_pipeline/data/*_manifiesto.json')
+          if [ -n "$encontrados" ]; then
+            echo "FALLO: hay datos de clientes versionados en el repositorio:"
+            echo "$encontrados"
+            exit 1
+          fi
+          echo "Los desenlaces reales quedan fuera del repositorio."
+
+      # ----------------------------------------------------------------------
+      # N-26: el perfil de referencia y el artefacto viajan juntos en la imagen, salen del
+      # mismo entrenamiento y hasta la Fase 13 nada lo comprobaba. Un perfil de otra
+      # ejecucion hace que el monitor compare produccion contra la poblacion de otro modelo,
+      # y el PSI sigue saliendo con el mismo aspecto.
+      #
+      # Se comprueban las dos mitades: que los archivos que se versionan corresponden, y que
+      # el monitor SE NIEGA de verdad ante uno ajeno. Lo segundo es lo que atrapa quitar la
+      # comprobacion dejando la huella escrita en el perfil.
+      - name: El perfil de referencia corresponde al artefacto
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import tempfile
+
+          sys.path.insert(0, "ml_pipeline/src")
+          from drift_monitor import verificar_vinculo
+
+          modelos = "ml_pipeline/models"
+          with open(f"{modelos}/reference_profile.json", encoding="utf-8") as fh:
+              perfil = json.load(fh)
+          artefacto = f"{modelos}/lead_scorer_model.joblib"
+
+          problema = verificar_vinculo(perfil, artefacto)
+          if problema:
+              sys.exit(f"FALLO: {problema}")
+
+          with open(f"{modelos}/registry.json", encoding="utf-8") as fh:
+              registro = json.load(fh)
+          publicadas = [
+              e for e in registro
+              if e.get("model_sha256") == perfil["model_sha256"] and e.get("publicado")
+          ]
+          if not publicadas or publicadas[-1].get("huella_datos_sha256") != perfil.get("huella_datos_sha256"):
+              sys.exit("FALLO: el perfil no coincide con la publicacion registrada de su artefacto.")
+
+          with tempfile.TemporaryDirectory() as tmp:
+              ruta = os.path.join(tmp, "perfil_ajeno.json")
+              with open(ruta, "w", encoding="utf-8") as fh:
+                  json.dump(dict(perfil, model_sha256="0" * 64), fh)
+              r = subprocess.run(
+                  [sys.executable, "ml_pipeline/src/drift_monitor.py", "--perfil", ruta, "--modelo", artefacto],
+                  capture_output=True, text=True,
+              )
+              if r.returncode != 1 or "No se evalua" not in r.stdout:
+                  sys.exit(
+                      f"FALLO: el monitor no rechazo un perfil ajeno (codigo {r.returncode}).\n"
+                      f"{r.stdout}{r.stderr}"
+                  )
+
+          print(f"Perfil y artefacto {perfil['model_sha256'][:12]} corresponden; un perfil ajeno se rechaza.")
+          PY
+
+      # N-27: `--publicar` dependia de que alguien hubiera mirado el intervalo de confianza.
+      # Se pregunta a la regla con las cifras reales del ensayo de 45 desenlaces —ROC-AUC
+      # 0.8889, IC [0.571, 1.000]—, que pasaban el umbral puntual y no deben publicarse; y se
+      # comprueba que el artefacto que se acaba de publicar cumple la condicion.
+      #
+      # §19.9, capitulo 24: lo mismo para el aporte sobre el heuristico. Se pregunta con las
+      # cifras de una cohorte de 1000 filas —aporte +0.028, IC [-0.002, +0.059]— y se exige
+      # que el intervalo del aporte no se pueda omitir.
+      - name: Publicar exige el intervalo de confianza
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          sys.path.insert(0, "ml_pipeline/src")
+          import inspect
+
+          import train_model
+          from train_model import motivo_para_no_publicar
+
+          # Que la regla exista no basta: el entrenamiento tiene que decidir con ella.
+          cuerpo = inspect.getsource(train_model.entrenar)
+          if "motivo_para_no_publicar(" not in cuerpo or "if motivo_publicacion is not None:" not in cuerpo:
+              sys.exit("FALLO: entrenar() ya no decide la publicacion con motivo_para_no_publicar().")
+
+          aporte_holgado = {"inferior": 0.03, "superior": 0.07}
+          if motivo_para_no_publicar(0.8889, 0.05, {"inferior": 0.571, "superior": 1.0}, 9,
+                                     intervalo_aporte=aporte_holgado) is None:
+              sys.exit("FALLO: un ROC-AUC de 0.8889 con IC [0.571, 1.000] volveria a publicarse.")
+          if motivo_para_no_publicar(0.95, 0.05, None, 6, intervalo_aporte=aporte_holgado) is None:
+              sys.exit("FALLO: sin intervalo calculable se publicaria igual.")
+
+          ic_auc = {"inferior": 0.91, "superior": 0.97}
+          if motivo_para_no_publicar(0.94, 0.0277, ic_auc, 200,
+                                     intervalo_aporte={"inferior": -0.0015, "superior": 0.0587}) is None:
+              sys.exit("FALLO: un aporte de +0.028 con IC [-0.002, +0.059] volveria a publicarse (§19.9).")
+          if motivo_para_no_publicar(0.94, 0.05, ic_auc, 200, intervalo_aporte=None) is None:
+              sys.exit("FALLO: sin intervalo del aporte se publicaria igual.")
+          try:
+              motivo_para_no_publicar(0.94, 0.05, ic_auc, 200)
+          except TypeError:
+              pass
+          else:
+              sys.exit("FALLO: el intervalo del aporte vuelve a poder omitirse.")
+          if "intervalo_bootstrap_del_aporte(" not in cuerpo or "intervalo_aporte=intervalo_aporte" not in cuerpo:
+              sys.exit("FALLO: entrenar() ya no calcula el intervalo del aporte o no lo pasa al gate.")
+
+          with open("ml_pipeline/models/metrics.json", encoding="utf-8") as fh:
+              metricas = json.load(fh)
+          ic = metricas.get("roc_auc_ic95") or {}
+          if not metricas.get("publicado") or ic.get("inferior", 0.0) < metricas["auc_threshold"]:
+              sys.exit("FALLO: el artefacto publicado no cumple la condicion del intervalo.")
+          ic_aporte = metricas.get("delta_sobre_heuristico_ic95") or {}
+          if ic_aporte.get("inferior", -1.0) < metricas["min_delta_sobre_heuristico"]:
+              sys.exit("FALLO: el artefacto publicado no cumple la condicion del intervalo del aporte.")
+          print(f"Publicado con IC inferior {ic['inferior']:.4f} >= {metricas['auc_threshold']:.2f} "
+                f"y aporte con IC inferior {ic_aporte['inferior']:+.4f} >= {metricas['min_delta_sobre_heuristico']:+.4f}.")
+          PY
+
+      # ----------------------------------------------------------------------
+      # Capitulo 24 (§21.12): el modelo no recibe datos que nadie dio.
+      #
+      # Tres defectos con la misma forma: el adaptador pasaba 100 000 de ingresos cuando
+      # faltaban, `whatsapp_messages` contaba tambien LinkedIn y las llamadas sin respuesta no
+      # llegaban. Se comprueban ejecutando, no leyendo: la fila que construye el adaptador, el
+      # preprocesador del artefacto publicado y las variables que extrae el servicio de un
+      # prospecto con actividades de cada clase.
+      - name: El modelo no recibe datos inventados
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import math
+          import sys
+
+          sys.path.insert(0, "backend")
+          sys.path.insert(0, "ml_pipeline/src")
+          import joblib
+          from app.adapters.azure_ml_adapter import NativeMLScoringAdapter
+          from app.core.vector_del_modelo import COLUMNAS_DEL_MODELO, VERSION_DEL_VECTOR
+          from app.models.entities import ActivityType, Lead, LeadActivity
+          from app.services.scoring_service import ScoringService
+
+          for ausente in (None, 0.0):
+              fila = NativeMLScoringAdapter.construir_fila({"annual_revenue": ausente})
+              if not math.isnan(fila["annual_revenue"]):
+                  sys.exit(f"FALLO: con ingresos {ausente!r} el adaptador pasa {fila['annual_revenue']} al modelo.")
+          if list(NativeMLScoringAdapter.construir_fila({})) != COLUMNAS_DEL_MODELO:
+              sys.exit("FALLO: la fila del adaptador ya no es el vector del modelo (ML-4).")
+
+          from feature_engineering import build_preprocessor
+
+          tramos = {nombre: (paso, cols) for nombre, paso, cols in build_preprocessor().transformers}
+          if "ingresos" not in tramos or not tramos["ingresos"][0].named_steps["imputar"].add_indicator:
+              sys.exit("FALLO: el preprocesador ya no imputa los ingresos marcando que faltaban.")
+
+          modelo = joblib.load("ml_pipeline/models/lead_scorer_model.joblib")
+          if list(modelo.feature_names_in_) != COLUMNAS_DEL_MODELO:
+              sys.exit("FALLO: el artefacto publicado no se entreno con el vector vigente.")
+          imputador = modelo.named_steps["preprocessor"].named_transformers_["ingresos"].named_steps["imputar"]
+          if not imputador.add_indicator or imputador.indicator_ is None:
+              sys.exit("FALLO: el artefacto imputa los ingresos sin marcar que faltaban.")
+
+          import tempfile
+
+          import pandas as pd
+          from sklearn.dummy import DummyClassifier
+
+          with tempfile.TemporaryDirectory() as tmp:
+              antiguo = f"{tmp}/lead_scorer_model.joblib"
+              joblib.dump(DummyClassifier().fit(pd.DataFrame({"phone_calls": [0, 1]}), [0, 1]), antiguo)
+              if NativeMLScoringAdapter(model_path=antiguo, expected_sha256="").version_del_motor() != "heuristico":
+                  sys.exit("FALLO: el adaptador carga un artefacto de otro vector y lo anotaria como ml.")
+
+          for nombre in ("metrics.json", "reference_profile.json"):
+              with open(f"ml_pipeline/models/{nombre}", encoding="utf-8") as fh:
+                  if json.load(fh).get("version_del_vector") != VERSION_DEL_VECTOR:
+                      sys.exit(f"FALLO: {nombre} no declara el vector {VERSION_DEL_VECTOR}.")
+
+          lead = Lead(first_name="Ci", last_name="Vector", email="ci@vector.invalid", annual_revenue=None)
+          lead.activities = [
+              LeadActivity(activity_type=ActivityType.PHONE_CALL, call_outcome="CONECTO"),
+              LeadActivity(activity_type=ActivityType.PHONE_CALL, call_outcome="BUZON"),
+              LeadActivity(activity_type=ActivityType.PHONE_CALL, call_outcome="NO_CONTESTO"),
+              LeadActivity(activity_type=ActivityType.PHONE_CALL, call_outcome=None),
+              LeadActivity(activity_type=ActivityType.WHATSAPP_MESSAGE),
+              LeadActivity(activity_type=ActivityType.LINKEDIN_MESSAGE),
+              LeadActivity(activity_type=ActivityType.LINKEDIN_MESSAGE),
+          ]
+          v = ScoringService(db=None).extract_features_from_lead(lead)
+          esperado = {
+              "annual_revenue": None, "phone_calls_connected": 1, "phone_calls_unanswered": 2,
+              "whatsapp_messages": 1, "linkedin_messages": 2, "version_del_vector": VERSION_DEL_VECTOR,
+          }
+          distintos = {k: (v.get(k), e) for k, e in esperado.items() if v.get(k) != e}
+          if distintos:
+              sys.exit(f"FALLO: el servicio extrae variables que no son las del prospecto (obtenido, esperado): {distintos}")
+          print("Ingresos ausentes como ausencia, canales y resultados de llamada separados, vector "
+                f"{VERSION_DEL_VECTOR} en artefacto, perfil y metricas.")
+          PY
+
+      - name: El bucle de realimentacion sigue vivo
+        run: python ml_pipeline/src/ensayo_del_bucle.py --tamano 60 --en-curso 20 --entrenar
+
+      - name: Publicar métricas del modelo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metricas-modelo
+          path: ml_pipeline/models/metrics.json
+          if-no-files-found: warn
+
+      # El .joblib está en .gitignore, así que no existe en un checkout limpio. El build
+      # de la imagen del backend lo necesita (COPY ml_pipeline/models) y lo toma de aquí:
+      # la imagen se construye con el modelo que este pipeline acaba de validar, no con
+      # un binario comprometido en el repositorio que nadie sabe cuándo se entrenó.
+      - name: Publicar artefacto del modelo
+        uses: actions/upload-artifact@v4
+        with:
+          name: modelo-entrenado
+          path: ml_pipeline/models/
+          retention-days: 7
+
+  # ============================================================================
+  # Pruebas del backend
+  # ============================================================================
+  pruebas:
+    name: Pruebas backend + cobertura
+    runs-on: ubuntu-latest
+    needs: modelo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias desde el lock
+        run: pip install --require-hashes -r backend/requirements-dev.lock
+
+      # Las pruebas se ejecutan contra el mismo artefacto que irá a la imagen, de modo
+      # que ejercitan la ruta real de inferencia y no el heurístico de respaldo.
+      - name: Descargar el modelo validado
+        uses: actions/download-artifact@v4
+        with:
+          name: modelo-entrenado
+          path: ml_pipeline/models/
+
+      # ----------------------------------------------------------------------
+      # Capitulo 25: la pagina de interes es la unica ruta sin sesion que escribe en la
+      # base. Las pruebas de la suite comprueban casos; esta guarda comprueba propiedades:
+      # un campo `comentarios` nuevo no rompe ninguna prueba existente, porque nadie lo
+      # envia, y aqui falla en cuanto existe. Va antes de la suite y con nombre propio para
+      # que el motivo se lea en el titulo del paso. Necesita el artefacto validado: la
+      # alineacion se mide contra lo que puntua de verdad, no contra una copia de las listas.
+      - name: La pagina publica conserva sus defensas
+        run: python scripts/guarda_de_la_pagina_publica.py
+
+      # La suite levanta su propio SQLite en memoria y declara sus datos por fixtures.
+      # No se siembra ninguna base de datos antes: hacerlo acoplaba los tests a un script
+      # de demostración y los volvía dependientes del orden de ejecución.
+      - name: Ejecutar la suite con medición de cobertura
+        run: |
+          python -m pytest backend/tests/ \
+            --cov=backend/app \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=${{ env.COBERTURA_MINIMA }} \
+            --color=yes
+
+      - name: Publicar informe de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: coverage.xml
+          if-no-files-found: warn
+
+  # ============================================================================
+  # Frontend
+  # ============================================================================
+  frontend:
+    name: Cliente (lint, pruebas, cobertura, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` y no `npm install`: instala exactamente lo del lockfile y falla si este
+      # no concuerda con package.json, en vez de resolver versiones nuevas en silencio.
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      # El cliente no tenia analisis estatico (N-9). La primera pasada de eslint encontro
+      # veinte problemas, y dos de ellos no eran estilo: `LeadDetailModal` llamaba a once
+      # hooks DESPUES de un `return` condicional —un render con `lead` nulo habria dejado
+      # la aplicacion entera en blanco—, y dos efectos tenian la lista de dependencias
+      # incompleta, que es la familia exacta del defecto de respuestas desordenadas que
+      # esta misma fase encontro en el simulador.
+      - name: Analisis estatico del cliente (eslint)
+        working-directory: frontend
+        run: npm run lint
+
+      # Las pruebas y el suelo de cobertura en la misma orden: los umbrales viven en
+      # `vite.config.js` y `vitest` sale con codigo distinto de cero si no se alcanzan.
+      - name: Pruebas del cliente con cobertura
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Guardar el informe de cobertura del cliente
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-cliente
+          path: frontend/coverage/
+          retention-days: 14
+
+      - name: Compilar la SPA
+        working-directory: frontend
+        run: npm run build
+
+      # Un `dist/` vacío o sin index.html compila "correctamente" y rompe en producción.
+      - name: Comprobar que el bundle existe
+        working-directory: frontend
+        run: |
+          test -f dist/index.html || { echo "dist/index.html no se generó"; exit 1; }
+          test -d dist/assets || { echo "dist/assets no se generó"; exit 1; }
+          echo "Tamaño del bundle:"; du -sh dist
+
+      # Las fuentes dejaron de venir de fonts.googleapis.com y viajan en el bundle (N-7).
+      # Si alguien vuelve a enlazarlas de fuera, el bundle deja de traer los .woff2 y la
+      # CSP las bloquea en produccion sin que nada falle: solo se ven fuentes distintas.
+      - name: Las fuentes viajan en el bundle
+        working-directory: frontend
+        run: |
+          fuentes=$(find dist/assets -name '*.woff2' | wc -l)
+          echo "archivos .woff2 en el bundle: $fuentes"
+          [ "$fuentes" -ge 2 ] || {
+            echo ""
+            echo "FALLO: el bundle no lleva las fuentes autoalojadas."
+            echo "Si vuelven a cargarse desde un CDN, la CSP (font-src 'self') las"
+            echo "bloqueara en produccion y la aplicacion caera a las del sistema (N-7)."
+            exit 1
+          }
+
+      # `dist/` está en .gitignore y NO se versiona (N-17). Este es el unico sitio donde
+      # se compila para publicar: la imagen del backend lo sirve y la del frontend lo
+      # consume tal cual, sin recompilarlo, para que lo probado y lo desplegado sean el
+      # mismo archivo.
+      - name: Publicar el bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
+
+  # ============================================================================
+  # Imágenes de contenedor
+  # ============================================================================
+  imagenes:
+    name: Build de imágenes Docker
+    runs-on: ubuntu-latest
+    needs: [ modelo, frontend, pruebas ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # El Dockerfile del backend copia rutas concretas en lugar de `COPY . .`, y dos de
+      # ellas no están en el repositorio: se reponen aquí desde los trabajos anteriores.
+      - name: Restaurar el modelo validado
+        uses: actions/download-artifact@v4
+        with:
+          name: modelo-entrenado
+          path: ml_pipeline/models/
+
+      - name: Restaurar el bundle del frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      # Contexto en la raíz del repositorio: la imagen necesita backend/, ml_pipeline/
+      # y frontend/dist/ a la vez.
+      - name: Construir la imagen del backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          tags: plurione-backend:ci
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # `download-artifact` ya dejo el bundle en `frontend/dist/`, que es exactamente
+      # donde el destino `desde-artefacto` del Dockerfile lo busca dentro del contexto.
+      # Aqui solo se comprueba que llego entero: la accion no falla si el artefacto
+      # existe pero viene vacio, y una imagen construida con un `dist/` vacio arranca sin
+      # quejarse y devuelve 404 en cada ruta.
+      - name: El bundle descargado esta completo
+        run: |
+          set -euo pipefail
+          test -f frontend/dist/index.html || { echo "FALLO: falta dist/index.html"; ls -la frontend/dist || true; exit 1; }
+          test -d frontend/dist/assets || { echo "FALLO: falta dist/assets"; exit 1; }
+          echo "huella del bundle que se va a empaquetar:"
+          sha256sum frontend/dist/index.html
+
+      # `--target desde-artefacto`: NO recompila (N-17). El destino por defecto del
+      # Dockerfile compila desde el codigo y es lo correcto en un portatil; aqui seria un
+      # error, porque produciria un bundle DISTINTO del que acaba de pasar el `linter`,
+      # las pruebas y el suelo de cobertura. Dos compilaciones que terminan bien no son
+      # la misma compilacion, y la diferencia no da ningun sintoma.
+      - name: Construir la imagen del frontend con el bundle ya probado
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: desde-artefacto
+          tags: plurione-frontend:ci
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Que la imagen lleve EXACTAMENTE el artefacto, no uno equivalente.
+      - name: La imagen lleva el bundle que se probo
+        run: |
+          set -euo pipefail
+          esperada=$(sha256sum frontend/dist/index.html | cut -d' ' -f1)
+          encontrada=$(docker run --rm --entrypoint sh plurione-frontend:ci \
+            -c 'sha256sum /usr/share/nginx/html/index.html' | cut -d' ' -f1)
+          echo "  artefacto: $esperada"
+          echo "  en imagen: $encontrada"
+          [ "$esperada" = "$encontrada" ] || {
+            echo "FALLO: la imagen no sirve el bundle que el pipeline probo (N-17)"
+            exit 1
+          }
+
+      # Que la imagen se construya no dice nada sobre si cumple lo que se le pidió. Estas
+      # son las propiedades de endurecimiento de la Fase 4, y cualquiera se pierde con un
+      # descuido en el Dockerfile. Se comprueban desde un `sh -c` dentro del contenedor:
+      # así el mismo comando sirve para verificarlo en local, en Windows incluido.
+      - name: Verificar el endurecimiento de la imagen del backend
+        run: |
+          docker run --rm --entrypoint sh plurione-backend:ci -c '
+            fallos=0
+            aviso() { echo "FALLO: $1"; fallos=$((fallos + 1)); }
+
+            echo "--- El proceso no corre como root ---"
+            echo "uid=$(id -u) usuario=$(id -un)"
+            [ "$(id -u)" -ne 0 ] || aviso "la imagen corre como root"
+
+            echo "--- pytest no viaja en la imagen de producción ---"
+            python -c "import pytest" 2>/dev/null && aviso "pytest instalado en producción"
+
+            echo "--- El artefacto del modelo viaja en la imagen (A-5) ---"
+            ls -la /opt/plurione/models/
+            [ -f /opt/plurione/models/lead_scorer_model.joblib ] || aviso "falta el modelo"
+
+            echo "--- La SPA compilada viaja en la imagen ---"
+            [ -f /frontend/dist/index.html ] || aviso "falta el bundle del frontend"
+
+            echo "--- Rutas que NUNCA deben estar ---"
+            for ruta in /app/.env /app/lead_scoring.db /app/tests /app/requirements-dev.txt; do
+              if [ -e "$ruta" ]; then aviso "la imagen contiene $ruta"; else echo "  ausente: $ruta"; fi
+            done
+
+            echo "--- El proceso no puede reescribir su propio código ---"
+            touch /app/prueba-escritura 2>/dev/null && aviso "/app es escribible por el proceso"
+
+            [ "$fallos" -eq 0 ] || exit 1
+            echo "Imagen conforme."
+          '
+
+      # R-2 en el sitio donde importa: lo que pip dejo DENTRO de la imagen. El guion corre
+      # en el propio contenedor para que los marcadores del lock —uvloop solo fuera de
+      # Windows, tzdata solo en Windows— se evaluen para la plataforma real y no para el
+      # runner. Despues se audita esa misma lista.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: La imagen lleva exactamente lo fijado y eso es lo que se audita
+        run: |
+          set -euo pipefail
+          verificar() {
+            docker run --rm --entrypoint python \
+              -v "$PWD/scripts/comprobar_instalado.py:/verificacion/comprobar_instalado.py:ro" \
+              -v "$PWD/backend/requirements.lock:/verificacion/requirements.lock:ro" \
+              plurione-backend:ci /verificacion/comprobar_instalado.py /verificacion/requirements.lock "$@"
+          }
+          verificar
+          verificar --listar > instalado-imagen.txt
+          test -s instalado-imagen.txt || { echo "FALLO: la lista de lo instalado en la imagen salio vacia"; exit 1; }
+          python -m venv /tmp/auditoria
+          /tmp/auditoria/bin/pip install --require-hashes -r backend/requirements-dev.lock
+          /tmp/auditoria/bin/pip-audit --requirement instalado-imagen.txt --no-deps --disable-pip --strict --progress-spinner=off
+
+      # El modelo que viaja en la imagen tiene que ser exactamente el que el trabajo
+      # `modelo` entrenó y validó. `joblib.load` deserializa con pickle —que ejecuta
+      # código—, así que el artefacto es superficie de ataque: comparar su huella cierra
+      # el hueco entre "CI validó un modelo" y "la imagen lleva ese modelo" (A-10).
+      - name: La huella del modelo de la imagen coincide con la validada
+        run: |
+          set -euo pipefail
+          esperada=$(jq -r '.model_sha256' ml_pipeline/models/metrics.json)
+          if [ -z "$esperada" ] || [ "$esperada" = "null" ]; then
+            echo "FALLO: metrics.json no trae la huella del modelo"; exit 1
+          fi
+
+          # Se resuelve dentro de un `sh -c` para que la ruta absoluta no la reescriba el
+          # shell del anfitrion (en Git Bash sobre Windows, /opt/... se traduce y falla).
+          encontrada=$(docker run --rm --entrypoint sh plurione-backend:ci \
+            -c 'sha256sum /opt/plurione/models/lead_scorer_model.joblib' | cut -d" " -f1)
+
+          echo "  esperada:   $esperada"
+          echo "  en imagen:  $encontrada"
+          [ "$esperada" = "$encontrada" ] || {
+            echo "FALLO: el artefacto de la imagen NO es el validado por el pipeline"; exit 1
+          }
+          echo "  Fíjela en el despliegue con ML_MODEL_SHA256=$esperada"
+
+      # Arranque real contra Postgres. Que la imagen se construya no prueba que arranque:
+      # `init_db()` corre en el lifespan, así que un fallo de dependencias o de rutas solo
+      # aparece aquí. De paso se verifican las dos propiedades de la Fase 4 que solo se
+      # pueden observar con el proceso vivo: el healthcheck y el cierre de la documentación.
+      - name: Arrancar la imagen contra una base de datos real
+        run: |
+          set -euo pipefail
+          docker network create ci-net
+          docker run -d --name pg-ci --network ci-net \
+            -e POSTGRES_USER=plurione \
+            -e POSTGRES_PASSWORD=contrasena-de-verificacion-de-ci-no-reutilizada \
+            -e POSTGRES_DB=lead_scoring_db \
+            postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+
+          echo "Esperando a Postgres..."
+          for _ in $(seq 1 30); do
+            docker exec pg-ci pg_isready -U plurione -d lead_scoring_db >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+          docker run -d --name backend-ci --network ci-net -p 8000:8000 \
+            -e SECRET_KEY=clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real \
+            -e DATABASE_URL=postgresql+psycopg2://plurione:contrasena-de-verificacion-de-ci-no-reutilizada@pg-ci:5432/lead_scoring_db \
+            plurione-backend:ci
+
+          echo "Esperando al backend..."
+          for _ in $(seq 1 45); do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health || echo 000)
+            [ "$codigo" = "200" ] && break
+            sleep 2
+          done
+          if [ "$codigo" != "200" ]; then
+            echo "FALLO: el backend no llegó a responder 200 en /health (último código: $codigo)"
+            docker logs backend-ci
+            exit 1
+          fi
+          echo "El contenedor arranca y /health responde 200."
+
+      # Antes /health devolvía "healthy" como constante: seguía diciendo que el servicio
+      # estaba sano con la base caída, y Docker mantenía la instancia en rotación. Aquí se
+      # tumba Postgres a propósito para comprobar que ahora se entera.
+      - name: El healthcheck detecta la caída de la base de datos
+        run: |
+          set -euo pipefail
+          docker stop pg-ci >/dev/null
+          sleep 5
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health || echo 000)
+          cuerpo=$(curl -s http://127.0.0.1:8000/health || true)
+          echo "con la base caída: $codigo $cuerpo"
+          [ "$codigo" = "503" ] || { echo "FALLO: se esperaba 503, llegó $codigo"; exit 1; }
+          # La respuesta no debe filtrar la cadena de conexion ni el nombre del servidor:
+          # un 503 que devuelve el traceback de psycopg2 regala la topologia interna.
+          if echo "$cuerpo" | grep -qiE "password|postgresql://|psycopg2"; then
+            echo "FALLO: /health filtra detalles de la conexion"; exit 1
+          fi
+          echo "El healthcheck depende de verdad de la base de datos."
+
+      # La imagen fija ENVIRONMENT=production, así que el esquema no debe publicarse.
+      - name: La documentación está cerrada en producción
+        run: |
+          set -euo pipefail
+          docker start pg-ci >/dev/null
+          sleep 8
+          for ruta in /docs /redoc /api/v1/openapi.json; do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$ruta" || echo 000)
+            echo "  $ruta -> $codigo"
+            [ "$codigo" = "404" ] || { echo "FALLO: $ruta está expuesto en producción"; exit 1; }
+          done
+
+      # ----------------------------------------------------------------------
+      # La pagina servida y su politica de seguridad (N-7)
+      # ----------------------------------------------------------------------
+      # El defecto que cierra esto no era una CSP ausente: la CSP estaba y era estricta,
+      # y la pagina pedia tres familias de `fonts.googleapis.com` que esa misma politica
+      # prohibia. El navegador las bloqueaba en silencio, la aplicacion caia a las
+      # fuentes del sistema, y el unico sintoma era que en produccion se veia distinta
+      # que en `npm run dev`. Ni el build ni las pruebas decian una palabra, porque
+      # ninguno de los dos sirve la pagina detras de nginx.
+      #
+      # `--add-host backend:127.0.0.1` porque nginx resuelve el `upstream` al arrancar y
+      # se niega a levantar si el nombre no existe; aqui no hay backend en la red.
+      - name: La CSP admite todo lo que la pagina pide
+        run: |
+          set -euo pipefail
+          docker run -d --name web-ci --add-host backend:127.0.0.1 -p 8099:80 plurione-frontend:ci
+          for _ in $(seq 1 20); do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/ || echo 000)
+            [ "$codigo" = "200" ] && break
+            sleep 1
+          done
+          [ "$codigo" = "200" ] || { echo "FALLO: nginx no sirve la SPA"; docker logs web-ci; exit 1; }
+
+          fallos=0
+          aviso() { echo "FALLO: $1"; fallos=$((fallos + 1)); }
+
+          cabeceras=$(curl -sS -D - -o /tmp/pagina.html http://127.0.0.1:8099/)
+          csp=$(printf '%s\n' "$cabeceras" | tr -d '\r' | sed -n 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy: //p')
+          echo "politica servida: $csp"
+          [ -n "$csp" ] || aviso "la respuesta no trae Content-Security-Policy"
+
+          # Se quitan los comentarios HTML (explican que ANTES habia enlaces a Google y
+          # nombran el dominio) y los data: (el favicon lleva dentro un xmlns de w3.org,
+          # que es un espacio de nombres XML y no una descarga). Sin este filtro la
+          # comprobacion fallaria sobre un arbol correcto.
+          externos=$(sed 's/<!--.*-->//g' /tmp/pagina.html | sed 's/data:[^"]*//g' \
+            | grep -oE 'https?://[^"'"'"' )>]+' | sed -E 's#(https?://[^/]+).*#\1#' | sort -u || true)
+          if [ -n "$externos" ]; then
+            aviso "la pagina servida enlaza a un tercero: $externos"
+          else
+            echo "  no pide nada a terceros"
+          fi
+
+          # Todo lo que enlaza tiene que servirlo este mismo origen.
+          recursos=$(grep -oE '(src|href)="/[^"]+"' /tmp/pagina.html | sed -E 's/.*="([^"]+)"/\1/' | sort -u)
+          for ruta in $recursos; do
+            codigo=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:8099$ruta")
+            echo "  $ruta -> $codigo"
+            [ "$codigo" = "200" ] || aviso "$ruta no se sirve ($codigo)"
+          done
+
+          # Y las fuentes, una por una. El `try_files` de la SPA devuelve index.html con
+          # codigo 200 para cualquier ruta que no exista, asi que comprobar el codigo no
+          # basta: se mira la firma 'wOF2' del propio archivo.
+          css=$(printf '%s\n' "$recursos" | grep '\.css$' | head -1)
+          curl -sS -o /tmp/bundle.css "http://127.0.0.1:8099$css"
+          fuentes=$(grep -oE 'url\(([^)]*\.woff2)\)' /tmp/bundle.css | sed -E 's/url\(([^)]*)\)/\1/' | tr -d '"' | sort -u)
+          [ -n "$fuentes" ] || aviso "el CSS servido no declara ninguna fuente .woff2"
+          for f in $fuentes; do
+            case "$f" in
+              http*) aviso "la fuente $f viene de fuera"; continue ;;
+              /*) ruta="$f" ;;
+              *) ruta="/assets/$(basename "$f")" ;;
+            esac
+            codigo=$(curl -sS -o /tmp/fuente.bin -w '%{http_code}' "http://127.0.0.1:8099$ruta")
+            firma=$(head -c 4 /tmp/fuente.bin)
+            echo "  $ruta -> $codigo firma=$firma"
+            [ "$codigo" = "200" ] || aviso "la fuente $ruta no se sirve"
+            [ "$firma" = "wOF2" ] || aviso "$ruta responde 200 pero no es un woff2"
+          done
+
+          # La politica no debe admitir mas de lo que hace falta.
+          for esperado in "script-src 'self'" "font-src 'self'" "connect-src 'self'" "frame-ancestors 'none'"; do
+            case "$csp" in
+              *"$esperado"*) echo "  ok: $esperado" ;;
+              *) aviso "la politica no dice \"$esperado\"" ;;
+            esac
+          done
+          case "$csp" in *googleapis*|*gstatic*) aviso "la politica nombra un origen de Google" ;; esac
+          case "$csp" in *"script-src 'self' 'unsafe-inline'"*) aviso "script-src admite inline" ;; esac
+
+          [ "$fallos" -eq 0 ] || exit 1
+          echo "La pagina servida y su politica de seguridad coinciden."
+
+      # ----------------------------------------------------------------------
+      # Vulnerabilidades de las imagenes y lista de materiales (N-10)
+      # ----------------------------------------------------------------------
+      # `--ignore-unfixed` no es una concesion: es lo que hace que esta puerta signifique
+      # algo. Sin ella, la imagen del backend salia con 57 hallazgos ALTOS o CRITICOS de
+      # los que 55 no tenian arreglo publicado por Debian. Una puerta que esta en rojo
+      # por causas que nadie de este proyecto puede resolver se acaba desactivando, y
+      # entonces tampoco avisa de los dos que si eran accionables.
+      #
+      # Los dos accionables eran `msgpack` y `setuptools` VENDORIZADOS dentro de pip.
+      # La aplicacion no los importa nunca: se cerraron sacando pip entero de la imagen
+      # de ejecucion. Los siete de la imagen del frontend eran `libuuid` del sistema base
+      # de Alpine, ya corregidos aguas arriba. Desde el capitulo 22 se recogen con `apk add` de
+      # la version exacta sobre una base fijada por huella, no con un `apk upgrade` a ciegas.
+      #
+      # Se ejecuta el contenedor oficial y no una accion de terceros: es la misma orden
+      # que se puede repetir en un portatil, palabra por palabra.
+      - name: Vulnerabilidades de las imagenes (Trivy)
+        run: |
+          set -euo pipefail
+          mkdir -p informes
+          escanear() {
+            imagen="$1"; nombre="$2"
+            echo "=============== $imagen"
+            # Informe completo primero, con TODAS las severidades: que la puerta deje
+            # pasar lo moderado no significa que nadie deba mirarlo.
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/informes:/informes" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969image \
+              --scanners vuln --quiet --format json --output "/informes/trivy-$nombre.json" "$imagen"
+            # Y ahora la puerta.
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969image --scanners vuln --quiet \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$imagen"
+            echo "  sin vulnerabilidades ALTAS ni CRITICAS con arreglo publicado."
+          }
+          escanear plurione-backend:ci backend
+          escanear plurione-frontend:ci frontend
+
+      # La lista de materiales de cada imagen. Sirve para lo que ningun escaner sirve:
+      # cuando manana se publique un aviso sobre una biblioteca, responder «esta o no
+      # esta, y en que version» sin tener que reconstruir nada.
+      - name: Lista de materiales de las imagenes (syft, CycloneDX)
+        run: |
+          set -euo pipefail
+          mkdir -p informes
+          for par in "plurione-backend:ci backend" "plurione-frontend:ci frontend"; do
+            set -- $par
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              anchore/syft:v1.51.1@sha256:95fe0835e5bebc6f8b1f8acef68d47d63d594ef4c0f25c097ff853b23cbac74c -q -o cyclonedx-json "$1" > "informes/sbom-$2.cdx.json"
+            componentes=$(python3 -c "import json,sys; print(len(json.load(open('informes/sbom-$2.cdx.json')).get('components',[])))")
+            echo "  $1: $componentes componentes"
+            [ "$componentes" -gt 0 ] || { echo "FALLO: la SBOM de $1 salio vacia"; exit 1; }
+          done
+
+      - name: Guardar los informes de seguridad de las imagenes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seguridad-imagenes
+          path: informes/
+          retention-days: 30
+
+      - name: Recoger los contenedores de verificación
+        if: always()
+        run: |
+          docker logs backend-ci 2>&1 | tail -40 || true
+          docker logs web-ci 2>&1 | tail -20 || true
+          docker rm -f backend-ci pg-ci web-ci >/dev/null 2>&1 || true
+          docker network rm ci-net >/dev/null 2>&1 || true
+
+  # ============================================================================
+  # Regresiones de configuración peligrosa
+  # ============================================================================
+  configuracion-peligrosa:
+    name: Configuración peligrosa (regresiones)
+    runs-on: ubuntu-latest
+
+    # Correcciones que un cambio bienintencionado revierte con facilidad: todas tienen
+    # la forma de "una línea que hace que algo deje de fallar". El coste de comprobarlas
+    # es de segundos; el de descubrirlas otra vez en producción, no.
+    steps:
+      - uses: actions/checkout@v4
+
+      # A-8: el comodín de CORS junto a `allow_credentials=True` autoriza a cualquier
+      # sitio web a leer respuestas autenticadas desde el navegador de un usuario con
+      # sesión abierta.
+      - name: CORS sin comodín
+        run: |
+          set -euo pipefail
+          if grep -nE 'allow_origins\s*=.*\["\*"\]|allow_origins\s*=.*or ' backend/app/main.py; then
+            echo ""
+            echo "FALLO: el middleware de CORS vuelve a admitir el comodín."
+            echo "Con allow_credentials=True eso autoriza a cualquier origen a leer"
+            echo "respuestas autenticadas. Enumere los orígenes en CORS_ORIGINS."
+            exit 1
+          fi
+          echo "El middleware de CORS toma la lista validada de Settings."
+
+      # A-2: el script de siembra vacía las tablas de negocio. Sin confirmación explícita
+      # y apuntado por descuido a la base equivocada, es una pérdida total de datos.
+      - name: El script de siembra conserva sus guardas
+        run: |
+          set -euo pipefail
+          for simbolo in verificar_entorno_permitido SiembraRechazada "--force" "--solo-usuarios"; do
+            if ! grep -q -- "$simbolo" backend/scripts/seed_data.py; then
+              echo "FALLO: seed_data.py ya no contiene '$simbolo'."
+              echo "El script borra las tablas de negocio; sus guardas no son opcionales."
+              exit 1
+            fi
+          done
+          echo "Guardas presentes."
+
+      # A-11: los datos del prospecto los escribe quien rellena el formulario. Volver a
+      # interpolarlos en el prompt les devuelve la capacidad de redactar la recomendación
+      # que después ve el asesor comercial.
+      - name: Los datos del prospecto no se interpolan en el prompt
+        run: |
+          set -euo pipefail
+          if grep -nE 'user_content\s*=\s*f"' backend/app/adapters/azure_openai_adapter.py; then
+            echo ""
+            echo "FALLO: el turno del usuario se vuelve a componer por interpolación."
+            echo "Use construir_bloque_de_datos(), que serializa y sanea (A-11)."
+            exit 1
+          fi
+          grep -q "construir_bloque_de_datos" backend/app/adapters/azure_openai_adapter.py
+          grep -q "validar_explicacion" backend/app/adapters/azure_openai_adapter.py
+          echo "El prompt se construye con datos saneados y la salida se valida."
+
+      # N-6: `X-Forwarded-For` la escribe el cliente. Con la confianza activada por
+      # defecto, un backend alcanzable directamente acepta como identidad lo que le
+      # manden, y el tope por IP se esquiva rotando un valor inventado en cada intento.
+      - name: No se confía en las cabeceras de proxy por defecto
+        run: |
+          set -euo pipefail
+          if grep -nE '^\s*TRUST_PROXY_HEADERS:\s*bool\s*=\s*True' backend/app/core/config.py; then
+            echo ""
+            echo "FALLO: TRUST_PROXY_HEADERS vuelve a venir activada por defecto."
+            echo "Declárela solo en el despliegue que tiene un proxy de confianza delante"
+            echo "(devops/docker-compose.yml ya lo hace)."
+            exit 1
+          fi
+          grep -qE '^\s*TRUST_PROXY_HEADERS:\s*bool\s*=\s*False' backend/app/core/config.py
+          echo "El valor por defecto es no fiarse de la cabecera."
+
+      # N-1: la rotación tiene que consumir el token presentado. Sin eso vuelve a ser
+      # nominal: se entrega una cookie nueva y la anterior sigue valiendo siete días.
+      - name: La rotación de sesión consume el token anterior
+        run: |
+          set -euo pipefail
+          for simbolo in ReutilizacionDetectada REUSE_DETECTED revocar_familia _revocar; do
+            if ! grep -q -- "$simbolo" backend/app/services/session_service.py; then
+              echo "FALLO: session_service.py ya no contiene '$simbolo'."
+              echo "La detección de reutilización de refresh tokens no es opcional (N-1)."
+              exit 1
+            fi
+          done
+          grep -q "rotar_sesion" backend/app/api/v1/endpoints/auth.py
+          echo "El refresco rota y detecta reutilización."
+
+      # N-2: la firma HMAC autentica el cuerpo pero no acredita que la petición sea nueva.
+      # Sin el registro de entregas, reenviar una captura vuelve a ingerir el evento.
+      - name: La ingesta comprueba que la entrega sea nueva
+        run: |
+          set -euo pipefail
+          for simbolo in verificar_entrega reservar_entrega clave_de_idempotencia; do
+            if ! grep -q -- "$simbolo" backend/app/api/v1/endpoints/crm.py; then
+              echo "FALLO: el endpoint de webhook ya no usa '$simbolo'."
+              echo "Una entrega reenviada dentro de la ventana volvería a ingerirse (N-2)."
+              exit 1
+            fi
+          done
+          echo "La ingesta es idempotente y rechaza los reenvíos exactos."
+
+      # N-8: la bitácora no tiene endpoint de borrado ni de edición. Una bitácora que la
+      # aplicación puede reescribir no prueba nada.
+      - name: La bitácora de auditoría es de solo lectura
+        run: |
+          set -euo pipefail
+          if grep -nE '@router\.(post|put|patch|delete)' backend/app/api/v1/endpoints/audit.py; then
+            echo ""
+            echo "FALLO: la bitácora expone un método de escritura."
+            echo "Lo primero que borraría quien abusa de sus permisos es el registro de"
+            echo "que lo hizo: la retención se aplica fuera de la aplicación (N-8)."
+            exit 1
+          fi
+          grep -q "require_roles(\[UserRole.SYSTEM_ADMIN\])" backend/app/api/v1/endpoints/audit.py
+          echo "Solo lectura y solo para System_Admin."
+
+      - name: El proxy sobrescribe X-Forwarded-For
+        run: |
+          set -euo pipefail
+          # Se miran las DIRECTIVAS, no el archivo entero: el comentario que explica el
+          # arreglo nombra `$proxy_add_x_forwarded_for` y no debe hacer fallar la guarda.
+          if grep -vE '^[[:space:]]*#' frontend/nginx.conf | grep 'X-Forwarded-For' | grep -q 'proxy_add_x_forwarded_for'; then
+            echo ""
+            echo "FALLO: nginx AÑADE la IP real detrás de lo que mandó el cliente."
+            echo "El backend lee el primer elemento de la cadena, que seguiría siendo el"
+            echo "inventado: rotar la cabecera abre un contador nuevo por petición y el"
+            echo "tope por IP no llega a aplicarse nunca (N-6)."
+            exit 1
+          fi
+          grep -vE '^[[:space:]]*#' frontend/nginx.conf | grep -q 'proxy_set_header X-Forwarded-For \$remote_addr;'
+          echo "nginx sobrescribe la cabecera con la IP real del cliente."
+
+      - name: La pila aplica las migraciones antes de servir
+        run: |
+          set -euo pipefail
+          # Sobre un volumen vacío el backend aborta en bucle si nadie ha sellado el
+          # esquema: se niega a servir sin migraciones aplicadas, y con razón. Alguien
+          # tiene que aplicarlas, y no puede ser el propio backend, que corre con varios
+          # workers.
+          if ! grep -qE '^  migrate:' devops/docker-compose.yml; then
+            echo ""
+            echo "FALLO: la pila no tiene servicio de migración."
+            echo "\`docker compose up\` sobre un volumen vacío no llegaría a arrancar."
+            exit 1
+          fi
+          grep -q 'condition: service_completed_successfully' devops/docker-compose.yml || {
+            echo ""
+            echo "FALLO: nadie espera a que la migración TERMINE BIEN."
+            echo "Con cualquier otra condición el backend arranca con el esquema a medias."
+            exit 1
+          }
+          echo "La pila migra antes de servir."
+
+      - name: El repositorio de prospectos exige alcance
+        run: |
+          set -euo pipefail
+          # La autorización por objeto se olvida en silencio: nadie recibe un error porque
+          # una consulta devolvió prospectos ajenos. Que el alcance sea un argumento
+          # OBLIGATORIO es lo que convierte el olvido en un TypeError inmediato.
+          if grep -nE 'def __init__\(self, db: Session, alcance: AlcanceDeCartera = ' backend/app/repositories/lead_repository.py; then
+            echo ""
+            echo "FALLO: el alcance del repositorio tiene valor por defecto."
+            echo "Un alcance opcional convierte el descuido en acceso a la cartera completa,"
+            echo "que es justo el defecto que N-3 cierra."
+            exit 1
+          fi
+          grep -q 'def __init__(self, db: Session, alcance: AlcanceDeCartera)' backend/app/repositories/lead_repository.py
+          if grep -rnE 'LeadRepository\(\s*db\s*\)' backend/app; then
+            echo ""
+            echo "FALLO: hay un LeadRepository construido sin alcance."
+            exit 1
+          fi
+          echo "El repositorio no se construye sin decir para quién."
+
+      - name: La gestión de cuentas no borra ni publica hashes
+        run: |
+          set -euo pipefail
+          # El DELETE de /users desactiva; no elimina la fila. Borrarla dejaría sin sujeto
+          # los asientos de auditoría de esa persona.
+          if grep -nE 'db\.delete\(usuario\)|\.query\(User\)\.filter\([^)]*\)\.delete\(\)' backend/app/api/v1/endpoints/users.py; then
+            echo ""
+            echo "FALLO: la gestión de cuentas borra filas de `users`."
+            echo "La baja es lógica: el rastro de auditoría de esa persona debe seguir"
+            echo "teniendo sujeto (N-4)."
+            exit 1
+          fi
+          # Se busca la DECLARACIÓN de un campo, no la palabra: el docstring del módulo
+          # explica precisamente por qué no debe estar, y una guarda que no distinga el
+          # código de la prosa que lo justifica obliga a no explicar los arreglos.
+          if grep -nE '^[[:space:]]*hashed_password[[:space:]]*[:=]' backend/app/schemas/user.py backend/app/schemas/auth.py; then
+            echo ""
+            echo "FALLO: un esquema de respuesta declara el hash de la contraseña."
+            echo "Enumerar los campos uno a uno es lo que impide publicarlo sin querer."
+            exit 1
+          fi
+          grep -q 'require_roles(\[UserRole.SYSTEM_ADMIN\])' backend/app/api/v1/endpoints/users.py
+          echo "Baja lógica, sin hashes en las respuestas y solo para System_Admin."
+
+      - name: El cambio de contraseña propio exige la actual
+        run: |
+          set -euo pipefail
+          # Si bastara el token, el robo de una sesión de quince minutos se convertiría en
+          # la pérdida definitiva de la cuenta.
+          grep -q 'verify_password(datos.contrasena_actual' backend/app/api/v1/endpoints/auth.py || {
+            echo ""
+            echo "FALLO: /auth/change-password no comprueba la contraseña actual."
+            echo "Un token robado bastaría para quedarse con la cuenta cambiándola."
+            exit 1
+          }
+          grep -q 'cerrar_sesiones_del_usuario' backend/app/api/v1/endpoints/auth.py
+          echo "Pide la contraseña actual y cierra las sesiones."
+
+      # N-24: `must_change_password` se anotaba y no se imponia (§15.8). Ahora se impone en la
+      # resolucion de identidad POR DEFECTO y la excepcion se pide por su nombre. Hay dos
+      # formas de deshacerlo sin que nada falle a simple vista: quitar la comprobacion, o
+      # empezar a pedir la excepcion desde un endpoint que no sea de /auth.
+      - name: La contrasena prestada no opera
+        run: |
+          set -euo pipefail
+          grep -q 'if user.must_change_password and not admitir_contrasena_prestada' backend/app/core/security.py || {
+            echo ""
+            echo "FALLO: la resolucion de identidad ya no rechaza las contrasenas prestadas."
+            echo "Una cuenta creada o restablecida trabajaria con la contrasena que conoce el administrador."
+            exit 1
+          }
+          fuera=$(grep -rl 'get_current_user_con_contrasena_prestada' backend/app --include='*.py' \
+            | grep -v -E 'backend/app/core/security\.py$|backend/app/api/v1/endpoints/auth\.py$' || true)
+          if [ -n "$fuera" ]; then
+            echo ""
+            echo "FALLO: la excepcion para contrasenas prestadas se usa fuera de /auth:"
+            echo "$fuera"
+            exit 1
+          fi
+          usos=$(grep -c 'Depends(get_current_user_con_contrasena_prestada)' backend/app/api/v1/endpoints/auth.py || true)
+          if [ "$usos" -ne 3 ]; then
+            echo ""
+            echo "FALLO: /auth pide la excepcion en $usos rutas; deben ser tres (me, change-password, logout)."
+            exit 1
+          fi
+          echo "Con contrasena prestada solo se puede consultar el perfil, cambiarla y salir."
+
+      - name: El frontend no lleva equipo comercial escrito a mano
+        run: |
+          set -euo pipefail
+          if grep -rn 'DEFAULT_SALES_REPS' frontend/src; then
+            echo ""
+            echo "FALLO: vuelve a haber un equipo comercial fijo en el propio componente."
+            echo "Esa lista enseñaba personas y roles que no existían en el backend, y"
+            echo "seguía enseñándolos cuando la API estaba caída."
+            exit 1
+          fi
+          grep -q 'fetchSalesReps' frontend/src/components/AdminPanel.jsx
+          echo "El panel se alimenta del endpoint real."
+
+      - name: El recalculo masivo mantiene su arriendo y su turno
+        run: |
+          set -euo pipefail
+          # Un trabajo en RUNNING no demuestra que nadie lo esté ejecutando: sin un plazo
+          # que caduque, el proceso que muere a mitad deja la fila viva para siempre y
+          # bloquea todos los recálculos siguientes.
+          for columna in lease_until heartbeat_at lease_key; do
+            grep -qE "^[[:space:]]*${columna} = Column" backend/app/models/entities.py || {
+              echo ""
+              echo "FALLO: 'ScoringJob' perdió la columna '${columna}'."
+              echo "Sin ella, un recálculo abandonado queda en RUNNING indefinidamente (N-5)."
+              exit 1
+            }
+          done
+          # La exclusión tiene que estar en la BASE. Una comprobación previa en Python es
+          # una carrera: con dos workers, dos peticiones simultáneas leen "no hay ninguno"
+          # y ambas insertan.
+          grep -q 'Index("uq_scoring_jobs_lease_key", "lease_key", unique=True)' backend/app/models/entities.py || {
+            echo ""
+            echo "FALLO: desapareció el índice único del turno de recálculo."
+            echo "Sin él, 'uno a la vez' es una intención y no una garantía (N-5)."
+            exit 1
+          }
+          # `except RecalculoEnCurso`, no el nombre a secas: importarlo no es atenderlo, y
+          # con la excepcion sin capturar el segundo recalculo daria 500 en vez de 409.
+          grep -q 'except RecalculoEnCurso' backend/app/api/v1/endpoints/leads.py || {
+            echo ""
+            echo "FALLO: el endpoint no atiende RecalculoEnCurso."
+            echo "Sin ese manejador, pedir un segundo recálculo devuelve 500 (N-5)."
+            exit 1
+          }
+          grep -q 'HTTP_409_CONFLICT' backend/app/api/v1/endpoints/leads.py
+          # La LLAMADA, no el nombre. Buscar 'recuperar_trabajos_huerfanos' a secas daba
+          # por buena la línea del `import`: se podía dejar de invocar la función y la
+          # guarda seguía en verde. Se comprobó reintroduciendo justo ese defecto.
+          grep -vE '^[[:space:]]*#' backend/app/main.py | grep -q 'recuperar_trabajos_huerfanos()' || {
+            echo ""
+            echo "FALLO: nadie barre los recálculos huérfanos al arrancar."
+            echo "Importar la función no es llamarla: un reinicio tras una caída dejaría"
+            echo "los trabajos muertos en RUNNING, bloqueando el turno (N-5)."
+            exit 1
+          }
+          echo "Arriendo, turno exclusivo y barrido de arranque en su sitio."
+
+      - name: El identificador de peticion no se inventa en el manejador de errores
+        run: |
+          set -euo pipefail
+          # El 500 devolvía un `request_id` generado allí mismo: no constaba en ningún
+          # otro renglón, así que el dato que soporte pedía no llevaba a ninguna parte.
+          if grep -nE '^[[:space:]]*request_id = uuid' backend/app/main.py; then
+            echo ""
+            echo "FALLO: el manejador global vuelve a inventarse un request_id."
+            echo "Debe tomar el del contexto de la petición, que es el que llevan todos"
+            echo "los renglones del registro (N-14)."
+            exit 1
+          fi
+          grep -q 'request_id_actual()' backend/app/main.py
+          grep -q 'RequestIdMiddleware' backend/app/main.py
+          # Un identificador ajeno se acepta solo si es seguro imprimirlo: con un objeto
+          # JSON por línea, un salto de línea dentro de la cabecera fabrica eventos falsos.
+          # El USO del patrón, no su definición: dejar la constante declarada y quitar la
+          # comprobación es exactamente el defecto, y buscar solo el nombre lo daba por
+          # bueno. Se comprobó reintroduciéndolo.
+          grep -q 'REQUEST_ID_ADMISIBLE.match' backend/app/core/observabilidad.py || {
+            echo ""
+            echo "FALLO: el X-Request-ID entrante se aceptaría sin comprobar."
+            echo "Con un objeto JSON por línea, un salto de línea dentro de esa cabecera"
+            echo "escribe renglones enteros en el registro del servidor (N-14)."
+            exit 1
+          }
+          echo "El request_id se propaga y el entrante se filtra."
+
+      - name: Las metricas no quedan abiertas en un entorno endurecido
+        run: |
+          set -euo pipefail
+          # El volcado dice cuántos prospectos hay y cómo se reparten por categoría.
+          # Publicarlo debe ser una decisión: sin testigo, la ruta se apaga en producción.
+          grep -q 'METRICS_TOKEN' backend/app/core/config.py || {
+            echo "FALLO: desapareció METRICS_TOKEN."; exit 1
+          }
+          # Se miran las LINEAS DE CODIGO, no el archivo entero: el comentario que
+          # justifica `compare_digest` lo nombra, y buscarlo en el texto completo dejaba la
+          # guarda satisfecha por su propia explicación aunque el código usara '=='.
+          grep -vE '^[[:space:]]*#' backend/app/main.py | grep -q 'compare_digest' || {
+            echo ""
+            echo "FALLO: el testigo de /metrics se compara con '=='."
+            echo "La comparación de cadenas corta en el primer byte distinto y ese"
+            echo "tiempo es medible desde fuera."
+            exit 1
+          }
+          grep -q 'return not settings.is_hardened_environment' backend/app/main.py || {
+            echo ""
+            echo "FALLO: /metrics ya no se apaga sola en producción sin testigo."
+            exit 1
+          }
+          # Fuera de /api/: el nginx de la pila solo hace de pasarela para ese prefijo, y
+          # eso es lo que mantiene la ruta inalcanzable desde el puerto público.
+          if grep -q 'metrics' backend/app/api/v1/api.py; then
+            echo "FALLO: /metrics colgó de la API versionada y quedaría expuesta por nginx."
+            exit 1
+          fi
+          echo "/metrics protegida y fuera del prefijo que nginx publica."
+
+      - name: Los contenedores no corren con los valores de fabrica
+        run: |
+          set -euo pipefail
+          # Dos cosas que la primera versión de esta guarda hacía mal, y las dos se
+          # descubrieron comprobando que disparara:
+          #
+          #  1. Miraba el archivo entero, y la cabecera del compose explica los cuatro
+          #     mecanismos nombrándolos literalmente: la guarda quedaba satisfecha por su
+          #     propia documentación aunque no quedara un servicio endurecido.
+          #  2. Comprobaba que cada directiva apareciera «alguna vez». Con ocho servicios,
+          #     quitársela a uno dejaba las otras siete y la guarda callaba.
+          #
+          # Ahora se filtran los comentarios y se CUENTA: una por servicio.
+          directivas=$(grep -vE '^[[:space:]]*#' devops/docker-compose.yml)
+          # Solo el bloque `services:`. Contar las claves de dos espacios en el archivo
+          # entero metia tambien `volumes:` y `networks:` —11 en vez de 8— y la guarda
+          # fallaba sobre un arbol correcto. Una guarda que siempre falla acaba
+          # desactivada, que es peor que no tenerla.
+          bloque=$(printf '%s\n' "$directivas" | sed -n '/^services:/,/^volumes:/p')
+          servicios=$(printf '%s\n' "$bloque" | grep -cE '^  [a-z][a-z0-9_-]*:' || true)
+          echo "servicios declarados: $servicios"
+          faltan=0
+          for clave in "no-new-privileges:true" "cap_drop" "max-size"; do
+            veces=$(printf '%s\n' "$bloque" | grep -c -- "$clave" || true)
+            echo "  '$clave': $veces de $servicios"
+            if [ "$veces" -lt "$servicios" ]; then
+              echo "FALLO: '$clave' falta en $((servicios - veces)) servicio(s)."
+              faltan=1
+            fi
+          done
+          # `read_only` admite exactamente una excepción: PostgreSQL, que escribe fuera del
+          # volumen al inicializar. Cualquier otra ausencia es un descuido.
+          solo_lectura=$(printf '%s\n' "$bloque" | grep -c 'read_only: true' || true)
+          echo "  'read_only: true': $solo_lectura de $servicios (se espera $((servicios - 1)))"
+          if [ "$solo_lectura" -lt "$((servicios - 1))" ]; then
+            echo "FALLO: hay más de un servicio con el sistema de ficheros escribible."
+            faltan=1
+          fi
+          [ "$faltan" = "0" ] || {
+            echo ""
+            echo "Sin techo de recursos, un proceso desbocado se lleva por delante también"
+            echo "a la base de datos; sin rotación, el registro llena el disco donde vive"
+            echo "PostgreSQL (N-12)."
+            exit 1
+          }
+          echo "Endurecimiento de contenedores declarado."
+
+      - name: Las copias se comprueban y la restauracion se ensaya
+        run: |
+          set -euo pipefail
+          for guion in respaldo.sh prueba_de_restauracion.sh restaurar.sh; do
+            test -f "devops/backup/$guion" || {
+              echo "FALLO: falta devops/backup/$guion (N-13)."; exit 1
+            }
+          done
+          # SIEMPRE sobre las ordenes, nunca sobre el archivo entero: cada una de estas
+          # opciones aparece dos veces en su guion —en la orden y en el comentario que
+          # explica por que hace falta—, de modo que buscarlas en el texto completo daba
+          # guardas que el propio comentario satisface. Se comprobo: quitar
+          # `--exit-on-error` del pg_restore real no hacia fallar nada.
+          ordenes() { grep -vE '^[[:space:]]*#' "$1"; }
+
+          # Que pg_dump termine no significa que el archivo sirva.
+          ordenes devops/backup/respaldo.sh | grep -q 'pg_restore --list' || {
+            echo "FALLO: el volcado se da por bueno sin comprobar que se puede leer."
+            exit 1
+          }
+          # Sin --exit-on-error, pg_restore informa de los errores y sale con codigo 0:
+          # una restauracion a medias se leeria como un exito.
+          ordenes devops/backup/prueba_de_restauracion.sh | grep -q -- '--exit-on-error' || {
+            echo ""
+            echo "FALLO: la prueba de restauración no falla cuando la restauración falla."
+            echo "Sin '--exit-on-error' el informe diría que las copias funcionan."
+            exit 1
+          }
+          ordenes devops/backup/prueba_de_restauracion.sh | grep -q 'trap retirar_base_desechable EXIT' || {
+            echo ""
+            echo "FALLO: la base desechable solo se retira en la salida feliz."
+            echo "Con 'set -e', un pg_restore que falla aborta antes del DROP y deja una"
+            echo "base a medias en el servidor por cada intento."
+            exit 1
+          }
+          ordenes devops/backup/restaurar.sh | grep -q 'CONFIRMO_SOBRESCRIBIR:-'
+          ordenes devops/backup/restaurar.sh | grep -q -- '--single-transaction'
+          echo "Copias verificadas y restauración ensayable."
+
+      # ------------------------------------------------------------------
+      # Fase 11 — El cliente
+      # ------------------------------------------------------------------
+      - name: Las fuentes siguen autoalojadas y la politica las admite
+        run: |
+          set -euo pipefail
+          # Sin comentarios: `index.html` y `security-headers.conf` EXPLICAN que antes
+          # habia enlaces a Google y nombran los dos dominios. Buscarlos en el texto
+          # completo daria una guarda satisfecha por su propia documentacion, que es el
+          # error que este pipeline ya cometio tres veces.
+          marcado=$(sed 's/<!--.*-->//g' frontend/index.html | sed 's/data:[^"]*//g')
+          politica=$(grep -vE '^[[:space:]]*#' frontend/security-headers.conf)
+
+          if printf '%s\n' "$marcado" | grep -qE 'https?://'; then
+            echo ""
+            echo "FALLO: index.html vuelve a enlazar un origen externo."
+            printf '%s\n' "$marcado" | grep -E 'https?://'
+            echo "La CSP dice font-src 'self' y style-src 'self': el navegador lo"
+            echo "bloqueara en produccion SIN error visible, y la aplicacion caera a"
+            echo "las fuentes del sistema (N-7)."
+            exit 1
+          fi
+
+          # La declaracion, no la mencion, y CONTADA. La primera version se conformaba
+          # con que apareciera una `url()` local en alguna parte del archivo: con dos
+          # familias declaradas, quitarle el archivo a una dejaba la otra y la guarda
+          # callaba. Es el mismo «aparece alguna vez» que ya fallo con el endurecimiento
+          # de los contenedores en la fase anterior.
+          caras=$(grep -c '@font-face' frontend/src/fuentes.css || true)
+          locales=$(grep -c "url('@fontsource-variable/" frontend/src/fuentes.css || true)
+          echo "  caras declaradas: $caras, con archivo local: $locales"
+          [ "$caras" -ge 2 ] || { echo "FALLO: faltan familias autoalojadas (N-7)"; exit 1; }
+          [ "$locales" -eq "$caras" ] || {
+            echo ""
+            echo "FALLO: $((caras - locales)) cara(s) sin archivo local en fuentes.css."
+            echo "Una familia que no viaja en el bundle se pide fuera, y font-src 'self'"
+            echo "la bloquea en produccion sin ningun error visible (N-7)."
+            exit 1
+          }
+
+          # `font-src 'self'` a secas. Con `data:` la politica admite mas de lo que hace
+          # falta y deja de servir para detectar que algo cambio.
+          printf '%s\n' "$politica" | grep -q "font-src 'self';" || {
+            echo "FALLO: la CSP ya no restringe las fuentes al propio origen (N-7)."
+            exit 1
+          }
+          if printf '%s\n' "$politica" | grep -qE 'googleapis|gstatic'; then
+            echo "FALLO: la CSP admite un origen de Google."
+            exit 1
+          fi
+          echo "Fuentes autoalojadas y politica coherente."
+
+      - name: El cliente conserva su red de pruebas
+        run: |
+          set -euo pipefail
+          # El cliente no tenia ni pruebas ni analisis estatico (N-9). Estas cuatro cosas
+          # son la red entera: si alguna desaparece, el resto deja de significar nada.
+          for guion in '"test":' '"lint":' '"test:coverage":'; do
+            grep -q -- "$guion" frontend/package.json || {
+              echo "FALLO: falta el guion $guion en frontend/package.json (N-9)."
+              exit 1
+            }
+          done
+
+          # La regla que justifica instalar eslint, y en 'error'. Como aviso se acumula
+          # y se ignora, y entonces no protege de nada.
+          grep -vE '^\s*//' frontend/eslint.config.js \
+            | grep -q "'react-hooks/exhaustive-deps': 'error'" || {
+            echo ""
+            echo "FALLO: exhaustive-deps ya no es un error."
+            echo "Una lista de dependencias incompleta no rompe la pantalla: el efecto se"
+            echo "queda leyendo un valor viejo. Es la familia del defecto de respuestas"
+            echo "desordenadas que la Fase 11 encontro en el simulador."
+            exit 1
+          }
+
+          # El suelo de cobertura, con su valor. Que exista el bloque `thresholds` no
+          # dice nada si dentro pone 0.
+          umbrales=$(grep -vE '^\s*//' frontend/vite.config.js \
+            | sed -n '/thresholds: {/,/}/p' | grep -oE '[0-9]+' | sort -n | head -1)
+          echo "  suelo de cobertura mas bajo: ${umbrales:-ninguno}"
+          [ -n "${umbrales:-}" ] && [ "$umbrales" -ge 80 ] || {
+            echo "FALLO: el suelo de cobertura del cliente esta ausente o por debajo del 80 %."
+            exit 1
+          }
+
+          # Y que las pruebas existan de verdad. Un suelo de cobertura sobre cero
+          # archivos de prueba se cumple solo.
+          pruebas=$(find frontend/src -name '*.test.js' -o -name '*.test.jsx' | wc -l)
+          echo "  archivos de prueba: $pruebas"
+          [ "$pruebas" -ge 4 ] || {
+            echo "FALLO: faltan archivos de prueba del cliente (se esperan al menos 4)."
+            exit 1
+          }
+          echo "Red de pruebas del cliente completa."
+
+      - name: La imagen del cliente consume el artefacto, no lo recompila
+        run: |
+          set -euo pipefail
+          # `dist/` no se versiona (N-17). Se comprueban las dos mitades: que la regla
+          # siga, y que nadie la haya anulado con una negacion posterior —`!frontend/dist/`
+          # deja la regla intacta y la desactiva igual, y la primera version de esta
+          # guarda no lo veia—.
+          grep -qE '^dist/$' .gitignore || {
+            echo "FALLO: dist/ ya no esta en .gitignore (N-17)."
+            exit 1
+          }
+          if grep -qE '^!.*dist' .gitignore; then
+            echo "FALLO: una negacion en .gitignore vuelve a versionar dist/ (N-17)."
+            grep -nE '^!.*dist' .gitignore
+            exit 1
+          fi
+          if git ls-files --error-unmatch frontend/dist >/dev/null 2>&1; then
+            echo "FALLO: frontend/dist esta versionado (N-17)."
+            exit 1
+          fi
+
+          # El destino que consume el bundle ya compilado tiene que existir...
+          grep -vE '^\s*#' frontend/Dockerfile | grep -q 'AS desde-artefacto' || {
+            echo "FALLO: el Dockerfile del cliente ya no tiene el destino desde-artefacto (N-17)."
+            exit 1
+          }
+          # ...y el pipeline tiene que USARLO. Que exista y no se use es exactamente el
+          # defecto: el pipeline compilaria un bundle distinto del que acaba de probar,
+          # las dos compilaciones terminarian bien y no habria ningun sintoma.
+          #
+          # OJO con como se busca. La primera version hacia `grep` sobre ci.yml entero, y
+          # encontraba su propio patron: la cadena que busca esta escrita en esta misma
+          # linea, dentro de este mismo archivo. La guarda se daba por satisfecha a si
+          # misma y no disparaba con NINGUNA de las cuatro reintroducciones. Se acota al
+          # bloque del trabajo `imagenes`, que ademas es mas exigente: no basta con que
+          # la orden exista en alguna parte, tiene que estar donde construye la imagen.
+          bloque_imagenes=$(sed -n '/^  imagenes:/,/^  configuracion-peligrosa:/p' \
+            .github/workflows/ci.yml | grep -vE '^\s*#')
+
+          printf '%s\n' "$bloque_imagenes" | grep -q 'target: desde-artefacto' || {
+            echo ""
+            echo "FALLO: el pipeline vuelve a recompilar la SPA dentro de la imagen."
+            echo "Lo que se prueba y lo que se despliega dejarian de ser el mismo archivo (N-17)."
+            exit 1
+          }
+          printf '%s\n' "$bloque_imagenes" | grep -q 'sha256sum /usr/share/nginx/html' || {
+            echo "FALLO: nadie comprueba que la imagen lleve el bundle que se probo (N-17)."
+            exit 1
+          }
+          echo "La imagen del cliente lleva el artefacto verificado."
+
+      - name: Las dependencias y las imagenes se auditan e inventarian
+        run: |
+          set -euo pipefail
+          # Se miran los DOS bloques donde estas ordenes tienen que estar, no el archivo
+          # entero. Buscar en ci.yml completo hacia que esta guarda encontrara los
+          # patrones escritos en sus propias lineas `grep` —esta incluida— y no disparara
+          # con ninguna de las cinco reintroducciones. Acotar al bloque es a la vez el
+          # arreglo y una comprobacion mas estricta.
+          bloque_deps=$(sed -n '/^  dependencias:/,/^  modelo:/p' .github/workflows/ci.yml | grep -vE '^\s*#')
+          bloque_imagenes=$(sed -n '/^  imagenes:/,/^  configuracion-peligrosa:/p' .github/workflows/ci.yml | grep -vE '^\s*#')
+
+          # `npm audit` con su umbral: sin `--audit-level` la orden informa y sale con 0.
+          printf '%s\n' "$bloque_deps" | grep -q -- 'npm audit --audit-level=high' || {
+            echo ""
+            echo "FALLO: el cliente ya no se audita (N-10)."
+            echo "Sin '--audit-level=high' npm audit informa y sale con codigo 0: el"
+            echo "pipeline seguiria verde con avisos criticos."
+            exit 1
+          }
+
+          # Trivy con `--exit-code 1`: sin eso escanea, imprime y no falla nunca.
+          printf '%s\n' "$bloque_imagenes" | grep -q -- '--exit-code 1' || {
+            echo ""
+            echo "FALLO: el escaneo de imagenes ya no tumba el pipeline (N-10)."
+            exit 1
+          }
+          # Y con `--ignore-unfixed`: sin eso la puerta se queda en rojo por 55 avisos
+          # que nadie de este proyecto puede resolver, y una puerta asi se desactiva.
+          printf '%s\n' "$bloque_imagenes" | grep -q -- '--ignore-unfixed' || {
+            echo "FALLO: la puerta de Trivy falla por avisos sin arreglo publicado (N-10)."
+            exit 1
+          }
+
+          # La lista de materiales, y que se publique: una SBOM que no sale del runner no
+          # sirve para responder «esta o no esta» cuando llegue el proximo aviso.
+          # La ORDEN, no el nombre del paso. Buscar 'syft' a secas daba por buena la
+          # linea `- name: Lista de materiales de las imagenes (syft, CycloneDX)`: se
+          # podia sustituir la orden entera por un `true` y la guarda seguia en verde.
+          # Es el mismo error que la linea del `import` en la fase anterior.
+          printf '%s\n' "$bloque_imagenes" | grep -q 'anchore/syft' || {
+            echo "FALLO: ya no se genera la lista de materiales de las imagenes (N-10)."
+            exit 1
+          }
+          # Y que el formato siga siendo intercambiable: una SBOM en el formato propio
+          # de una herramienta no sirve para responderle a otra.
+          printf '%s\n' "$bloque_imagenes" | grep -q 'cyclonedx-json' || {
+            echo "FALLO: la lista de materiales ya no sale en CycloneDX (N-10)."
+            exit 1
+          }
+          printf '%s\n' "$bloque_imagenes" | grep -q 'name: seguridad-imagenes' || {
+            echo "FALLO: los informes de seguridad de las imagenes no se publican (N-10)."
+            exit 1
+          }
+          # R-2: se audita lo INSTALADO desde los locks, sin volver a resolver rangos. Y la
+          # lista auditada no puede salir vacia: un `pip-audit` sobre cero paquetes tambien
+          # dice «No known vulnerabilities found».
+          printf '%s\n' "$bloque_deps" | grep -q -- '--no-deps --disable-pip' || {
+            echo ""
+            echo "FALLO: pip-audit vuelve a resolver versiones en lugar de auditar lo instalado (R-2)."
+            exit 1
+          }
+          if printf '%s\n' "$bloque_deps" | grep -qE 'pip-audit --requirement backend/requirements(-dev)?\.txt'; then
+            echo "FALLO: se vuelven a auditar los rangos de requirements.txt (R-2)."
+            exit 1
+          fi
+          # La COMPROBACION, no solo el listado: las dos ordenes llaman al mismo guion, y
+          # quitar la que compara dejando la que lista seguiria auditando sin saber si lo
+          # auditado es lo fijado.
+          printf '%s\n' "$bloque_deps" | grep -qE 'comprobar_instalado.py backend/requirements.lock --ignorar pip$' || {
+            echo "FALLO: ya no se comprueba que lo instalado sea lo fijado (R-2)."
+            exit 1
+          }
+          { printf '%s\n' "$bloque_imagenes" | grep -q 'comprobar_instalado.py /verificacion/requirements.lock' \
+            && printf '%s\n' "$bloque_imagenes" | grep -qx '          verificar'; } || {
+            echo "FALLO: ya no se comprueba lo que la imagen lleva instalado (R-2)."
+            exit 1
+          }
+          printf '%s\n' "$bloque_imagenes" | grep -q 'test -s instalado-imagen.txt' || {
+            echo "FALLO: se audita la lista de la imagen sin comprobar que no este vacia (R-2)."
+            exit 1
+          }
+          # Capitulo 23: CERO avisos ignorados. La unica excepcion que hubo —PYSEC-2026-1325,
+          # sobre `ecdsa`— se cerro retirando python-jose. Se mira el workflow entero y no solo
+          # los dos bloques: un `--ignore-vuln` en cualquier paso es la misma excepcion.
+          ignoradas=$(grep -vE '^\s*#' .github/workflows/ci.yml | grep -oE -- '--ignore-vuln[ =][A-Za-z0-9-]+' | grep -v "grep -oE" | sort -u | tr '\n' ' ' || true)
+          [ -z "$ignoradas" ] || {
+            echo "FALLO: pip-audit vuelve a ignorar avisos: '$ignoradas' (capitulo 23)."
+            echo "Si un aviso no tiene arreglo, se decide a la vista y se cambia test_dependencias_fijadas.py."
+            exit 1
+          }
+          echo "Auditoria de dependencias, escaneo de imagenes e inventario en su sitio."
+
+      # R-2. Basta una linea para volver a instalar «lo ultimo que haya»: un `pip install
+      # ruff` suelto, un `-r requirements.txt` en el Dockerfile. Se mira el workflow entero
+      # MENOS este trabajo, cuyas lineas `grep` contienen los patrones que se buscan.
+      - name: Las dependencias se instalan desde el lock
+        run: |
+          set -euo pipefail
+          dockerfile=$(grep -vE '^\s*#' backend/Dockerfile)
+          printf '%s\n' "$dockerfile" | grep -q 'pip install --require-hashes -r /tmp/requirements.lock' || {
+            echo ""
+            echo "FALLO: la imagen del backend ya no instala desde el lock con huellas (R-2)."
+            exit 1
+          }
+          if printf '%s\n' "$dockerfile" | grep -nE 'requirements(-dev)?\.txt|pip install --upgrade'; then
+            echo ""
+            echo "FALLO: la imagen vuelve a instalar desde rangos, o a actualizar pip sin version (R-2)."
+            exit 1
+          fi
+          resto=$(sed '/^  configuracion-peligrosa:/,/^  migraciones:/d' .github/workflows/ci.yml | grep -vE '^\s*#')
+          sueltas=$(printf '%s\n' "$resto" | grep -nE '(^|[ /])pip install' | grep -vE 'pip install --require-hashes -r backend/requirements(-dev)?\.lock' || true)
+          if [ -n "$sueltas" ]; then
+            echo "$sueltas"
+            echo ""
+            echo "FALLO: hay instalaciones en CI que no salen de un lock (R-2)."
+            exit 1
+          fi
+          # El lock tiene que llegar al contexto de construccion de la imagen.
+          if grep -vE '^\s*#' .dockerignore | grep -qxE '/?backend/requirements\.lock|\*\*/\*\.lock|/?backend'; then
+            echo "FALLO: .dockerignore deja fuera el lock que la imagen instala (R-2)."
+            exit 1
+          fi
+          echo "La imagen y todos los trabajos de CI instalan desde los locks."
+
+      # R-3. La purga tiene tres piezas que un cambio razonable rompe sin que falle nada:
+      # que este programada, que respete la instantanea de entrada que usa el bucle de
+      # realimentacion, y que resuma solo lo que borro.
+      - name: El historial de puntuacion tiene plazo y la purga no rompe el bucle
+        run: |
+          set -euo pipefail
+          servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
+          { printf '%s\n' "$servicio" | grep -q '/app/scripts/retencion_historial.py' \
+            && printf '%s\n' "$servicio" | grep -q -- '--cada'; } || {
+            echo ""
+            echo "FALLO: la purga del historial ya no esta programada en la pila (R-3)."
+            exit 1
+          }
+          grep -q '^from app.services.retencion_service import consulta_instantanea_de_entrada' ml_pipeline/src/feedback_dataset.py || {
+            echo ""
+            echo "FALLO: el extractor del bucle ya no usa el criterio de la purga (R-3)."
+            echo "Si cada pieza decide por su cuenta cual es la instantanea de entrada, la purga"
+            echo "puede borrar la que el extractor va a usar, y el reentrenamiento aprende con"
+            echo "fuga de informacion sin que nada falle."
+            exit 1
+          }
+          purga=$(grep -vE '^\s*#' backend/app/services/retencion_service.py)
+          printf '%s\n' "$purga" | grep -q 'protegidas = filas_protegidas(db, lead_ids)' || {
+            echo "FALLO: la purga ya no protege la instantanea de entrada ni la puntuacion vigente (R-3)."
+            exit 1
+          }
+          printf '%s\n' "$purga" | grep -q 'if borradas != len(candidatas):' || {
+            echo "FALLO: la purga resume lo que leyo en lugar de lo que borro (R-3)."
+            exit 1
+          }
+          echo "Purga programada, entrada protegida y resumen sin dobles cuentas."
+
+      # R-11. Suprimir tenia dos formas de no suprimir: seguir las cascadas del ORM, que no
+      # alcanzan lo que no cuelga por clave foranea, y anotar el correo de la persona en el
+      # asiento de su propio borrado.
+      - name: La supresion alcanza todo y no deja al titular en la bitacora
+        run: |
+          set -euo pipefail
+          borrado=$(sed -n '/^def delete_lead(/,/^@router/p' backend/app/api/v1/endpoints/leads.py | grep -vE '^\s*#')
+          printf '%s\n' "$borrado" | grep -q 'suprimir_prospecto(db, condenado)' || {
+            echo ""
+            echo "FALLO: el borrado de prospectos ya no pasa por la supresion completa (R-11)."
+            exit 1
+          }
+          if printf '%s\n' "$borrado" | grep -nE 'anotar\(.*(email|empresa)='; then
+            echo ""
+            echo "FALLO: el asiento del borrado vuelve a guardar datos de la persona borrada (R-11)."
+            exit 1
+          fi
+          grep -q '@router.get("/{lead_id}/exportar")' backend/app/api/v1/endpoints/leads.py || {
+            echo "FALLO: desaparecio la exportacion de los datos del titular (R-11)."
+            exit 1
+          }
+          for tabla in lead_activities score_histories score_history_monthly crm_integration_logs webhook_deliveries; do
+            grep -q "\"$tabla\":" backend/app/services/derechos_del_titular.py || {
+              echo "FALLO: la exportacion y la supresion ya no alcanzan $tabla (R-11)."
+              exit 1
+            }
+          done
+          echo "Exportacion disponible; la supresion recorre el mapa completo y no guarda al titular."
+
+      # Fase 15. Habia tres caminos para escribir una actividad y cada uno validaba a su
+      # manera. Un cuarto que se anadiera se saltaria la validacion, la deduplicacion
+      # permanente y la minimizacion, y ninguna prueba del endpoint nuevo lo notaria.
+      - name: Las actividades se registran por un solo camino
+        run: |
+          set -euo pipefail
+          escritores=$(grep -rnE 'LeadActivity\(' backend/app --include='*.py' \
+            | grep -vE 'class LeadActivity\(|<LeadActivity\(' | cut -d: -f1 | sort -u)
+          if [ "$escritores" != "backend/app/services/registro_de_actividad.py" ]; then
+            printf '%s\n' "$escritores"
+            echo ""
+            echo "FALLO: hay codigo que construye actividades fuera de registrar_evento (Fase 15)."
+            exit 1
+          fi
+          if grep -vE '^\s*#' backend/app/repositories/activity_repository.py | grep -n 'def add_activity'; then
+            echo "FALLO: el repositorio de actividades vuelve a escribir por su cuenta (Fase 15)."
+            exit 1
+          fi
+          manual=$(sed -n '/^async def add_lead_activity(/,/^@router/p' backend/app/api/v1/endpoints/leads.py | grep -vE '^\s*#')
+          printf '%s\n' "$manual" | grep -q 'registro_de_actividad.registrar_evento(db, evento, lead=lead)' || {
+            echo "FALLO: el registro desde la ficha ya no pasa por registrar_evento (Fase 15)."
+            exit 1
+          }
+          grep -vE '^\s*#' backend/app/services/crm_service.py | grep -q 'await registrar_evento(' || {
+            echo "FALLO: la ingesta del CRM ya no pasa por registrar_evento (Fase 15)."
+            exit 1
+          }
+          echo "Panel, CRM y conectores escriben actividades por registrar_evento y por nada mas."
+
+      # Fase 15. Lo que no llega no se inventa y lo que no se conoce no se supone: ni
+      # industria «Tecnologia», ni tamano «1-10», ni FORM_SUBMIT para un tipo desconocido,
+      # ni ficha para un aviso de quien no es cartera, ni conversacion para un buzon.
+      - name: El registro no inventa ni supone
+        run: |
+          set -euo pipefail
+          crm=$(grep -vE '^\s*#' backend/app/services/crm_service.py)
+          # Entre comillas: literales de codigo. La documentacion del modulo nombra esos
+          # valores para contar que ya no se usan, y la primera version de esta guarda
+          # fallaba sobre el arbol correcto por leerla.
+          if printf '%s\n' "$crm" | grep -nE 'ActivityType\.FORM_SUBMIT|"Tecnolog|"1-10"|"Empresa no identificada"|"No especificado"|"Sin Apellido"'; then
+            echo ""
+            echo "FALLO: la ingesta del CRM vuelve a rellenar con valores inventados (Fase 15)."
+            exit 1
+          fi
+          registro=$(grep -vE '^\s*#' backend/app/services/registro_de_actividad.py)
+          { printf '%s\n' "$registro" | grep -q 'if not v.fuente.crea_prospecto:' \
+            && printf '%s\n' "$registro" | grep -q 'return _a_la_bandeja(db, v, commit)'; } || {
+            echo "FALLO: un correo desconocido vuelve a crear ficha desde cualquier fuente (Fase 15)."
+            exit 1
+          }
+          scoring=$(grep -vE '^\s*#' backend/app/services/scoring_service.py)
+          printf '%s\n' "$scoring" | grep -q 'if act.call_outcome == CallOutcome.CONECTO.value:' || {
+            echo "FALLO: una llamada que no conecto vuelve a contar como conversacion (Fase 15)."
+            exit 1
+          }
+          printf '%s\n' "$scoring" | grep -q '"company_size": lead.company_size or "",' || {
+            echo "FALLO: el extractor vuelve a suponer un tamano de empresa que no llego (Fase 15)."
+            exit 1
+          }
+          echo "Nada inventado: tipo con motivo, ficha solo desde fuentes que la generan, llamada solo si conecto."
+
+      # Fase 15. Del mensaje se guarda el tipo, la direccion, la fecha y el identificador,
+      # nunca el texto. Y cada integracion firma con su secreto y cuenta con su limite: una
+      # revocada o filtrada no arrastra a las demas.
+      - name: El texto de los mensajes no se guarda y las integraciones no comparten secreto
+        run: |
+          set -euo pipefail
+          crm=$(grep -vE '^\s*#' backend/app/services/crm_service.py)
+          [ "$(printf '%s\n' "$crm" | grep -c 'payload=minimizar(payload.model_dump())')" -eq 2 ] || {
+            echo "FALLO: lo que se guarda de la entrega del CRM ya no pasa por minimizar (Fase 15)."
+            exit 1
+          }
+          grep -vE '^\s*#' backend/app/services/registro_de_actividad.py | grep -q 'datos = minimizar(dict(evento.datos or {}))' || {
+            echo "FALLO: los datos de la actividad ya no se minimizan antes de guardarse (Fase 15)."
+            exit 1
+          }
+          entrada=$(grep -vE '^\s*#' backend/app/api/v1/endpoints/integraciones.py)
+          printf '%s\n' "$entrada" | grep -q 'verificar_firma_de_entrega(request, integracion.secreto, integracion.nombre)' || {
+            echo "FALLO: las integraciones ya no firman cada una con su secreto (Fase 15)."
+            exit 1
+          }
+          printf '%s\n' "$entrada" | grep -q 'aplicar_limite(integracion, request)' || {
+            echo "FALLO: las integraciones ya no tienen limite propio (Fase 15)."
+            exit 1
+          }
+          for integracion in CALENDLY WHATSAPP LINKEDIN_LEAD_GEN FORMULARIO_WEB; do
+            grep -qE "^    INTEGRACION_${integracion}_ACTIVA: bool = False$" backend/app/core/config.py || {
+              echo "FALLO: INTEGRACION_${integracion} nace encendida o sin interruptor (Fase 15)."
+              exit 1
+            }
+            for ajuste in SECRETO LIMITE; do
+              grep -qE "^    INTEGRACION_${integracion}_${ajuste}: str = " backend/app/core/config.py || {
+                echo "FALLO: INTEGRACION_${integracion}_${ajuste} desaparecio (Fase 15)."
+                exit 1
+              }
+            done
+          done
+          echo "Mensajes sin texto; cada integracion con su secreto, su interruptor y su limite."
+
+      # Capitulo 22. Cada tabla que §20.5 dejaba sin caducidad tiene plazo, y lo aplica la
+      # pasada diaria. Tres formas de volver atras sin que falle nada: quitar la llamada del
+      # guion, sacar una tabla de la lista o no pasar los plazos al servicio de la pila.
+      - name: Nada sin plazo - la purga diaria aplica la caducidad
+        run: |
+          set -euo pipefail
+          guion=$(grep -vE '^\s*#' backend/scripts/retencion_historial.py)
+          printf '%s\n' "$guion" | grep -q 'for resultado in aplicar_caducidad(db, simular=simular):' || {
+            echo ""
+            echo "FALLO: la pasada diaria ya no aplica los plazos de conservacion (capitulo 22)."
+            exit 1
+          }
+          plazos=$(grep -vE '^\s*#' backend/app/services/caducidad_service.py)
+          for tabla in refresh_tokens scoring_jobs crm_integration_logs unmatched_events; do
+            printf '%s\n' "$plazos" | grep -q "\"$tabla\"" || {
+              echo "FALLO: $tabla vuelve a no tener plazo (capitulo 22)."
+              exit 1
+            }
+          done
+          # La funcion que ya existia, no una segunda: el defecto era que nadie la llamaba.
+          printf '%s\n' "$plazos" | grep -q 'purgar_tokens_caducados(db, margen_dias=dias, ahora=ahora)' || {
+            echo "FALLO: la purga de sesiones ya no pasa por purgar_tokens_caducados (capitulo 22)."
+            exit 1
+          }
+          printf '%s\n' "$plazos" | grep -q 'ScoringJob.status.in_(ESTADOS_TERMINALES)' || {
+            echo "FALLO: la caducidad de recalculos ya no se limita a los terminados (capitulo 22)."
+            exit 1
+          }
+          servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
+          for ajuste in CONSERVACION_SESIONES_DIAS CONSERVACION_TRABAJOS_DIAS CONSERVACION_REGISTROS_CRM_DIAS CONSERVACION_SIN_ASOCIAR_DIAS; do
+            printf '%s\n' "$servicio" | grep -q "^      $ajuste:" || {
+              echo "FALLO: $ajuste no llega al servicio que aplica el plazo (capitulo 22)."
+              exit 1
+            }
+          done
+          echo "Sesiones, recalculos, registros CRM y bandeja con plazo, aplicado cada dia."
+
+      # §19.9. Negarse a evaluar con un perfil ajeno es correcto; hacerlo sin avisar deja al
+      # sistema aparentando vigilancia. La negativa tiene que salir por el webhook, y la de
+      # una evaluacion fallida sin el mensaje de la excepcion, que nombra la base.
+      - name: El monitor avisa tambien cuando no evalua
+        run: |
+          set -euo pipefail
+          monitor=$(grep -vE '^\s*#' ml_pipeline/src/drift_monitor.py)
+          for motivo in MOTIVO_PERFIL_AUSENTE MOTIVO_PERFIL_ILEGIBLE MOTIVO_PERFIL_AJENO; do
+            printf '%s\n' "$monitor" | grep -q "return _negarse($motivo," || {
+              echo ""
+              echo "FALLO: el monitor vuelve a negarse en silencio por $motivo (§19.9)."
+              exit 1
+            }
+          done
+          printf '%s\n' "$monitor" | grep -q 'procesar_negativa(args.estado, MOTIVO_EVALUACION_FALLIDA, exc.__class__.__name__)' || {
+            echo "FALLO: una evaluacion fallida en bucle ya no avisa, o avisa con el mensaje de la excepcion (§19.9)."
+            exit 1
+          }
+          sed -n '/^def emitir_negativa(/,/^def /p' ml_pipeline/src/drift_monitor.py | grep -vE '^\s*#' | grep -q '_entregar_a_webhook(evento)' || {
+            echo "FALLO: la negativa ya no se entrega al webhook de las alertas (§19.9)."
+            exit 1
+          }
+          echo "Negativas del monitor por el mismo canal que sus alertas."
+
+      # Capitulo 22 (§20.8, §17.9). La guarda es el propio guion de renovacion en su modo sin
+      # red: imagenes sin huella, una etiqueta con dos huellas, `apk upgrade` o un paquete de
+      # `apk` sin version. Solo biblioteca estandar, para correr sin instalar nada.
+      - name: Las imagenes base van fijadas por huella y sin apk upgrade
+        run: python3 scripts/renovar_imagenes.py --solo-fijacion
+
+      # Capitulo 23 (§14.7). El access token lleva `ver` y la resolucion de identidad la
+      # compara. Dos lineas que un cambio razonable quita sin que nada falle a la vista:
+      # la del claim al emitir y la de la comparacion. Y la biblioteca de JWT no vuelve a
+      # ser python-jose, que arrastraba el aviso sin arreglo de `ecdsa`.
+      - name: El access token se revoca al instante y no hay python-jose
+        run: |
+          set -euo pipefail
+          seguridad=$(grep -vE '^\s*#' backend/app/core/security.py)
+          # Dentro de create_access_token: el refresh token lleva la misma linea, y buscarla
+          # en el archivo entero la encontraba aunque el access token la hubiera perdido.
+          sed -n '/^def create_access_token(/,/^def create_refresh_token(/p' backend/app/core/security.py \
+            | grep -vE '^\s*#' | grep -q '"ver": user.token_version,' || {
+            echo ""
+            echo "FALLO: el access token ya no lleva la version de la cuenta (capitulo 23)."
+            exit 1
+          }
+          sed -n '/^def _resolver_identidad(/,/^def get_current_user(/p' backend/app/core/security.py \
+            | grep -vE '^\s*#' | grep -q 'if payload.get("ver") != user.token_version:' || {
+            echo "FALLO: la resolucion de identidad ya no compara la version del token (capitulo 23)."
+            echo "Un access token robado volveria a sobrevivir al logout de su victima."
+            exit 1
+          }
+          printf '%s\n' "$seguridad" | grep -q '"require": \[' || {
+            echo "FALLO: decode_token ya no exige los claims obligatorios; un token sin exp valdria siempre."
+            exit 1
+          }
+          if grep -rnE '^\s*(import|from)\s+(jose|ecdsa)\b' backend --include='*.py'; then
+            echo "FALLO: vuelve python-jose o ecdsa al codigo (capitulo 23)."
+            exit 1
+          fi
+          if grep -qiE '^(python-jose|ecdsa)==' backend/requirements.lock; then
+            echo "FALLO: python-jose o ecdsa vuelven al lock de produccion (capitulo 23)."
+            exit 1
+          fi
+          echo "Access token con version comprobada en cada peticion; JWT sin python-jose."
+
+      # Capitulo 23. La lista local de filtradas se comprueba en las tres puertas porque las
+      # tres pasan por `exigir`, y exigir la consulta. Si la consulta se quita, o el archivo
+      # deja de viajar en el paquete que copia la imagen, la politica vuelve a aceptar
+      # contrasenas filtradas sin que nada lo diga.
+      - name: Las contrasenas filtradas se rechazan con la lista local
+        run: |
+          set -euo pipefail
+          politica=$(grep -vE '^\s*#' backend/app/core/passwords.py)
+          printf '%s\n' "$politica" | grep -q 'in contrasenas_filtradas()' || {
+            echo ""
+            echo "FALLO: la politica ya no consulta la lista de contrasenas filtradas (capitulo 23)."
+            exit 1
+          }
+          # La comparacion de la huella, no un `raise` cualquiera: el de las entradas solo
+          # detecta una lista con otro tamano, no una sustituida por otra del mismo.
+          sed -n '/^def contrasenas_filtradas(/,/^def /p' backend/app/core/passwords.py | grep -vE '^\s*#' \
+            | grep -A1 -F 'if hashlib.sha256(datos).hexdigest() != manifiesto.get("sha256"):' | grep -q 'raise ListaDeFiltradasInvalida' || {
+            echo "FALLO: una lista vaciada o sustituida se usaria en silencio (capitulo 23)."
+            exit 1
+          }
+          for archivo in contrasenas_filtradas.txt.gz contrasenas_filtradas.json; do
+            test -s "backend/app/core/datos/$archivo" || {
+              echo "FALLO: falta backend/app/core/datos/$archivo (capitulo 23)."
+              exit 1
+            }
+          done
+          esperada=$(python3 -c "import json; print(json.load(open('backend/app/core/datos/contrasenas_filtradas.json'))['sha256'])")
+          real=$(sha256sum backend/app/core/datos/contrasenas_filtradas.txt.gz | cut -d' ' -f1)
+          [ "$esperada" = "$real" ] || {
+            echo "FALLO: la lista de filtradas no es la de su manifiesto (capitulo 23)."
+            exit 1
+          }
+          for puerta in backend/app/api/v1/endpoints/users.py backend/app/api/v1/endpoints/auth.py; do
+            grep -vE '^\s*#' "$puerta" | grep -q 'exigir(' || {
+              echo "FALLO: $puerta ya no pasa las contrasenas por la politica (capitulo 23)."
+              exit 1
+            }
+          done
+          echo "Politica con lista local de filtradas, integra y aplicada en alta, cambio y restablecimiento."
+
+  # ============================================================================
+  # Migraciones de base de datos
+  # ============================================================================
+  migraciones:
+    name: Migraciones (Alembic)
+    runs-on: ubuntu-latest
+
+    # PostgreSQL real y no SQLite: es el motor de produccion, y buena parte de lo que hay
+    # que verificar --tipos con zona horaria, tipos ENUM, `USING` en las conversiones-- no
+    # existe en SQLite, donde estas migraciones son casi no-operativas.
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+        env:
+          POSTGRES_USER: plurione
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+          POSTGRES_DB: lead_scoring_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://plurione:contrasena-de-verificacion-de-ci-no-reutilizada@localhost:5432/lead_scoring_db
+      ENVIRONMENT: development
+      SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias desde el lock
+        run: pip install --require-hashes -r backend/requirements.lock
+
+      - name: Aplicar todas las migraciones
+        run: python -m alembic upgrade head
+
+      # El fallo que esto atrapa es el mas silencioso de todos: alguien cambia un modelo y
+      # olvida generar la migracion. En desarrollo no se nota --alli el esquema se crea
+      # desde los modelos-- y en produccion revienta en la primera peticion que toque la
+      # columna que falta, a veces dias despues del despliegue.
+      - name: El esquema declarado coincide con el migrado
+        run: |
+          set -euo pipefail
+          if ! python -m alembic check; then
+            echo ""
+            echo "FALLO: los modelos y las migraciones no coinciden."
+            echo "Genere la migracion que falta con:"
+            echo "  python -m alembic revision --autogenerate -m '<descripcion>'"
+            exit 1
+          fi
+
+      # Una migracion que no se puede revertir no es una migracion: es un viaje de ida.
+      # El ciclo se hace dos veces porque el fallo tipico --tipos ENUM que PostgreSQL
+      # conserva al borrar las tablas-- solo aparece al volver a subir.
+      - name: Las migraciones son reversibles
+        run: |
+          set -euo pipefail
+          for vuelta in 1 2; do
+            echo "--- vuelta $vuelta ---"
+            python -m alembic downgrade base
+            python -m alembic upgrade head
+          done
+          python -m alembic check
+
+      # Las columnas temporales deben quedar con zona horaria. Se comprueba sobre el
+      # catalogo del motor y no sobre el codigo: es la unica forma de saber que la
+      # migracion hizo lo que dice.
+      - name: Las columnas temporales llevan zona horaria
+        run: |
+          set -euo pipefail
+          sin_zona=$(python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          motor = create_engine(os.environ["DATABASE_URL"])
+          consulta = text("""
+              SELECT count(*) FROM information_schema.columns
+              WHERE table_schema = 'public' AND data_type = 'timestamp without time zone'
+          """)
+          with motor.connect() as conexion:
+              print(conexion.execute(consulta).scalar())
+          PY
+          )
+          echo "columnas temporales sin zona: $sin_zona"
+          [ "$sin_zona" = "0" ] || { echo "FALLO: quedan columnas sin zona horaria"; exit 1; }
+
+      # La multi-tenencia decorativa se retiro: `tenant_id` estaba en cada token pero
+      # ninguna consulta filtraba por el. Que no vuelva por descuido.
+      - name: No hay columnas de multi-tenencia sin filtrado
+        run: |
+          set -euo pipefail
+          hay=$(python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          motor = create_engine(os.environ["DATABASE_URL"])
+          consulta = text("""
+              SELECT count(*) FROM information_schema.columns
+              WHERE table_schema = 'public' AND column_name = 'tenant_id'
+          """)
+          with motor.connect() as conexion:
+              print(conexion.execute(consulta).scalar())
+          PY
+          )
+          [ "$hay" = "0" ] || { echo "FALLO: reaparecio tenant_id sin filtrado asociado"; exit 1; }
+
+  # ============================================================================
+  # Composición del despliegue
+  # ============================================================================
+  compose:
+    name: Validar la pila de despliegue
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La pila de producción debe abortar sin credenciales: los valores por defecto
+      # cómodos ("postgres"/"postgres") son exactamente los que acaban desplegados.
+      - name: La pila aborta sin SECRET_KEY ni POSTGRES_PASSWORD
+        working-directory: devops
+        run: |
+          if docker compose config --quiet 2>/dev/null; then
+            echo "FALLO: la pila valida sin credenciales obligatorias"; exit 1
+          fi
+          echo "aborta como se espera"
+
+      - name: La pila valida con credenciales
+        working-directory: devops
+        env:
+          SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+        run: docker compose config --quiet
+
+      # Capitulo 22. Un solo modo de arrancar, y es este. Se ejercita el lanzador de verdad
+      # —crear el entorno fuera del repositorio, comprobarlo, resolver la pila con Compose— y
+      # se comprueba que se niega en los dos casos en que tiene que negarse. Sin Python del
+      # proyecto: el lanzador es biblioteca estandar.
+      - name: La pila solo arranca con el entorno fuera del repositorio
+        run: |
+          set -euo pipefail
+          entorno="$RUNNER_TEMP/plurione/pila.env"
+          python3 devops/pila.py --entorno "$entorno" iniciar
+          python3 devops/pila.py --entorno "$entorno" --comprobar
+          python3 devops/pila.py --entorno "$entorno" config --quiet
+
+          cp "$entorno" devops/.env
+          if python3 devops/pila.py --entorno "$entorno" --comprobar; then
+            echo ""
+            echo "FALLO: el lanzador arranca con un .env dentro del repositorio (capitulo 22)."
+            echo "Compose carga devops/.env por su cuenta: los secretos volverian al arbol."
+            exit 1
+          fi
+          rm devops/.env
+
+          cp "$entorno" devops/secretos.env
+          if python3 devops/pila.py --entorno devops/secretos.env --comprobar; then
+            echo "FALLO: el lanzador acepta un archivo de entorno dentro del repositorio (capitulo 22)."
+            exit 1
+          fi
+          rm devops/secretos.env
+          echo "El lanzador arranca con el entorno fuera y se niega con uno dentro."
+
+      - name: El overlay de desarrollo valida por separado
+        working-directory: devops
+        env:
+          SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+          PGADMIN_EMAIL: ci@example.invalid
+          PGADMIN_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+
+      # Los servicios de copia van con perfil y NO deben aparecer en la pila normal:
+      # `docker compose up` no puede lanzar una restauración.
+      - name: El perfil de respaldo valida y no arranca con la pila
+        working-directory: devops
+        env:
+          SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+        run: |
+          set -euo pipefail
+          cfg=$(docker compose config --format json)
+          for servicio in respaldo prueba-de-restauracion restaurar; do
+            if echo "$cfg" | jq -e --arg s "$servicio" '.services | has($s)' >/dev/null; then
+              echo "FALLO: '$servicio' forma parte de la pila que levanta 'up'."
+              exit 1
+            fi
+          done
+          docker compose --profile respaldo config --quiet
+          echo "Perfil de respaldo válido y fuera del arranque normal."
+
+      # N-23. `drift_monitor.py` existia desde la fase 8 y solo se documentaba como orden
+      # manual, asi que la deriva se detectaba el dia que a alguien se le ocurria mirar.
+      # Se comprueba sobre la configuracion RESUELTA y no leyendo el YAML: lo que importa
+      # es lo que arranca `up`, y un override puede cambiarlo.
+      # N-23. `drift_monitor.py` existia desde la fase 8 y solo se documentaba como orden
+      # manual, asi que la deriva se detectaba el dia que a alguien se le ocurria mirar.
+      #
+      # Se comprueba sobre la configuracion RESUELTA por compose y no leyendo el YAML: lo
+      # que importa es lo que arranca `up`, y un override puede cambiarlo.
+      #
+      # Con `python3` y no con `jq` como los pasos vecinos, a proposito: `jq` esta en el
+      # ejecutor y no en las maquinas donde se trabaja, y la primera version de esta guarda
+      # dio por verificadas cuatro reintroducciones que en realidad fallaban por
+      # «jq: command not found». Una guarda que no se puede ejecutar donde se escribe no se
+      # puede comprobar.
+      - name: El monitor de deriva esta programado y alerta
+        working-directory: devops
+        env:
+          SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          # El guion invoca a compose el mismo, sin archivo intermedio: la primera version
+          # redirigia a /tmp y lo leia despues, y eso funciona en el ejecutor pero no en
+          # todas las maquinas donde se comprueba. Un fallo de ruta se confunde con un
+          # disparo de la guarda, que es la peor manera de que una guarda parezca buena.
+          salida = subprocess.run(
+              ["docker", "compose", "config", "--format", "json"],
+              capture_output=True, text=True, check=True,
+          ).stdout
+          pila = json.loads(salida)
+          servicio = pila.get("services", {}).get("monitor-deriva")
+          if not servicio:
+              sys.exit(
+                  "FALLO: la pila no lleva el monitor de deriva (N-23).\n"
+                  "Sin el, drift_monitor.py vuelve a ser una orden que hay que acordarse de "
+                  "lanzar,\ny la deriva se detecta el dia que alguien decide mirar."
+              )
+
+          orden = " ".join(servicio.get("command") or [])
+          print(f"  orden: {orden}")
+
+          exigencias = [
+              ("drift_monitor.py", "el servicio no ejecuta el monitor de deriva"),
+              ("--alertar", "el monitor corre sin --alertar: calcula PSI y no avisa a nadie"),
+              ("--cada", "el monitor no se repite; una sola evaluacion no es vigilancia"),
+          ]
+          for cadena, motivo in exigencias:
+              if cadena not in orden:
+                  sys.exit(f"FALLO: {motivo} (N-23).")
+
+          # El estado de las alertas tiene que sobrevivir a un reinicio. En tmpfs, cada
+          # reinicio olvidaria que ya aviso y repetiria la misma alerta; una alerta que se
+          # repite sola se aprende a ignorar, y entonces tampoco se lee la que si es nueva.
+          estado = (servicio.get("environment") or {}).get("ML_DRIFT_ESTADO", "")
+          if not estado:
+              sys.exit("FALLO: el monitor no guarda estado de alertas (N-23).")
+
+          destinos = [v.get("target", "") for v in servicio.get("volumes") or []
+                      if v.get("type") == "volume"]
+          if not any(estado.startswith(d) for d in destinos):
+              sys.exit(
+                  f"FALLO: {estado} no cae en ningun volumen persistente "
+                  f"(los hay en {destinos or 'ninguno'}).\n"
+                  "Tras cada reinicio el monitor volveria a avisar de la misma deriva."
+              )
+
+          print("Monitor de deriva programado, con alerta y con memoria.")
+          PY
+
+      # Publicar Postgres exponía la base a toda la red del anfitrión. Se comprueba sobre
+      # la configuración ya resuelta, no leyendo el YAML: un override podría reintroducirlo.
+      - name: Postgres no publica puerto en la pila de produccion
+        working-directory: devops
+        env:
+          SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          POSTGRES_PASSWORD: contrasena-de-verificacion-de-ci-no-reutilizada
+        run: |
+          set -euo pipefail
+          cfg=$(docker compose config --format json)
+          echo "Puertos publicados por servicio:"
+          echo "$cfg" | jq -r '.services | to_entries[] | "  \(.key): \(.value.ports // [] | length) puerto(s)"'
+          if echo "$cfg" | jq -e '(.services.postgres.ports // []) | length > 0' >/dev/null; then
+            echo "FALLO: postgres publica puertos en la pila de produccion"; exit 1
+          fi
+          if echo "$cfg" | jq -e '.services | has("pgadmin")' >/dev/null; then
+            echo "FALLO: pgadmin forma parte de la pila de produccion"; exit 1
+          fi
+          echo "postgres sin publicar y sin pgadmin: correcto"
