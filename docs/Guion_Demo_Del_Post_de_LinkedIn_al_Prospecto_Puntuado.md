@@ -368,6 +368,14 @@ El esfuerzo va a que la historia de la sección 2 funcione de punta a punta.
 > - Paso 6: el informe suma estado, responsable, enlace al post, visitas, tasa de envío y el gráfico de perfiles por día; la comparativa, visitas y tasa. **«Duplicar publicación»** da un borrador con enlace propio.
 > - Detalle en el capítulo 26 de la Memoria (`docs/reportes/Reporte_26_...`).
 
+> **Actualización, capítulo 27 «Una publicación, varias redes» (22-09-2026).**
+> - Paso 1: la publicación se difunde por varias **redes**. Vienen activadas LinkedIn, WhatsApp, Facebook y correo; Instagram y X se activan si se quieren. Sin tocar nada, el guion no cambia.
+> - Paso 2: además de «Copiar texto para LinkedIn», **«Compartir en redes»** da el enlace y el texto de cada red —X recortado a 280 contando el enlace—, su botón oficial de compartir, «Copiar texto» donde la red no se lleva el texto, y un **código QR** descargable para Instagram y material impreso. No se publica nada por nosotros: abre la red con la sesión de quien pulsa.
+> - Paso 3: el enlace de cada red lleva a la **misma** página, con `?r=whatsapp` al final. Una red inventada o manipulada no rechaza a nadie: se cuenta como «sin red».
+> - Paso 5: la ficha guarda el **canal de la red de llegada** («WhatsApp», «Facebook»…) y la ficha 360 dice «Llegó por la publicación X, vía WhatsApp». Ninguno de esos canales lo conoce el modelo, así que el score no se mueve.
+> - Paso 6: el informe añade una **fila por red** con visitas, envíos, tasa, perfiles y score medio.
+> - Detalle en el capítulo 27 de la Memoria (`docs/reportes/Reporte_27_...`).
+
 Ninguno se corrige en este documento. Van en orden de dependencia para la demo.
 
 | Id | Hueco | Paso afectado | Regla |

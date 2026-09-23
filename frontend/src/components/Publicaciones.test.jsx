@@ -220,6 +220,8 @@ describe('crear una publicación y copiar su texto', () => {
       responsable_id: null,
       url_del_post: null,
       necesidades: null,
+      // Las de siempre: una publicación nueva sale difundible por las cuatro por defecto.
+      redes: ['linkedin', 'whatsapp', 'facebook', 'correo'],
       channel: 'LinkedIn',
     });
     expect(enviado).not.toHaveProperty('public_slug');
@@ -359,6 +361,7 @@ describe('editar y el ciclo de estados', () => {
         responsable_id: 21,
         url_del_post: null,
         necesidades: ['Cubrir vacantes de TI', 'Formar un equipo completo'],
+        redes: ['linkedin', 'whatsapp', 'facebook', 'correo'],
       }),
     );
   });

@@ -246,7 +246,7 @@ def duplicar_campana(
     auditoria: AsientoDeAuditoria = Depends(auditar(ACCION_CAMPANA_DUPLICAR, ENTIDAD_CAMPANA)),
 ):
     """
-    Una campaña nueva con el texto, el público, las opciones y el responsable de otra.
+    Una campaña nueva con el texto, el público, las opciones, las redes y el responsable de otra.
 
     Sale en borrador y con enlace propio: el enlace del original ya está publicado y apunta
     al original para siempre. No copia la dirección del post, las fechas ni las visitas.

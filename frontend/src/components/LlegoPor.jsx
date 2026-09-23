@@ -50,7 +50,12 @@ export default function LlegoPor({ llegoPor }) {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-              <strong>{solicitud.titulo || 'Publicación retirada'}</strong>
+              <strong>
+                {solicitud.titulo || 'Publicación retirada'}
+                {/* «Llegó por la publicación X, vía WhatsApp». Es de este envío: la misma
+                    persona puede volver por otra red, y cada solicitud dice la suya. */}
+                {solicitud.red && <span style={{ fontWeight: 400 }}>, vía {solicitud.red}</span>}
+              </strong>
               <span style={{ color: 'var(--text-muted)' }}>
                 {new Date(solicitud.recibida_en).toLocaleString('es-MX')}
               </span>

@@ -16,14 +16,16 @@ Es la única parte del sistema sin sesión, y por eso el orden de las comprobaci
 La respuesta es siempre la misma: exista o no el correo, sea la primera vez o la quinta.
 """
 import logging
+from typing import Optional
 
 from app.core.database import get_db
 from app.core.proxy import ip_del_cliente
+from app.core.redes import normalizar_red_de_llegada
 from app.models.entities import utc_now
 from app.schemas.interes import PublicacionPublica, RespuestaDeInteres, SolicitudDeInteres
 from app.services import ciclo_de_publicaciones, pagina_de_interes
 from app.services.registro_de_actividad import registrar_evento
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -35,13 +37,22 @@ router = APIRouter()
 def ver_publicacion(
     slug: str,
     request: Request,
+    r: Optional[str] = Query(None, description="Red por la que se repartió el enlace."),
     db: Session = Depends(get_db),
 ):
-    """La publicación y las listas del formulario. Sin sesión."""
+    """
+    La publicación y las listas del formulario. Sin sesión.
+
+    `r` es la red de difusión. No se valida contra nada que pueda fallar: si no se reconoce,
+    la visita se cuenta como «sin red» y la página se sirve igual. Es una etiqueta de
+    analítica, no una llave, y tratarla como llave dejaría la página fuera de servicio para
+    quien copió el enlace a mano y se comió un carácter.
+    """
     pagina_de_interes.aplicar_limite_de_lectura(request)
     publicacion = pagina_de_interes.buscar_publicacion(db, slug)
-    # Una visita más en el recuento del día. Solo el número: ni IP, ni navegador, ni cookie.
-    ciclo_de_publicaciones.registrar_visita(db, publicacion)
+    # Una visita más en el recuento del día y de su red. Solo el número: ni IP, ni
+    # navegador, ni cookie.
+    ciclo_de_publicaciones.registrar_visita(db, publicacion, red=normalizar_red_de_llegada(r))
     return pagina_de_interes.describir(publicacion)
 
 
@@ -50,6 +61,7 @@ async def registrar_interes(
     slug: str,
     solicitud: SolicitudDeInteres,
     request: Request,
+    r: Optional[str] = Query(None, description="Red por la que se repartió el enlace."),
     db: Session = Depends(get_db),
 ):
     """
@@ -70,7 +82,14 @@ async def registrar_interes(
     resultado = await registrar_evento(
         db,
         pagina_de_interes.construir_evento(
-            solicitud, publicacion, etiqueta, ciclo_de_publicaciones.asesor_para(db, publicacion)
+            solicitud,
+            publicacion,
+            etiqueta,
+            ciclo_de_publicaciones.asesor_para(db, publicacion),
+            # Una red que no se reconoce no invalida el envío: se registra «sin red». El
+            # parámetro lo puede editar cualquiera, y perder un prospecto porque alguien
+            # tocó la dirección sería cambiar una persona por una etiqueta.
+            normalizar_red_de_llegada(r),
         ),
     )
     pagina_de_interes.anotar(

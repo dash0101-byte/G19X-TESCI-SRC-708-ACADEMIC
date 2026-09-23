@@ -128,12 +128,14 @@ def test_el_texto_lleva_la_descripcion_y_el_enlace(client, lead_headers, monkeyp
 
     enlace = f"https://plurione.com/p/{publicacion['public_slug']}"
     assert publicacion["enlace_publico"] == enlace
-    assert publicacion["texto_para_linkedin"] == f"{DESCRIPCION}\n\n{enlace}"
+    # Desde el capítulo 27 el enlace que se copia lleva su red: si no, todo el que llegara
+    # por el post de LinkedIn se contaría como «sin red».
+    assert publicacion["texto_para_linkedin"] == f"{DESCRIPCION}\n\n{enlace}?r=linkedin"
 
 
 def test_sin_descripcion_el_texto_es_solo_el_enlace(client, lead_headers):
     publicacion = _publicar(client, lead_headers, description=None).json()
-    assert publicacion["texto_para_linkedin"] == publicacion["enlace_publico"]
+    assert publicacion["texto_para_linkedin"] == f"{publicacion['enlace_publico']}?r=linkedin"
 
 
 def test_la_descripcion_mas_larga_cabe_en_un_post(client, lead_headers):

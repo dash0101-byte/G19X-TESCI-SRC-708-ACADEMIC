@@ -28,6 +28,7 @@ from app.core.config import settings
 from app.core.proxy import ip_del_cliente
 from app.core.publicaciones import ACTIVA, CANAL_LINKEDIN, necesidades_de
 from app.core.rate_limit import limiter
+from app.core.redes import SIN_RED, canal_de, etiqueta_de
 from app.core.vector_del_modelo import CATEGORIAS_DEL_MODELO
 from app.models.entities import ActivityType, Campaign, utc_now
 from app.schemas.interes import (
@@ -42,9 +43,11 @@ logger = logging.getLogger(__name__)
 
 FUENTE = "pagina_de_interes"
 
-# Canal con el que se guarda la ficha. Es el de la publicación: una persona que llegó por
-# un post de LinkedIn no vino por «LinkedIn Ads», que es publicidad pagada.
-CANAL = CANAL_LINKEDIN
+# El canal con el que se guarda la ficha sale de la **red de llegada** (`app/core/redes.py`):
+# «LinkedIn», «WhatsApp», «Facebook», «Correo», «Instagram», «X», o «Publicación» cuando no
+# consta. Ninguno es «LinkedIn Ads» ni ninguna otra categoría del modelo: una persona que
+# llegó por un post orgánico no vino por publicidad pagada, y el modelo trata todos estos
+# canales como desconocidos, es decir, neutros.
 
 # El tipo de toda solicitud, sea cual sea la necesidad. Elegir «Ver una demostración» en un
 # botón no es una demo pedida: registrarla como `DEMO_REQUEST` le sumaba 25 puntos en la
@@ -163,6 +166,7 @@ def construir_evento(
     publicacion: Campaign,
     etiqueta_de_necesidad: str,
     asesor_id: Optional[int] = None,
+    red: Optional[str] = None,
 ) -> Evento:
     """
     El evento que se registra. Lo que la persona no indicó no viaja, y por tanto queda
@@ -179,9 +183,17 @@ def construir_evento(
 
     `asesor_id` es el responsable de la publicación: una ficha **nueva** nace asignada a él.
     Una que ya existía no se reasigna, porque esta fuente no toca fichas existentes.
+
+    `red` es por dónde llegó (capítulo 27). Decide el **canal** de la ficha —«WhatsApp»,
+    «Facebook»…— y se guarda también en la actividad, con su etiqueta, para que la ficha 360
+    pueda decir «Llegó por la publicación X, vía WhatsApp». Ninguno de esos canales lo
+    conoce el modelo, así que todos cuentan como desconocido, es decir, neutro: igual que
+    «LinkedIn» desde el capítulo 25. Cuando no consta la red, el canal es «Publicación»: la
+    página se pudo compartir desde cualquier sitio y escribir «LinkedIn» sería inventarlo.
     """
     ahora = utc_now()
     extra = {"perfil_de_linkedin": solicitud.linkedin} if solicitud.linkedin else {}
+    canal = canal_de(red)
 
     return Evento(
         fuente=FUENTE,
@@ -191,7 +203,7 @@ def construir_evento(
         # los dos cuentan, pero una entrega repetida del mismo (un reintento de la página)
         # no se registra dos veces.
         identificador_externo=f"{publicacion.public_slug}:{uuid.uuid4().hex}",
-        canal=CANAL,
+        canal=canal,
         # Lo que la ficha 360 enseña de cada solicitud. El aviso se guarda **en el envío**
         # y no solo en la ficha: la ficha conserva el primero —no se pisa nunca—, y quien
         # llama necesita saber cuándo consintió esta persona esta publicación en concreto.
@@ -199,6 +211,10 @@ def construir_evento(
             "publicacion": publicacion.public_slug,
             "necesidad": solicitud.necesidad,
             "necesidad_etiqueta": etiqueta_de_necesidad,
+            # La red de llegada, con su etiqueta, igual que la necesidad: la clave es lo que
+            # se cuenta y la etiqueta lo que se enseña. `sin_red` cuando no consta.
+            "red": red or SIN_RED,
+            "red_etiqueta": etiqueta_de(red),
             "aviso_aceptado_en": ahora.isoformat(),
         },
         contacto=Contacto(
@@ -216,7 +232,7 @@ def construir_evento(
             "job_title": solicitud.cargo,
             "industry": solicitud.sector,
             "company_size": solicitud.tamano_de_empresa,
-            "source": CANAL,
+            "source": canal,
             "raw_metadata": extra,
             "assigned_rep_id": asesor_id,
         },

@@ -25,7 +25,13 @@ Falla —con un mensaje que dice qué se perdió— si la página:
    cerrara—; cuenta visitas con algo más que un número por día, pone cookies o cuenta la
    vista previa del panel; acepta una necesidad que no es de las opciones de esa
    publicación o deja que alguna puntúe; no asigna el responsable, o asigna uno que ya no es
-   asesor activo; o guarda como dirección del post algo que no es de linkedin.com.
+   asesor activo; o guarda como dirección del post algo que no es de linkedin.com;
+7. **deja de aguantar cualquier red en el enlace** (capítulo 27): una red desconocida o
+   manipulada en `?r=` rechaza el envío en lugar de contarse como «sin red»; la red de
+   llegada deja de marcar el canal de la ficha o las visitas dejan de repartirse por red;
+   alguno de esos canales pasa a ser una categoría que el modelo conoce, con lo que la red
+   empezaría a mover el score; el texto de una red se pasa de su tope o se come el enlace;
+   o un botón de compartir lleva credenciales en la dirección.
 
 Por qué además de la suite: las pruebas de `test_pagina_de_interes.py` comprueban casos; esta
 guarda comprueba **propiedades**. Un campo nuevo `comentarios: str` no rompe ninguna prueba
@@ -88,7 +94,14 @@ ESCRITOS_POR_LA_PERSONA = {
 # `necesidad_etiqueta` es la etiqueta de la opción elegida, que escribió el líder al configurar
 # la publicación (capítulo 26), no la persona: se guarda para que cambiar después las opciones
 # no cambie lo que eligió quien ya escribió.
-DATOS_DE_LA_ACTIVIDAD = {"publicacion", "necesidad", "necesidad_etiqueta", "aviso_aceptado_en"}
+#
+# `red` y `red_etiqueta` son la red de difusión por la que llegó (capítulo 27). Tampoco las
+# escribe la persona: la clave sale del catálogo cerrado del servidor —lo que no está en él
+# se guarda como `sin_red`— y la etiqueta es la de ese mismo catálogo. No dicen nada de
+# quien visita, solo por dónde se repartió el enlace.
+DATOS_DE_LA_ACTIVIDAD = {
+    "publicacion", "necesidad", "necesidad_etiqueta", "aviso_aceptado_en", "red", "red_etiqueta",
+}
 
 # La solicitud de referencia toma cargo, sector y tamaño de las listas del modelo y no de
 # valores escritos aquí: si esas listas cambian, la referencia sigue siendo válida y cada
@@ -437,8 +450,8 @@ def comprobar_ciclo(cliente) -> None:
 
         # Visitas: un número por día, sin cookie, y la vista previa del panel no cuenta.
         columnas = {c.name for c in VisitaDePublicacion.__table__.columns}
-        if columnas != {"campaign_id", "dia", "visitas"}:
-            fallo(f"el contador de visitas guarda más que un número por día: {sorted(columnas)}.")
+        if columnas != {"campaign_id", "dia", "red", "visitas"}:
+            fallo(f"el contador de visitas guarda más que un número por día y red: {sorted(columnas)}.")
         activa = _publicacion(db, estado="activa")
         ruta = f"/api/v1/interes/{activa.public_slug}"
         respuestas = [cliente.get(ruta) for _ in range(3)]
@@ -518,6 +531,109 @@ def comprobar_ciclo(cliente) -> None:
             pass
 
 
+def comprobar_redes(cliente) -> None:
+    """
+    Una publicación, varias redes (capítulo 27).
+
+    Las propiedades que no pueden perderse, en este orden:
+
+    * **Ninguna red rechaza a nadie.** El parámetro `?r=` lo edita cualquiera: una red
+      inventada, manipulada o borrada tiene que dejar pasar el envío y contarse «sin red».
+      Lo contrario convierte una etiqueta de analítica en una puerta que se cierra desde
+      fuera editando la dirección.
+    * **El modelo no conoce estos canales.** Si alguno coincidiera con una categoría que el
+      modelo aprendió, la red de llegada empezaría a mover el score sin que nadie lo
+      decidiera.
+    * **El enlace nunca se recorta.** En X el texto cabe en 280 contando el enlace, y lo que
+      cede es la descripción.
+    * **Sin API ni cuentas.** Los botones son direcciones públicas de compartir: ninguna
+      lleva clave, token ni identificador de aplicación.
+    """
+    from app.core import redes as r
+    from app.core.vector_del_modelo import CATEGORIAS_DEL_MODELO
+    from app.models.entities import Lead, VisitaDePublicacion
+    from app.schemas.user import CampanaResponse
+
+    print("7. Una publicación, varias redes")
+    minima = {k: v for k, v in VALIDA.items() if k in OBLIGATORIOS}
+    db = SessionLocal()
+    try:
+        publicacion = _publicacion(db, name="Guarda · redes", description="Texto de la guarda. " * 40)
+        ruta = f"/api/v1/interes/{publicacion.public_slug}"
+
+        # Ninguna red rechaza a nadie.
+        #
+        # Se captura la excepción además de mirar el código: `TestClient` vuelve a lanzar lo
+        # que reviente dentro de la aplicación, y un rastro de pila enterraría el motivo en
+        # un paso del CI que solo se lee por su título. Que la página explote con una red
+        # inventada es exactamente el fallo que esta comprobación busca, así que se nombra.
+        for etiqueta in ("tiktok", "../../etc/passwd", "x" * 300, "", "whatsapp'; DROP TABLE x"):
+            correo = f"red.{abs(hash(etiqueta)) % 10**8}@ejemplo-demo.mx"
+            try:
+                codigos = (
+                    cliente.get(ruta, params={"r": etiqueta}).status_code,
+                    cliente.post(f"{ruta}?r={etiqueta}", json={**minima, "correo": correo}).status_code,
+                )
+            except Exception as error:  # noqa: BLE001  cualquier excepción aquí es el fallo
+                fallo(
+                    f"una red que no se reconoce («{etiqueta[:20]}») revienta la página: "
+                    f"{type(error).__name__}: {error}."
+                )
+                continue
+            if codigos != (200, 202):
+                fallo(
+                    f"una red que no se reconoce («{etiqueta[:20]}») deja la página en "
+                    f"{codigos[0]}/{codigos[1]} en lugar de dejar pasar."
+                )
+
+        # Y una que sí se reconoce marca el canal de la ficha.
+        cliente.post(f"{ruta}?r=whatsapp", json={**minima, "correo": "red.whatsapp@ejemplo-demo.mx"})
+        db.expire_all()
+        ficha = db.query(Lead).filter(Lead.email == "red.whatsapp@ejemplo-demo.mx").first()
+        if ficha is None or ficha.source != "WhatsApp":
+            fallo(f"llegar por WhatsApp no deja el canal de la ficha: {ficha and ficha.source}.")
+
+        # El modelo no conoce ninguno de estos canales: todos neutros.
+        conocidas = set(CATEGORIAS_DEL_MODELO["source_channel"])
+        intrusas = [c for c in r.CANALES_DE_PUBLICACION if c in conocidas]
+        if intrusas:
+            fallo(f"el modelo conoce canales de la página y dejarían de ser neutros: {intrusas}.")
+
+        # Las visitas se reparten por red y siguen sin decir nada de quien visita.
+        cliente.get(ruta, params={"r": "facebook"})
+        db.expire_all()
+        por_red = {
+            v.red: v.visitas
+            for v in db.query(VisitaDePublicacion).filter(
+                VisitaDePublicacion.campaign_id == publicacion.id
+            )
+        }
+        if "facebook" not in por_red or "sin_red" not in por_red:
+            fallo(f"las visitas no se reparten por red: {por_red}.")
+
+        # El enlace no se recorta, y cada red apunta a la misma página.
+        difusion = {f.clave: f for f in CampanaResponse.model_validate(publicacion).difusion}
+        for clave, fila in difusion.items():
+            if publicacion.public_slug not in fila.enlace:
+                fallo(f"el enlace de {clave} no lleva a esta publicación: «{fila.enlace}».")
+            if not fila.texto.rstrip().endswith(fila.enlace):
+                fallo(f"el texto de {clave} no termina en su enlace entero: «{fila.texto[-60:]}».")
+            if fila.maximo is not None and fila.longitud > fila.maximo:
+                fallo(f"el texto de {clave} se pasa de su tope: {fila.longitud} > {fila.maximo}.")
+        if difusion["x"].maximo != 280:
+            fallo(f"X dejó de contar 280 caracteres: {difusion['x'].maximo}.")
+
+        # Sin API ni cuentas.
+        for clave, fila in difusion.items():
+            if not fila.compartir:
+                continue
+            sospechosas = [p for p in ("api_key", "client_id", "access_token", "oauth") if p in fila.compartir.lower()]
+            if sospechosas:
+                fallo(f"el botón de {clave} lleva credenciales en la dirección: {sospechosas}.")
+    finally:
+        db.close()
+
+
 def main() -> int:
     init_db()
     db = SessionLocal()
@@ -540,6 +656,7 @@ def main() -> int:
     comprobar_formulario(cliente, slug)
     comprobar_heuristico()
     comprobar_ciclo(cliente)
+    comprobar_redes(cliente)
     comprobar_limites(cliente, slug)
 
     if fallos:
@@ -547,8 +664,8 @@ def main() -> int:
         return 1
     print(
         "\nLímite de envíos, sin texto libre, listas del modelo, treinta segundos sin datos "
-        "supuestos, heurístico sin suposiciones y ciclo de la publicación: la página pública "
-        "conserva sus defensas."
+        "supuestos, heurístico sin suposiciones, ciclo de la publicación y redes de difusión: "
+        "la página pública conserva sus defensas."
     )
     return 0
 

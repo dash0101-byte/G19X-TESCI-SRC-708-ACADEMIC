@@ -38,6 +38,9 @@ class SolicitudDeLaFicha(BaseModel):
     recibida_en: datetime.datetime
     necesidad: Optional[str] = None
     aviso_aceptado_en: Optional[datetime.datetime] = None
+    # Por dónde llegó esta solicitud: «WhatsApp», «Facebook»… o «Sin red» cuando no consta.
+    # Es de cada envío, como la necesidad: la misma persona puede volver por otra red.
+    red: str = "Sin red"
 
 
 class LlegoPor(BaseModel):
@@ -96,6 +99,24 @@ class DiaDelInforme(BaseModel):
     visitas: int = 0
 
 
+class FilaDeRed(BaseModel):
+    """
+    Una red en el informe: qué trajo por sí sola.
+
+    `visitas` es de la publicación entera —un contador agregado no sabe de carteras—, pero
+    `perfiles` y `score_medio` se calculan **sobre lo que ve quien pregunta**, igual que el
+    resumen. Para un asesor eso son los suyos, así que su tasa por red describe su parte y
+    no la del equipo; `alcance_completo` en el resumen dice cuál de las dos está viendo.
+    """
+    red: str
+    etiqueta: str
+    visitas: int = 0
+    perfiles: int = 0
+    envios: int = 0
+    tasa_de_envio: Optional[float] = None
+    score_medio: float = 0.0
+
+
 class FilaDelInforme(BaseModel):
     lead_id: int
     nombre: str
@@ -121,6 +142,10 @@ class InformeDePublicacion(BaseModel):
     # periodo es más largo, `grafico_recortado` lo dice.
     por_dia: List[DiaDelInforme] = Field(default_factory=list)
     grafico_recortado: bool = False
+    # Una fila por red de difusión, y una más para «Sin red» si algo llegó sin ella. Es la
+    # comparativa entre redes de esta publicación: cuál trajo visitas y cuál trajo perfiles,
+    # que no siempre son la misma.
+    por_red: List[FilaDeRed] = Field(default_factory=list)
 
 
 class FilaDeComparativa(BaseModel):

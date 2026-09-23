@@ -44,6 +44,8 @@ from sqlalchemy.orm import Session
 
 from app.core.autorizacion import AlcanceDeCartera
 from app.core.publicaciones import CANAL_LINKEDIN, enlace_publico
+from app.core.redes import CANALES_DE_PUBLICACION, ORDEN, REDES, SIN_RED, redes_de
+from app.core.redes import etiqueta_de as etiqueta_de_red
 from app.models.entities import Campaign, Lead, LeadActivity, LeadStatus, User, VisitaDePublicacion
 from app.schemas.interes import NECESIDADES
 from app.schemas.publicaciones import (
@@ -51,6 +53,7 @@ from app.schemas.publicaciones import (
     DiaDelInforme,
     FilaDeComparativa,
     FilaDelInforme,
+    FilaDeRed,
     InformeDePublicacion,
     LlegoPor,
     PublicacionDelInforme,
@@ -178,6 +181,10 @@ def llego_por(db: Session, lead: Lead) -> Optional[LlegoPor]:
                 enlace=enlace_publico(campana.public_slug) if campana else None,
                 recibida_en=actividad.occurred_at,
                 necesidad=etiqueta_de_necesidad(datos),
+                # Por dónde llegó: «Llegó por la publicación X, vía WhatsApp». Se enseña la
+                # etiqueta guardada con el envío, no la que tenga hoy la clave, por lo mismo
+                # que la necesidad: lo que pasó no cambia porque cambie una lista.
+                red=str(datos.get("red_etiqueta") or etiqueta_de_red(datos.get("red"))),
                 # El aviso se acepta en cada envío y se guarda con él. Las solicitudes
                 # anteriores a que se anotara caen en su propia fecha, que es cuándo se
                 # envió el formulario: sin aceptar el aviso no había envío.
@@ -297,8 +304,14 @@ def informe(
     fechas_visibles = [f for (f,) in visibles.with_entities(fecha).all()]
     visitas_por_dia = _visitas_por_dia(db, publicacion.id, desde, hasta)
     visitas = sum(visitas_por_dia.values())
-    envios = _envios(db, publicacion.public_slug, inicio, fin, desde_el_dia=_primer_dia_contado(db, publicacion.id))
+    primer_dia = _primer_dia_contado(db, publicacion.id)
+    envios = _envios(db, publicacion.public_slug, inicio, fin, desde_el_dia=primer_dia)
     por_dia, recortado = _serie(fechas_visibles, visitas_por_dia, desde, hasta)
+    scores_visibles = {
+        lead_id: float(score or 0.0)
+        for lead_id, score in visibles.with_entities(Lead.id, Lead.current_score).all()
+    }
+    por_red = _por_red(db, publicacion, scores_visibles, desde, hasta, inicio, fin, primer_dia)
 
     return InformeDePublicacion(
         publicacion=_descripcion(publicacion),
@@ -314,6 +327,7 @@ def informe(
         ),
         por_dia=por_dia,
         grafico_recortado=recortado,
+        por_red=por_red,
         filas=[
             _fila(lead, recibida_en, asesor, necesidades.get(lead.id))
             for lead, recibida_en, asesor in filas
@@ -329,17 +343,121 @@ def tasa(envios: int, visitas: int) -> Optional[float]:
     return round(100.0 * envios / visitas, 1) if visitas else None
 
 
-def _visitas_por_dia(
+def _visitas_filtradas(
     db: Session, campaign_id: int, desde: Optional[datetime.date], hasta: Optional[datetime.date]
-) -> Dict[datetime.date, int]:
-    consulta = db.query(VisitaDePublicacion.dia, VisitaDePublicacion.visitas).filter(
+):
+    consulta = db.query(VisitaDePublicacion).filter(
         VisitaDePublicacion.campaign_id == campaign_id
     )
     if desde:
         consulta = consulta.filter(VisitaDePublicacion.dia >= desde)
     if hasta:
         consulta = consulta.filter(VisitaDePublicacion.dia <= hasta)
-    return dict(consulta.all())
+    return consulta
+
+
+def _visitas_por_dia(
+    db: Session, campaign_id: int, desde: Optional[datetime.date], hasta: Optional[datetime.date]
+) -> Dict[datetime.date, int]:
+    """
+    Visitas de cada día, **sumando todas las redes**. Desde el capítulo 27 hay una fila por
+    red y día; sin el `SUM` el gráfico enseñaría solo la última red de cada día.
+    """
+    filas = (
+        _visitas_filtradas(db, campaign_id, desde, hasta)
+        .with_entities(VisitaDePublicacion.dia, func.sum(VisitaDePublicacion.visitas))
+        .group_by(VisitaDePublicacion.dia)
+        .all()
+    )
+    return {dia: int(suma or 0) for dia, suma in filas}
+
+
+def _visitas_por_red(
+    db: Session, campaign_id: int, desde: Optional[datetime.date], hasta: Optional[datetime.date]
+) -> Dict[str, int]:
+    filas = (
+        _visitas_filtradas(db, campaign_id, desde, hasta)
+        .with_entities(VisitaDePublicacion.red, func.sum(VisitaDePublicacion.visitas))
+        .group_by(VisitaDePublicacion.red)
+        .all()
+    )
+    return {str(red): int(suma or 0) for red, suma in filas}
+
+
+def red_de(datos: dict) -> str:
+    """
+    La red de llegada de una solicitud. Las anteriores al capítulo 27 no la llevan y se
+    quedan en «sin red», que es la verdad: se registraron cuando no se miraba.
+    """
+    red = (datos or {}).get("red")
+    return str(red) if red in REDES else SIN_RED
+
+
+def _por_red(
+    db: Session,
+    publicacion: Campaign,
+    scores_visibles: Dict[int, float],
+    desde: Optional[datetime.date],
+    hasta: Optional[datetime.date],
+    inicio,
+    fin,
+    desde_el_dia: Optional[datetime.date],
+) -> List[FilaDeRed]:
+    """
+    Una fila por red: visitas, perfiles, envíos, tasa y score medio.
+
+    Se recorren las solicitudes de esta publicación en Python en lugar de agrupar por el
+    JSON en SQL. `activity_data` se consulta de forma distinta en PostgreSQL y en el SQLite
+    de las pruebas, y esto tiene que dar lo mismo en los dos; son las solicitudes de **una**
+    publicación, no las de la base entera.
+
+    Salen las redes activas de la publicación, más cualquier otra que haya traído algo:
+    desactivar una red no borra lo que trajo mientras estuvo activa, y esconderlo dejaría un
+    informe cuyas filas no suman el total.
+    """
+    visitas = _visitas_por_red(db, publicacion.id, desde, hasta)
+    envios: Dict[str, int] = {}
+    fichas: Dict[str, set] = {}
+
+    if desde_el_dia is not None:
+        primero = _desde_el_dia(_dia(desde_el_dia))
+        desde = max(inicio, primero) if inicio is not None else primero
+        consulta = db.query(
+            LeadActivity.lead_id, LeadActivity.activity_data, LeadActivity.occurred_at
+        ).filter(
+            LeadActivity.source == FUENTE,
+            LeadActivity.external_event_id.startswith(f"{publicacion.public_slug}:", autoescape=True),
+            LeadActivity.occurred_at >= desde,
+        )
+        if fin is not None:
+            consulta = consulta.filter(LeadActivity.occurred_at < fin)
+        for lead_id, datos, _ocurrido in consulta:
+            red = red_de(datos)
+            envios[red] = envios.get(red, 0) + 1
+            if lead_id in scores_visibles:
+                fichas.setdefault(red, set()).add(lead_id)
+
+    claves = [c for c in ORDEN if c in set(redes_de(publicacion.redes))]
+    for red in list(visitas) + list(envios):
+        if red not in claves:
+            claves.append(red)
+
+    filas = []
+    for red in claves:
+        de_esta = fichas.get(red, set())
+        valores = [scores_visibles[f] for f in de_esta]
+        filas.append(
+            FilaDeRed(
+                red=red,
+                etiqueta=etiqueta_de_red(red),
+                visitas=visitas.get(red, 0),
+                perfiles=len(de_esta),
+                envios=envios.get(red, 0),
+                tasa_de_envio=tasa(envios.get(red, 0), visitas.get(red, 0)),
+                score_medio=_redondear(sum(valores) / len(valores)) if valores else 0.0,
+            )
+        )
+    return filas
 
 
 def _primer_dia_contado(db: Session, campaign_id: int) -> Optional[datetime.date]:
@@ -577,10 +695,17 @@ def _media(fichas, estados: Dict[int, tuple]) -> float:
 
 # -------------------------------------------------------------------------- el contador
 def nuevos_sin_asesor(db: Session) -> int:
-    """Fichas llegadas por LinkedIn que todavía no tienen a nadie detrás."""
+    """
+    Fichas llegadas por una publicación que todavía no tienen a nadie detrás.
+
+    Se buscan por **todos** los canales que escribe la página de interés, no solo por
+    «LinkedIn». Desde el capítulo 27 una ficha de la misma publicación puede llegar como
+    «WhatsApp» o «Facebook»; con el filtro de antes, el líder habría dejado de ver a la
+    mayoría de los que están esperando justo cuando empezaron a llegar por más sitios.
+    """
     return (
         db.query(func.count(Lead.id))
-        .filter(Lead.source == CANAL_LINKEDIN, Lead.assigned_rep_id.is_(None))
+        .filter(Lead.source.in_(CANALES_DE_PUBLICACION), Lead.assigned_rep_id.is_(None))
         .scalar()
         or 0
     )

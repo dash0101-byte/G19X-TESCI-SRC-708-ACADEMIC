@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import math
@@ -12,13 +13,35 @@ logger = logging.getLogger(__name__)
 # Entornos donde una SECRET_KEY débil o ausente debe abortar el arranque
 HARDENED_ENVIRONMENTS = {"production", "prod", "staging", "preproduction", "preprod"}
 
-# Claves publicadas en el repositorio o en documentación: se consideran comprometidas
-COMPROMISED_SECRET_KEYS = {
-    "CLAVE_ROTADA_RETIRADA_DEL_HISTORIAL",
-    "changeme",
-    "secret",
-    "CAMBIAR_ESTA_CLAVE",
-}
+# Claves que alguna vez estuvieron escritas en el repositorio y no pueden volver a usarse.
+#
+# Se guardan **por su huella SHA-256**, no en claro. Hasta el capítulo 27 la lista llevaba
+# el texto literal de la clave de firma que se filtró en el capítulo 11. Funcionaba —la
+# prohibía—, pero dejaba la clave escrita en tres sitios del proyecto y en el historial de
+# Git para siempre; está rotada y no abre nada, pero un secreto publicado no se despublica,
+# y el repositorio no es el sitio donde se guarda lo que se quiere que nadie lea.
+#
+# Con la huella se consigue lo mismo sin el texto: comparar es una operación de un solo
+# sentido, así que el arranque puede reconocer la clave prohibida y nadie puede leerla aquí.
+# Añadir una clave nueva a la lista se hace calculando su huella fuera del proyecto:
+#   python -c "import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest())" CLAVE
+HUELLAS_DE_CLAVES_COMPROMETIDAS = frozenset({
+    # La clave de firma de producción que se publicó en el repositorio (capítulo 11) y se
+    # rotó el mismo día. Nunca vuelve a ser válida, ni en desarrollo.
+    "d133504215cb4b76ec3a97b6aff2293865eadb61f27e873a47e14e474344abef",
+})
+
+# Marcadores de posición: lo que alguien escribe para salir del paso. No son secretos de
+# nadie, así que se quedan en claro —son más útiles legibles— y además los tres son más
+# cortos que `MIN_SECRET_KEY_LENGTH`, que ya los rechazaría por su cuenta.
+CLAVES_DE_RELLENO = frozenset({"changeme", "secret", "CAMBIAR_ESTA_CLAVE"})
+
+
+def es_clave_comprometida(clave: str) -> bool:
+    """¿Es esta una clave que ya no puede volver a usarse?"""
+    if clave in CLAVES_DE_RELLENO:
+        return True
+    return hashlib.sha256(clave.encode("utf-8")).hexdigest() in HUELLAS_DE_CLAVES_COMPROMETIDAS
 
 MIN_SECRET_KEY_LENGTH = 32
 
@@ -441,7 +464,7 @@ class Settings(BaseSettings):
         if not is_hardened:
             self.REFRESH_COOKIE_SECURE = False
 
-        if key in COMPROMISED_SECRET_KEYS:
+        if es_clave_comprometida(key):
             problem = "es una clave publicada en el repositorio y se considera comprometida"
         elif not key:
             problem = "no está definida"

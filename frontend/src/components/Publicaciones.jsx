@@ -10,6 +10,7 @@ import {
   fetchVistaPreviaDePublicacion,
   updateCampaign,
 } from '../services/api';
+import CompartirEnRedes, { RedesDelFormulario } from './CompartirEnRedes';
 import InformeDePublicacion from './InformeDePublicacion';
 import PaginaDeInteres from './PaginaDeInteres';
 import VistaPreviaDelPost from './VistaPreviaDelPost';
@@ -54,6 +55,8 @@ const FORMULARIO_VACIO = {
   url_del_post: '',
   necesidades_propias: false,
   necesidades: ['', ''],
+  // Las de siempre, que es lo que trae una publicación nueva sin tocar nada.
+  redes: ['linkedin', 'whatsapp', 'facebook', 'correo'],
 };
 
 async function copiarAlPortapapeles(texto) {
@@ -97,6 +100,10 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
   const [comparativa, setComparativa] = useState([]);
   const [sinAsesor, setSinAsesor] = useState(null);
   const [asesores, setAsesores] = useState([]);
+  // Todas las redes que se pueden activar, tal como las declara el servidor.
+  const [redesDisponibles, setRedesDisponibles] = useState([]);
+  // La publicación cuyos botones de compartir están abiertos, o `null`.
+  const [compartiendo, setCompartiendo] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -104,6 +111,8 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
     try {
       const datos = await fetchCampaignList({ incluirInactivas: true, canal: CANAL_LINKEDIN });
       setPublicaciones((datos && datos.items) || []);
+      // El catálogo de redes viene con la lista: una sola fuente, la del servidor.
+      if (datos && datos.redes_disponibles) setRedesDisponibles(datos.redes_disponibles);
       if (puedeGestionar) {
         const [comparadas, pendientes, equipo] = await Promise.all([
           fetchComparativaDePublicaciones(),
@@ -144,6 +153,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       url_del_post: publicacion.url_del_post || '',
       necesidades_propias: Boolean(publicacion.necesidades_propias),
       necesidades: (publicacion.necesidades || []).map((o) => o.etiqueta),
+      redes: publicacion.redes || FORMULARIO_VACIO.redes,
     });
     setAviso('');
     setError('');
@@ -173,6 +183,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       necesidades: formulario.necesidades_propias
         ? formulario.necesidades.map((n) => n.trim())
         : null,
+      redes: formulario.redes,
     };
     try {
       if (enEdicion === 'nueva') {
@@ -233,17 +244,27 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
     }
   };
 
-  const copiarTexto = async (publicacion) => {
+  /**
+   * Copia un texto al portapapeles y, si el navegador no deja, lo enseña seleccionable.
+   *
+   * Es el mismo camino para el texto de LinkedIn de siempre y para el de cada red: quien no
+   * puede copiar con un clic tampoco puede en WhatsApp, y una de las dos vías acabaría
+   * fallando en silencio si se escribieran por separado.
+   */
+  const copiarTextoSuelto = async (publicacion, texto, destino) => {
     setError('');
     setTextoManual(null);
     try {
-      await copiarAlPortapapeles(publicacion.texto_para_linkedin);
-      setAviso(`Texto de «${publicacion.name}» copiado. Péguelo en LinkedIn.`);
+      await copiarAlPortapapeles(texto);
+      setAviso(`Texto de «${destino}» copiado. Ya puede pegarlo.`);
     } catch {
       setAviso('');
-      setTextoManual({ id: publicacion.id, texto: publicacion.texto_para_linkedin });
+      setTextoManual({ id: publicacion.id, texto });
     }
   };
+
+  const copiarTexto = (publicacion) =>
+    copiarTextoSuelto(publicacion, publicacion.texto_para_linkedin, `${publicacion.name} · LinkedIn`);
 
   if (informeDe) {
     return (
@@ -484,6 +505,12 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
             />
           </div>
 
+          <RedesDelFormulario
+            activas={formulario.redes}
+            disponibles={redesDisponibles}
+            onChange={(redes) => cambiar('redes', redes)}
+          />
+
           <fieldset style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '10px' }}>
             <legend className="form-label" style={{ padding: '0 4px' }}>Opciones de «¿Qué necesitas?»</legend>
             <label style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem' }}>
@@ -590,6 +617,14 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
+                    aria-expanded={compartiendo === publicacion.id}
+                    onClick={() => setCompartiendo(compartiendo === publicacion.id ? null : publicacion.id)}
+                  >
+                    Compartir en redes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
                     aria-expanded={postDe === publicacion.id}
                     onClick={() => setPostDe(postDe === publicacion.id ? null : publicacion.id)}
                   >
@@ -618,6 +653,15 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                   )}
                 </div>
               </div>
+
+              {compartiendo === publicacion.id && (
+                <div style={{ marginTop: '10px' }}>
+                  <CompartirEnRedes
+                    publicacion={publicacion}
+                    onCopiar={(texto, etiqueta) => copiarTextoSuelto(publicacion, texto, etiqueta)}
+                  />
+                </div>
+              )}
 
               {postDe === publicacion.id && (
                 <div style={{ marginTop: '10px' }}>

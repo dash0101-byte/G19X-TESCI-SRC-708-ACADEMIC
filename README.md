@@ -34,8 +34,8 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1082 pruebas en el backend (93 % de cobertura) y 267 en
-> el cliente (94 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
+> **Calidad en las dos mitades.** 1158 pruebas en el backend (93 % de cobertura) y 302 en
+> el cliente (94,6 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
 > con 34 guardas de regresión de configuración peligrosa.
 
 ## ⚡ Guía de Inicio Rápido (Despliegue de la Versión Entregable)
@@ -468,6 +468,24 @@ Se puede **duplicar** (sale en borrador, con enlace propio) y ver en dos **vista
 
 La página cuenta **visitas**: un número por día, sin cookies ni datos de quien mira. El
 informe da con ellas la tasa de envío y un gráfico de perfiles recibidos por día.
+
+Desde el capítulo 27 la misma publicación se difunde por **varias redes**: LinkedIn,
+WhatsApp, Facebook y correo vienen activadas; Instagram y X se activan si se quieren. Cada
+red tiene **su propio enlace a la misma página** (`?r=whatsapp`) y su propio texto, recortado
+a lo que cabe —X a 280 contando el enlace, WhatsApp y correo más cortos—, sin recortar nunca
+el enlace.
+
+Los botones «Compartir en…» abren la **dirección pública de compartir** de cada red: sin
+API, sin cuentas y sin claves; publica quien pulsa, con su sesión. Donde la red solo se lleva
+el enlace (LinkedIn, Facebook) o no tiene forma de compartir desde la web (Instagram), al
+lado va «Copiar texto». Hay además un **código QR** descargable del enlace, generado en el
+navegador, para Instagram y para material impreso.
+
+Por dónde llegó cada persona queda registrado: en la actividad, en la ficha 360 («Llegó por
+la publicación X, vía WhatsApp») y como **canal** de la ficha. Una red desconocida o
+manipulada en el enlace se registra como «sin red» y **nunca** rechaza el envío. Ninguno de
+esos canales lo conoce el modelo, así que todos son neutros, igual que «LinkedIn». El informe
+añade una **fila por red** con visitas, envíos, tasa, perfiles y score medio.
 
 **Página de interés.** El enlace lleva a `/interes/<slug>`, la única pantalla sin sesión.
 Muestra el título y el texto de la publicación y un formulario de listas cerradas: cargo,
@@ -1032,7 +1050,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1082 pruebas
+### Backend — 1158 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1096,7 +1114,7 @@ del artefacto que puntúa; y el alcance del informe, con el asesor viendo sus pr
 un número del resto, sin nombres. La guarda comprueba propiedades en lugar de casos, y es un
 paso propio del CI.
 
-### Cliente — 267 pruebas
+### Cliente — 302 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1105,7 +1123,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 267 pruebas
+npm test                # 302 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```
@@ -1159,7 +1177,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 
 ---
 
-## 📑 Suite de 26 Reportes Técnicos de Estadía Profesional
+## 📑 Suite de 27 Reportes Técnicos de Estadía Profesional
 
 | Reporte | Documento | Enfoque de Ingeniería |
 | :-: | :--- | :--- |
@@ -1189,6 +1207,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **24** | [Reporte 24](docs/reportes/Reporte_24_Modelo_sin_Datos_Inventados_Ingresos_Ausentes_Canales_Separados_y_Aporte_con_Intervalo.md) | Un solo vector del modelo con versión, ingresos ausentes como ausencia, canales y resultados de llamada separados y aporte sobre el heurístico con intervalo. |
 | **25** | [Reporte 25](docs/reportes/Reporte_25_Del_Post_de_LinkedIn_al_Prospecto_Puntuado_Publicaciones_Pagina_de_Interes_e_Informe_por_Publicacion.md) | Del post de LinkedIn al prospecto puntuado: publicaciones con enlace propio, página de interés pública y defendida, ficha «Llegó por», informe y comparativa por publicación, y guarda del CI. |
 | **26** | [Reporte 26](docs/reportes/Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md) | Publicaciones completas: estados y cierre automático, vistas previas del post y de la página, opciones de «¿Qué necesitas?» por publicación, asesor responsable, post real, duplicar, y visitas sin datos personales con tasa de envío y gráfico por día. |
+| **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, y las claves viejas de JWT guardadas por su huella. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos y 12 preguntas de sínodo con respuestas modelo. |
 
 ---

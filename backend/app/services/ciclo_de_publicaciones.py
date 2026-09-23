@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.publicaciones import ACTIVA, BORRADOR, CERRADA, CIERRAN_POR_FECHA, ESTADOS
+from app.core.redes import SIN_RED
 from app.models.entities import Campaign, User, VisitaDePublicacion, utc_now
 
 logger = logging.getLogger(__name__)
@@ -113,24 +114,43 @@ def asesor_para(db: Session, campana: Campaign) -> Optional[int]:
 
 
 # ------------------------------------------------------------------------------ visitas
-def registrar_visita(db: Session, campana: Campaign, dia: Optional[datetime.date] = None) -> None:
+def registrar_visita(
+    db: Session,
+    campana: Campaign,
+    *,
+    red: Optional[str] = None,
+    dia: Optional[datetime.date] = None,
+) -> None:
     """
-    Suma una visita al día de hoy. Solo el número: nada de quién, desde dónde ni con qué.
+    Suma una visita al día de hoy y a su red. Solo el número: nada de quién, desde dónde ni
+    con qué. La red es por dónde se repartió el enlace, no un dato de quien lo abrió.
+
+    `red` es `None` cuando el enlace llegó sin parámetro, con uno inventado o manipulado; se
+    cuenta en `sin_red`, que es una fila más y nunca un rechazo.
+
+    Los dos van con nombre a propósito. Antes del capítulo 27 el tercer argumento era el día,
+    y al meter la red delante una llamada antigua habría pasado una fecha donde ahora va una
+    red: sin error, contando visitas de una red llamada «2026-09-21».
 
     Primero se intenta sumar a la fila del día; si no existe, se crea. Si otra visita la
     creó a la vez, la inserción choca con la clave primaria y se vuelve a sumar.
     """
     dia = dia or utc_now().date()
+    red = red or SIN_RED
     suma = (
         update(VisitaDePublicacion)
-        .where(VisitaDePublicacion.campaign_id == campana.id, VisitaDePublicacion.dia == dia)
+        .where(
+            VisitaDePublicacion.campaign_id == campana.id,
+            VisitaDePublicacion.dia == dia,
+            VisitaDePublicacion.red == red,
+        )
         .values(visitas=VisitaDePublicacion.visitas + 1)
     )
     if db.execute(suma).rowcount:
         db.commit()
         return
     try:
-        db.add(VisitaDePublicacion(campaign_id=campana.id, dia=dia, visitas=1))
+        db.add(VisitaDePublicacion(campaign_id=campana.id, dia=dia, red=red, visitas=1))
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -141,8 +161,8 @@ def registrar_visita(db: Session, campana: Campaign, dia: Optional[datetime.date
 # ----------------------------------------------------------------------------- duplicar
 def duplicar(db: Session, original: Campaign) -> Campaign:
     """
-    Una publicación nueva con el mismo texto, público, opciones y responsable. Sale en
-    **borrador**, con enlace propio y sin post, fechas ni visitas: es otro post, y lo que
+    Una publicación nueva con el mismo texto, público, opciones, redes y responsable. Sale
+    en **borrador**, con enlace propio y sin post, fechas ni visitas: es otro post, y lo que
     trajo el original sigue siendo del original.
     """
     nombre = original.name
@@ -158,6 +178,7 @@ def duplicar(db: Session, original: Campaign) -> Campaign:
         utm_medium=original.utm_medium,
         utm_campaign=original.utm_campaign,
         necesidades=list(original.necesidades) if original.necesidades else None,
+        redes=list(original.redes) if original.redes else None,
         responsable_id=original.responsable_id,
     )
     fijar_estado(copia, BORRADOR)

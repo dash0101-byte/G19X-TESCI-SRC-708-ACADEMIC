@@ -13,7 +13,8 @@ Lo que tiene que cumplirse:
   día para la misma publicación.
 * La reversión quita la tabla y las cuatro columnas y conserva las campañas; y se puede
   volver a migrar hacia delante.
-* El esquema que deja la migración es el que declaran los modelos.
+* Y, al final de toda la cadena, el esquema que dejan las migraciones es el que declaran
+  los modelos.
 """
 import json
 import os
@@ -74,18 +75,6 @@ try:
 except sa.exc.IntegrityError:
     resultado["rechaza_dia_repetido"] = True
 
-# El esquema migrado frente a los modelos, para estas dos tablas.
-import sys
-sys.path.insert(0, os.environ["BACKEND"])
-from app.core.database import Base
-import app.models.entities  # noqa: F401
-with motor.connect() as c:
-    diferencias = compare_metadata(MigrationContext.configure(c), Base.metadata)
-def _toca(d):
-    texto = repr(d)
-    return "campaigns" in texto or "visitas_de_publicacion" in texto
-resultado["diferencias"] = [repr(d) for d in diferencias if _toca(d)]
-
 command.downgrade(cfg, os.environ["ANTERIOR"])
 resultado["columnas_tras_revertir"] = columnas("campaigns")
 resultado["tablas_tras_revertir"] = sorted(sa.inspect(motor).get_table_names())
@@ -97,6 +86,20 @@ command.upgrade(cfg, "head")
 with motor.connect() as c:
     resultado["tras_volver"] = [list(f) for f in c.execute(sa.text(
         "SELECT name, estado FROM campaigns ORDER BY id")).fetchall()]
+
+# El esquema que dejan TODAS las migraciones frente al que declaran los modelos. Se mira
+# en `head` y no en esta revisión: una revisión intermedia no tiene por qué coincidir con
+# los modelos de hoy, y compararla ahí empezaría a fallar en cuanto llegara la siguiente.
+import sys
+sys.path.insert(0, os.environ["BACKEND"])
+from app.core.database import Base
+import app.models.entities  # noqa: F401
+with motor.connect() as c:
+    diferencias = compare_metadata(MigrationContext.configure(c), Base.metadata)
+def _toca(d):
+    texto = repr(d)
+    return "campaigns" in texto or "visitas_de_publicacion" in texto
+resultado["diferencias"] = [repr(d) for d in diferencias if _toca(d)]
 print("__RESULTADO__" + json.dumps(resultado))
 """
 
@@ -140,12 +143,12 @@ def test_ciclo_completo_de_la_migracion(tmp_path):
     assert r["columnas_visitas"] == ["campaign_id", "dia", "visitas"]
     assert r["estado_por_defecto"] == "activa"
     assert r["rechaza_dia_repetido"] is True
-    assert r["diferencias"] == [], "el esquema migrado no es el de los modelos"
 
     # Hacia atrás: fuera la tabla y las columnas, dentro las campañas y su `is_active`.
     assert not NUEVAS & set(r["columnas_tras_revertir"])
     assert "visitas_de_publicacion" not in r["tablas_tras_revertir"]
     assert r["tras_revertir"] == [["Post activo", 1], ["Post desactivado", 0], ["Nueva", 1]]
 
-    # Y otra vez hacia delante.
+    # Y otra vez hacia delante, hasta el final de la cadena.
     assert r["tras_volver"] == [["Post activo", "activa"], ["Post desactivado", "cerrada"], ["Nueva", "activa"]]
+    assert r["diferencias"] == [], "el esquema migrado no es el de los modelos"

@@ -76,10 +76,13 @@ function erroresDelServidor(detalle) {
   return Object.keys(errores).length ? errores : null;
 }
 
+// `red`: por dónde llegó quien abre la página (`?r=whatsapp`). Solo viaja al servidor, que
+// decide si la reconoce; la página no la enseña ni la usa para nada más.
+//
 // `vistaPrevia`: lo que devuelve `/publicaciones/{id}/vista-previa`. Con él, la página se
 // pinta **igual** que la verá el interesado —el mismo componente, no una imitación— pero no
 // pide nada al servidor público ni envía: el botón queda desactivado y un aviso lo dice.
-export default function PaginaDeInteres({ slug, vistaPrevia = null }) {
+export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) {
   const [publicacion, setPublicacion] = useState(vistaPrevia);
   const [cargando, setCargando] = useState(!vistaPrevia);
   const [noDisponible, setNoDisponible] = useState(null);
@@ -99,7 +102,7 @@ export default function PaginaDeInteres({ slug, vistaPrevia = null }) {
     }
     setCargando(true);
     try {
-      setPublicacion(await fetchPublicacionDeInteres(slug));
+      setPublicacion(await fetchPublicacionDeInteres(slug, red));
     } catch (err) {
       // Un 429 no es «no disponible»: la publicación existe y se podrá abrir en un rato.
       // Decir lo contrario manda a la persona a buscar otro enlace que tampoco funcionará.
@@ -107,7 +110,7 @@ export default function PaginaDeInteres({ slug, vistaPrevia = null }) {
     } finally {
       setCargando(false);
     }
-  }, [slug, vistaPrevia]);
+  }, [slug, red, vistaPrevia]);
 
   useEffect(() => {
     cargar();
@@ -147,11 +150,17 @@ export default function PaginaDeInteres({ slug, vistaPrevia = null }) {
     }
     setEnviando(true);
     try {
-      const respuesta = await enviarInteres(slug, {
-        ...formulario,
-        telefono: formulario.telefono.trim() || null,
-        linkedin: formulario.linkedin.trim() || null,
-      });
+      const respuesta = await enviarInteres(
+        slug,
+        {
+          ...formulario,
+          telefono: formulario.telefono.trim() || null,
+          linkedin: formulario.linkedin.trim() || null,
+        },
+        // La misma red con la que se abrió la página: así el envío cuenta donde contó la
+        // visita, aunque la persona tarde un rato en rellenar el formulario.
+        red,
+      );
       setGracias(respuesta.mensaje);
     } catch (err) {
       const porCampo = err.status === 422 ? erroresDelServidor(err.detalle) : null;

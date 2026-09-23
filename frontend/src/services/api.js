@@ -437,18 +437,46 @@ async function publicFetch(path, options, defaultMsg) {
 // a pedir, y cuenta, como debe.
 const cargasEnCurso = new Map();
 
-export function fetchPublicacionDeInteres(slug) {
-  const enCurso = cargasEnCurso.get(slug);
+/**
+ * La red viaja como `?r=`, igual que en el enlace que abrió la persona (capítulo 27).
+ *
+ * No se valida aquí: si no se reconoce, el servidor la cuenta como «sin red» y sirve la
+ * página igual. Filtrarla en el navegador solo adelantaría el mismo resultado y añadiría un
+ * sitio más donde la lista de redes tendría que estar al día.
+ */
+function conRed(ruta, red) {
+  return red ? `${ruta}?r=${encodeURIComponent(red)}` : ruta;
+}
+
+/**
+ * La red con la que se abrió el enlace, leída de la dirección (`?r=whatsapp`).
+ *
+ * Vive aquí, y no suelta en el arranque de la aplicación, para que se pueda probar: el
+ * fichero de arranque no lo monta ninguna prueba, así que un fallo ahí —devolver siempre
+ * vacío, por ejemplo— no lo veía nadie.
+ */
+export function redDeLaUrl(busqueda = window.location.search) {
+  return new URLSearchParams(busqueda).get('r') || '';
+}
+
+export function fetchPublicacionDeInteres(slug, red = '') {
+  // La clave incluye la red: dos aperturas con redes distintas son dos visitas distintas y
+  // no se pueden compartir; con el mismo enlace, sí (React monta dos veces en desarrollo).
+  const clave = `${slug}?${red}`;
+  const enCurso = cargasEnCurso.get(clave);
   if (enCurso) return enCurso;
-  const carga = publicFetch(`/interes/${encodeURIComponent(slug)}`, {}, 'No fue posible cargar la publicación')
-    .finally(() => cargasEnCurso.delete(slug));
-  cargasEnCurso.set(slug, carga);
+  const carga = publicFetch(
+    conRed(`/interes/${encodeURIComponent(slug)}`, red),
+    {},
+    'No fue posible cargar la publicación',
+  ).finally(() => cargasEnCurso.delete(clave));
+  cargasEnCurso.set(clave, carga);
   return carga;
 }
 
-export function enviarInteres(slug, datos) {
+export function enviarInteres(slug, datos, red = '') {
   return publicFetch(
-    `/interes/${encodeURIComponent(slug)}`,
+    conRed(`/interes/${encodeURIComponent(slug)}`, red),
     { method: 'POST', body: JSON.stringify(datos) },
     'No fue posible enviar la solicitud',
   );

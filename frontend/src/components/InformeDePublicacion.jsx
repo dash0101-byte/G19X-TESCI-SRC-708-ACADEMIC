@@ -89,6 +89,42 @@ export default function InformeDePublicacion({ publicacion, onSelectLead, onCerr
 
       {informe && <GraficoPorDia dias={informe.por_dia} recortado={informe.grafico_recortado} />}
 
+      {informe && informe.por_red && informe.por_red.length > 0 && (
+        <div style={{ marginBottom: '14px' }}>
+          <h4 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Por red de difusión</h4>
+          <table className="data-table" aria-label="Resultados por red de difusión" style={{ fontSize: '0.78rem' }}>
+            <thead>
+              <tr>
+                <th scope="col">Red</th>
+                <th scope="col">Visitas</th>
+                <th scope="col">Envíos</th>
+                <th scope="col">Tasa de envío</th>
+                <th scope="col">Perfiles</th>
+                <th scope="col">Score medio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {informe.por_red.map((fila) => (
+                <tr key={fila.red}>
+                  <th scope="row" style={{ fontWeight: 600 }}>{fila.etiqueta}</th>
+                  <td>{fila.visitas}</td>
+                  <td>{fila.envios}</td>
+                  {/* Sin visitas no hay tasa. Un 0 % diría que nadie escribió de los que
+                      miraron, y lo que pasa es que no miró nadie. */}
+                  <td>{fila.tasa_de_envio === null || fila.tasa_de_envio === undefined ? '—' : `${fila.tasa_de_envio} %`}</td>
+                  <td>{fila.perfiles}</td>
+                  <td>{fila.score_medio}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            «Sin red» son las aperturas y los envíos que llegaron con el enlace sin etiquetar,
+            o con una etiqueta que no se reconoce.
+          </p>
+        </div>
+      )}
+
       {resumen && !resumen.alcance_completo && (
         <p role="status" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
           Está viendo sus prospectos. Esta publicación trajo {resumen.de_otros_asesores} más

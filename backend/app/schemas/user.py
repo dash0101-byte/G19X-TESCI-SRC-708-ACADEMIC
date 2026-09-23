@@ -21,7 +21,16 @@ from app.core.publicaciones import (
     necesidades_de,
     normalizar_necesidades,
     normalizar_url_del_post,
-    texto_para_linkedin,
+)
+from app.core.redes import (
+    LINKEDIN,
+    ORDEN,
+    REDES,
+    enlace_de_compartir,
+    enlace_de_red,
+    normalizar_redes,
+    redes_de,
+    texto_para,
 )
 from app.core.security import UserRole
 
@@ -188,6 +197,16 @@ class _CamposDePublicacion(BaseModel):
     def _url_del_post(cls, valor):
         return normalizar_url_del_post(valor)
 
+    @field_validator("redes", mode="before", check_fields=False)
+    @classmethod
+    def _redes(cls, valor):
+        """Las redes de difusión activas. `null` vuelve a las de siempre."""
+        if valor is None:
+            return None
+        if not isinstance(valor, list):
+            raise ValueError("Las redes van en una lista.")
+        return normalizar_redes(valor)
+
 
 class CampanaBase(_CamposDePublicacion):
     name: str = Field(min_length=2, max_length=200)
@@ -214,6 +233,7 @@ class CampanaCreate(CampanaBase):
     necesidades: Optional[List[Any]] = None
     responsable_id: Optional[int] = None
     url_del_post: Optional[str] = None
+    redes: Optional[List[str]] = None
 
 
 class CampanaUpdate(_CamposDePublicacion):
@@ -233,11 +253,39 @@ class CampanaUpdate(_CamposDePublicacion):
     necesidades: Optional[List[Any]] = None
     responsable_id: Optional[int] = None
     url_del_post: Optional[str] = None
+    # `null` explícito vuelve a las redes de siempre.
+    redes: Optional[List[str]] = None
 
 
 class OpcionDeNecesidad(BaseModel):
     clave: str
     etiqueta: str
+
+
+class RedDeDifusion(BaseModel):
+    """
+    Una red en el panel: si está activa, su enlace, su texto y cómo se comparte.
+
+    Salen del servidor y no del navegador porque el recorte por red —280 caracteres en X
+    contando el enlace— es la misma regla que se prueba en el backend. Calculado dos veces,
+    en dos lenguajes, acabaría dando dos resultados distintos el día que uno de los dos
+    cambie.
+    """
+    clave: str
+    etiqueta: str
+    activa: bool
+    # El enlace a la misma página de interés, etiquetado con esta red.
+    enlace: str
+    # El texto listo para pegar, ya recortado a lo que cabe en esta red.
+    texto: str
+    longitud: int
+    maximo: Optional[int] = None
+    # La dirección oficial de compartir, o `None` si la red no tiene (Instagram).
+    compartir: Optional[str] = None
+    # Si esa dirección se lleva también el texto. Cuando no, el panel enseña «Copiar texto»
+    # al lado, que es lo único que queda para no reescribirlo a mano.
+    admite_texto: bool = False
+    aviso: Optional[str] = None
 
 
 class ResponsableBreve(BaseModel):
@@ -272,6 +320,8 @@ class CampanaResponse(BaseModel):
     necesidades_guardadas: Optional[List[OpcionDeNecesidad]] = Field(
         None, validation_alias="necesidades", exclude=True
     )
+    # Lo guardado, tal cual: `None` si usa las redes de siempre.
+    redes_guardadas: Optional[List[str]] = Field(None, validation_alias="redes", exclude=True)
 
     @computed_field
     @property
@@ -293,7 +343,14 @@ class CampanaResponse(BaseModel):
     @computed_field
     @property
     def texto_para_linkedin(self) -> str:
-        return texto_para_linkedin(self.description, self.public_slug)
+        """
+        Lo que copia el botón de siempre: el texto de la red **LinkedIn**.
+
+        Desde el capítulo 27 su enlace lleva `?r=linkedin`. Sin eso, todo el que llegara por
+        el post de LinkedIn —la vía principal— se contaría como «sin red», y la tabla por red
+        del informe diría que LinkedIn no trajo a nadie.
+        """
+        return texto_para(LINKEDIN, self.description, self.public_slug)
 
     @computed_field
     @property
@@ -306,7 +363,65 @@ class CampanaResponse(BaseModel):
     def max_texto_de_linkedin(self) -> int:
         return MAX_TEXTO_DE_LINKEDIN
 
+    @computed_field
+    @property
+    def redes(self) -> List[str]:
+        """Las redes activas de esta publicación: las suyas o las de siempre."""
+        return redes_de(self.redes_guardadas)
+
+    @computed_field
+    @property
+    def redes_propias(self) -> bool:
+        return bool(self.redes_guardadas)
+
+    @computed_field
+    @property
+    def difusion(self) -> List[RedDeDifusion]:
+        """
+        **Todas** las redes conocidas, activas o no, cada una con su enlace y su texto.
+
+        Van todas para que el panel pueda pintar la casilla de activar sin pedir otra lista,
+        y para que activar una enseñe al momento lo que se va a compartir. Que el enlace de
+        una red desactivada exista no la reabre: lo que decide si una visita cuenta es la
+        red con la que llega, y eso se registra siempre.
+        """
+        activas = set(self.redes)
+        filas = []
+        for clave, red in REDES.items():
+            texto = texto_para(clave, self.description, self.public_slug)
+            filas.append(
+                RedDeDifusion(
+                    clave=clave,
+                    etiqueta=red.etiqueta,
+                    activa=clave in activas,
+                    enlace=enlace_de_red(self.public_slug, clave),
+                    texto=texto,
+                    longitud=len(texto),
+                    maximo=red.maximo,
+                    compartir=enlace_de_compartir(clave, texto, self.public_slug, self.name),
+                    admite_texto=red.admite_texto,
+                    aviso=red.aviso,
+                )
+            )
+        return filas
+
+
+class RedDisponible(BaseModel):
+    """Una red que se puede activar: lo justo para pintar su casilla."""
+    clave: str
+    etiqueta: str
+    por_defecto: bool
+
 
 class ListaDeCampanas(BaseModel):
     total: int
     items: List[CampanaResponse]
+    # El catálogo de redes viaja con la lista y no en una constante del navegador. Con una
+    # copia en el cliente, añadir una red obligaría a tocar dos sitios y el día que solo se
+    # tocara uno la casilla existiría sin que el servidor la aceptara, o al revés.
+    redes_disponibles: List[RedDisponible] = Field(
+        default_factory=lambda: [
+            RedDisponible(clave=c, etiqueta=REDES[c].etiqueta, por_defecto=REDES[c].por_defecto)
+            for c in ORDEN
+        ]
+    )

@@ -37,16 +37,29 @@ tres partes:
 
 1. Los secretos y la base de datos local salieron del árbol del proyecto.
 2. La clave comprometida quedó **en una lista de bloqueo explícita**, de modo que
-   reintroducirla por descuido impide el arranque:
+   reintroducirla por descuido impide el arranque.
+
+   Hasta el capítulo 27 esa lista llevaba el texto literal de la clave. Prohibirla
+   funcionaba, pero la dejaba escrita en el repositorio —y, desde que el proyecto se subió a
+   GitHub, en su historial para siempre—, que es justo lo que este capítulo vino a corregir.
+   Desde entonces la lista guarda **la huella SHA-256** de cada clave prohibida: comparar
+   una huella reconoce la clave sin escribirla en ninguna parte.
 
 ```python
-COMPROMISED_SECRET_KEYS = {
-    "CLAVE_ROTADA_RETIRADA_DEL_HISTORIAL",
-    "changeme",
-    "secret",
-    "CAMBIAR_ESTA_CLAVE",
-}
+HUELLAS_DE_CLAVES_COMPROMETIDAS = frozenset({
+    # La clave de firma de producción que se publicó aquí y se rotó el mismo día.
+    "d133504215cb4b76ec3a97b6aff2293865eadb61f27e873a47e14e474344abef",
+})
+
+# Marcadores de posición: no son secretos de nadie y los tres son más cortos que el
+# mínimo, que ya los rechazaría por su cuenta.
+CLAVES_DE_RELLENO = frozenset({"changeme", "secret", "CAMBIAR_ESTA_CLAVE"})
 ```
+
+   Una prueba recorre todo el código y toda la documentación, calcula la huella de cada
+   palabra que pudiera ser una clave y falla si alguna encaja con la lista: prohibir una
+   clave no sirve de nada si la clave sigue escrita al lado de la prohibición
+   (`test_claves_comprometidas.py`).
 
 3. En entorno productivo, una `SECRET_KEY` ausente, corta o comprometida **aborta el
    arranque**. Antes se generaba una temporal en silencio, lo que en la práctica significaba

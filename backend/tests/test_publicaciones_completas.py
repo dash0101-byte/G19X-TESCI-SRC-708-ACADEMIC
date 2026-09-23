@@ -480,9 +480,9 @@ def test_cada_apertura_de_la_pagina_suma_una_visita_del_dia(client, publicacion,
 
 
 def test_el_contador_no_guarda_nada_de_quien_visita():
-    """Una fila por publicación y día con un número. Ni IP, ni navegador, ni hora."""
+    """Una fila por publicación, día y red con un número. Ni IP, ni navegador, ni hora."""
     columnas = {c.name for c in VisitaDePublicacion.__table__.columns}
-    assert columnas == {"campaign_id", "dia", "visitas"}
+    assert columnas == {"campaign_id", "dia", "red", "visitas"}
 
 
 def test_la_respuesta_de_la_pagina_no_pone_cookies(client, publicacion):
@@ -501,8 +501,8 @@ def test_una_pagina_no_disponible_no_cuenta_visitas(client, lead_headers, db_ses
 def test_las_visitas_de_dias_distintos_van_por_separado(db_session, publicacion):
     campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
     ayer = datetime.date.today() - datetime.timedelta(days=1)
-    ciclo.registrar_visita(db_session, campana, ayer)
-    ciclo.registrar_visita(db_session, campana, ayer)
+    ciclo.registrar_visita(db_session, campana, dia=ayer)
+    ciclo.registrar_visita(db_session, campana, dia=ayer)
     ciclo.registrar_visita(db_session, campana)
 
     assert sorted(f.visitas for f in db_session.query(VisitaDePublicacion).all()) == [1, 2]
@@ -562,7 +562,7 @@ def test_el_grafico_trae_un_dia_por_barra_con_ceros(client, lead_headers, public
     _enviar(client, publicacion)
     campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
     hoy = datetime.datetime.now(datetime.timezone.utc).date()
-    ciclo.registrar_visita(db_session, campana, hoy - datetime.timedelta(days=3))
+    ciclo.registrar_visita(db_session, campana, dia=hoy - datetime.timedelta(days=3))
 
     por_dia = client.get(f"{PUBLICACIONES}/{publicacion['id']}/informe", headers=lead_headers).json()["por_dia"]
     assert [d["dia"] for d in por_dia] == [(hoy - datetime.timedelta(days=n)).isoformat() for n in (3, 2, 1, 0)]
@@ -573,8 +573,8 @@ def test_el_grafico_trae_un_dia_por_barra_con_ceros(client, lead_headers, public
 def test_el_grafico_se_recorta_a_los_ultimos_90_dias(client, lead_headers, publicacion, db_session):
     campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
     hoy = datetime.datetime.now(datetime.timezone.utc).date()
-    ciclo.registrar_visita(db_session, campana, hoy - datetime.timedelta(days=200))
-    ciclo.registrar_visita(db_session, campana, hoy)
+    ciclo.registrar_visita(db_session, campana, dia=hoy - datetime.timedelta(days=200))
+    ciclo.registrar_visita(db_session, campana, dia=hoy)
 
     informe = client.get(f"{PUBLICACIONES}/{publicacion['id']}/informe", headers=lead_headers).json()
     assert informe["grafico_recortado"] is True
@@ -636,4 +636,4 @@ def test_la_respuesta_dice_cuanto_ocupa_el_texto_y_el_tope(publicacion):
 
 def test_la_tabla_de_visitas_existe_con_su_clave(db_session):
     clave = inspect(db_session.get_bind()).get_pk_constraint("visitas_de_publicacion")
-    assert clave["constrained_columns"] == ["campaign_id", "dia"]
+    assert clave["constrained_columns"] == ["campaign_id", "dia", "red"]

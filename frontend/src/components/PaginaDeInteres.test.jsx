@@ -71,7 +71,8 @@ describe('lo que enseña', () => {
 
     expect(await screen.findByRole('heading', { name: PUBLICACION.titulo })).toBeInTheDocument();
     expect(screen.getByText(PUBLICACION.descripcion)).toBeInTheDocument();
-    expect(fetchPublicacionDeInteres).toHaveBeenCalledWith(SLUG);
+    // Sin `?r=` en la dirección, la red viaja vacía y el servidor la cuenta como «sin red».
+    expect(fetchPublicacionDeInteres).toHaveBeenCalledWith(SLUG, '');
   });
 
   it('las listas que manda el servidor, y ninguna escrita aquí', async () => {

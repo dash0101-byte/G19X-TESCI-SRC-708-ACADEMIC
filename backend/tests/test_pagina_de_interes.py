@@ -153,7 +153,9 @@ def test_un_envio_crea_la_ficha_puntuada_y_atribuida(client, publicacion, db_ses
     assert (lead.first_name, lead.last_name, lead.company) == ("Ana Prueba", "", "Ejemplo SA")
     assert (lead.job_title, lead.industry, lead.company_size) == ("CTO", "FinTech", "201-1000")
     assert lead.phone == "+525598765432"
-    assert lead.source == "LinkedIn"
+    # Sin `?r=`, el canal es «Publicación» y no «LinkedIn»: el enlace se pudo compartir
+    # desde cualquier sitio y escribir una red que no consta sería inventarla (cap. 27).
+    assert lead.source == "Publicación"
     assert lead.campaign_id == publicacion["id"]
     assert lead.current_score > 0
     assert lead.privacy_notice_accepted_at is not None
@@ -224,7 +226,8 @@ def test_la_actividad_queda_con_su_procedencia(client, publicacion, db_session):
     assert actividad.activity_type == ActivityType.FORM_SUBMIT
     assert actividad.source == "pagina_de_interes"
     assert actividad.verificada is True
-    assert actividad.channel == "LinkedIn"
+    assert actividad.channel == "Publicación"
+    assert actividad.activity_data["red"] == "sin_red"
     assert actividad.activity_data["publicacion"] == publicacion["public_slug"]
 
 

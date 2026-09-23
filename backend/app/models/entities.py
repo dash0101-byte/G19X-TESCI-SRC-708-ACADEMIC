@@ -22,6 +22,7 @@ from sqlalchemy.sql import expression
 
 from app.core.database import Base
 from app.core.publicaciones import ACTIVA, nuevo_slug_publico
+from app.core.redes import SIN_RED
 
 
 class ScoreCategory(str, enum.Enum):
@@ -197,6 +198,12 @@ class Campaign(Base):
     # La dirección del post ya publicado en LinkedIn, comprobada como de linkedin.com.
     url_del_post = Column(String(300), nullable=True)
 
+    # --- Capítulo 27: una publicación, varias redes ------------------------------------
+    # Redes de difusión activas: `["linkedin", "whatsapp", ...]` (`app/core/redes.py`).
+    # Vacío: las de siempre. Decide qué botones y qué textos ofrece el panel, no qué
+    # enlaces valen: un enlace ya repartido sigue contando aunque su red se desactive.
+    redes = Column(JSON, nullable=True)
+
     # Relaciones
     leads = relationship("Lead", back_populates="campaign")
     responsable = relationship("User", foreign_keys=[responsable_id])
@@ -215,14 +222,19 @@ class VisitaDePublicacion(Base):
     Cuántas veces se abrió la página de una publicación, por día. Nada más.
 
     Es un contador agregado a propósito: ni IP, ni navegador, ni cookie, ni hora. Una fila
-    por publicación y día con un número. Así la tasa de visitas a envíos se puede calcular
-    sin guardar nada de quien solo miró y no dejó sus datos —que no ha aceptado ningún
-    aviso de privacidad—, y no hay nada que suprimir ni que proteger.
+    por publicación, día y red con un número. Así la tasa de visitas a envíos se puede
+    calcular sin guardar nada de quien solo miró y no dejó sus datos —que no ha aceptado
+    ningún aviso de privacidad—, y no hay nada que suprimir ni que proteger.
+
+    Desde el capítulo 27 la red de llegada forma parte de la clave. Sigue sin ser un dato de
+    nadie: es por dónde se repartió el enlace, no quién lo abrió. Las visitas anteriores, y
+    las que llegan con el parámetro borrado o manipulado, se quedan en «sin red».
     """
     __tablename__ = "visitas_de_publicacion"
 
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="CASCADE"), primary_key=True)
     dia = Column(Date, primary_key=True)
+    red = Column(String(20), primary_key=True, nullable=False, default=SIN_RED, server_default=SIN_RED)
     visitas = Column(Integer, nullable=False, default=0)
 
 

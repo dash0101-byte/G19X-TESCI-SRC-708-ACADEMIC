@@ -579,6 +579,30 @@ describe('el catálogo de endpoints', () => {
     expect(f.vecesDe('/interes/abc123')).toBe(2);
   });
 
+  it('dos redes distintas son dos visitas, no una compartida', async () => {
+    // El reparto por red del capítulo 27 solo vale si cada red cuenta por su lado: con la
+    // clave del slug a secas, abrir por WhatsApp y por Facebook a la vez contaba una sola.
+    const f = fetchSimulado({ '/interes/abc123': () => respuesta(200, { titulo: 'X' }) });
+
+    await Promise.all([
+      api.fetchPublicacionDeInteres('abc123', 'whatsapp'),
+      api.fetchPublicacionDeInteres('abc123', 'facebook'),
+    ]);
+
+    expect(f.vecesDe('/interes/abc123')).toBe(2);
+    const redes = f.mock.calls.map(([url]) => new URL(url, 'http://x').searchParams.get('r'));
+    expect(redes.sort()).toEqual(['facebook', 'whatsapp']);
+  });
+
+  it('la red se saca de la dirección de la página', () => {
+    // Esta lectura vivía suelta en el arranque, que ninguna prueba monta: si devolvía
+    // siempre vacío, todo el mundo llegaba «sin red» y nada lo decía.
+    expect(api.redDeLaUrl('?r=whatsapp')).toBe('whatsapp');
+    expect(api.redDeLaUrl('?otra=1&r=x')).toBe('x');
+    expect(api.redDeLaUrl('')).toBe('');
+    expect(api.redDeLaUrl('?r=')).toBe('');
+  });
+
   it('una carga fallida de la página no se queda guardada', async () => {
     const f = fetchSimulado({ '/interes/abc123': (n) => (n === 1 ? respuesta(429, { detail: 'Demasiadas' }) : respuesta(200, { titulo: 'X' })) });
 
