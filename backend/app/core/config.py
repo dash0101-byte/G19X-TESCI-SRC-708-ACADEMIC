@@ -64,6 +64,30 @@ CONSERVACION_MINIMA_DIAS = {
     "CONSERVACION_REGISTROS_CRM_DIAS": 30,
     # Un aviso sin asociar necesita que alguien tenga tiempo de vincularlo.
     "CONSERVACION_SIN_ASOCIAR_DIAS": 30,
+    # Una tarea cerrada es la prueba de que el trabajo se hizo, y eso se revisa al cerrar
+    # el trimestre.
+    "CONSERVACION_TAREAS_DIAS": 30,
+    # Un aviso leído ya cumplió; se conserva lo justo para poder reconstruir una semana.
+    "CONSERVACION_AVISOS_DIAS": 14,
+}
+
+# Mínimo de cada plazo del motor de reglas (capítulo 28). Mismo criterio que arriba: un `0`
+# escrito por error no puede convertir el motor en una máquina de avisar. Aquí el daño no es
+# borrar sino lo contrario —inundar—, y el resultado práctico es el mismo: una bandeja con
+# cuarenta tareas de la misma mañana no se lee, y el sistema deja de decir qué hacer hoy.
+PLAZOS_MINIMOS_DE_LAS_REGLAS = {
+    # Menos de una hora para el primer contacto es pedir que nadie coma.
+    "REGLA_PRIMER_CONTACTO_HORAS": 1,
+    # Un HOT recién llegado a media tarde no lleva «demasiado tiempo» a las dos horas.
+    "REGLA_HOT_SIN_CONTACTO_HORAS": 4,
+    # El aviso al líder existe para escalar, y escalar exige que el primero tuviera margen.
+    "REGLA_HOT_LIDER_HORAS": 8,
+    # Volver a llamar el mismo día a quien no contestó es insistir, no hacer seguimiento.
+    "REGLA_VOLVER_A_LLAMAR_DIAS": 1,
+    # La víspera es la víspera: un recordatorio a diez minutos no da tiempo a prepararse.
+    "REGLA_RECORDATORIO_DE_REUNION_HORAS": 1,
+    # Una semana de silencio no es un prospecto dormido; es una semana.
+    "REGLA_DORMIDO_DIAS": 7,
 }
 
 
@@ -295,6 +319,60 @@ class Settings(BaseSettings):
         if valor < minimo:
             raise ValueError(f"{info.field_name}={valor} está por debajo del mínimo de {minimo} días.")
         return valor
+
+    # Días desde que la tarea se cerró. Una tarea abierta no caduca nunca: sigue siendo
+    # trabajo pendiente por viejo que sea, y borrarla lo haría desaparecer sin hacerse.
+    CONSERVACION_TAREAS_DIAS: int = 180
+    # Días desde que el aviso se leyó. Uno sin leer no caduca: nadie se ha enterado todavía.
+    CONSERVACION_AVISOS_DIAS: int = 90
+
+    # --- Plazos del motor de reglas (capítulo 28) ---
+    # Cuánto se da para cada cosa. Son de la instalación, no del dominio: un equipo que
+    # atiende cuentas grandes quizá dé 48 horas al primer contacto. El vocabulario de las
+    # reglas está en `app/core/agenda.py`.
+    #
+    # Para cuándo vence la tarea de primer contacto desde que se asigna el prospecto.
+    REGLA_PRIMER_CONTACTO_HORAS: int = 24
+    # Cuánto puede estar un HOT sin que nadie lo contacte antes de avisar a su asesor.
+    REGLA_HOT_SIN_CONTACTO_HORAS: int = 24
+    # Y antes de que el aviso suba al líder. Tiene que ser mayor que el anterior.
+    REGLA_HOT_LIDER_HORAS: int = 48
+    # Cuántos días después de una llamada sin respuesta toca volver a intentarlo.
+    REGLA_VOLVER_A_LLAMAR_DIAS: int = 2
+    # Cuánto antes de una reunión agendada se recuerda. 24 h es «la víspera».
+    REGLA_RECORDATORIO_DE_REUNION_HORAS: int = 24
+    # Días sin ninguna actividad tras los cuales el prospecto se marca dormido.
+    REGLA_DORMIDO_DIAS: int = 30
+
+    @field_validator(*PLAZOS_MINIMOS_DE_LAS_REGLAS)
+    @classmethod
+    def _validar_plazo_de_regla(cls, valor: int, info) -> int:
+        """Un plazo por debajo del mínimo se rechaza al arrancar, antes de crear nada."""
+        minimo = PLAZOS_MINIMOS_DE_LAS_REGLAS[info.field_name]
+        if valor < minimo:
+            raise ValueError(
+                f"{info.field_name}={valor} está por debajo del mínimo de {minimo}."
+            )
+        return valor
+
+    @model_validator(mode="after")
+    def _validar_escalado_al_lider(self) -> "Settings":
+        """
+        El aviso al líder llega DESPUÉS del aviso al asesor, o no es un escalado.
+
+        Cada plazo por separado puede ser válido y la pareja no serlo: con 24 y 24, las dos
+        reglas disparan en la misma pasada y el líder se entera a la vez que la persona que
+        todavía podía resolverlo. Con 24 y 12, antes. Esto no lo puede ver un validador de
+        un solo campo, y es justo el error que nadie notaría: no falla nada, simplemente el
+        líder recibe avisos que no debería estar recibiendo.
+        """
+        if self.REGLA_HOT_LIDER_HORAS <= self.REGLA_HOT_SIN_CONTACTO_HORAS:
+            raise ValueError(
+                f"REGLA_HOT_LIDER_HORAS={self.REGLA_HOT_LIDER_HORAS} tiene que ser mayor que "
+                f"REGLA_HOT_SIN_CONTACTO_HORAS={self.REGLA_HOT_SIN_CONTACTO_HORAS}: el aviso al "
+                "líder escala el del asesor, y no puede llegar antes ni a la vez."
+            )
+        return self
 
     # Database (SQLite autocontenido por defecto, compatible con PostgreSQL en producción)
     DATABASE_URL: str = "sqlite:///./lead_scoring.db"

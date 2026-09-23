@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import expression
 
+from app.core.agenda import ABIERTA
 from app.core.database import Base
 from app.core.publicaciones import ACTIVA, nuevo_slug_publico
 from app.core.redes import SIN_RED
@@ -273,6 +274,12 @@ class Lead(Base):
     last_score_update = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     last_activity_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
+    # Desde cuándo nadie lo toca (capítulo 28). Lo pone la regla «prospecto dormido» de la
+    # pasada diaria y lo quita la primera actividad que llegue. Es una marca y no un cálculo
+    # sobre `last_activity_at` a propósito: el motor necesita saber si YA avisó, y una
+    # consulta por fecha volvería a avisar cada día mientras el prospecto siguiera quieto.
+    dormido_desde = Column(DateTime(timezone=True), nullable=True, index=True)
+
     # Llaves Foráneas
     # Apunta a `users`, no a una tabla de asesores aparte. Es lo que permite comparar
     # "de quién es este prospecto" con "quién está pidiendo verlo" (N-3): mientras fueron
@@ -363,6 +370,133 @@ class LeadActivity(Base):
         return (
             f"<LeadActivity(id={self.id}, lead_id={self.lead_id}, type='{self.activity_type}', "
             f"source='{self.source}', occurred_at={self.occurred_at})>"
+        )
+
+
+class Tarea(Base):
+    """
+    Lo que hay que hacer con un prospecto, y para cuándo.
+
+    Por qué una tabla y no una actividad más
+    ----------------------------------------
+    `lead_activities` guarda lo que YA pasó: una llamada, un formulario, una reunión
+    agendada. Una tarea es lo contrario, algo que todavía no ha pasado y que alguien tiene
+    que hacer. Meterla en la misma tabla habría obligado a que el scoring, el decaimiento
+    temporal y la ficha 360 —que leen esa tabla entera— aprendieran a ignorar filas que no
+    son hechos. Una tarea pendiente no puede puntuar: nadie se vuelve más interesante
+    porque a su asesor le quede trabajo por hacer.
+
+    Idempotencia
+    ------------
+    `(regla, lead_id, clave)` es único. La pasada diaria puede repetirse cuantas veces
+    haga falta —la misma mañana, dos veces tras un reintento— sin duplicar nada: la
+    segunda inserción choca con el índice y se descarta. La `clave` es lo que distingue
+    dos tareas de la misma regla sobre el mismo prospecto: para «volver a llamar» es la
+    llamada que no contestaron, y para «primer contacto», el asesor al que se le asignó.
+    Reasignar a otra persona crea su propia tarea; volver a pasar el motor, no.
+
+    El índice cubre también las **cerradas**, y eso es deliberado: una tarea que ya se hizo
+    no debe volver a aparecer mañana por el mismo motivo.
+    """
+    __tablename__ = "tareas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+    # De quién es el trabajo. Si la cuenta desaparece, su lista de tareas se va con ella:
+    # una tarea sin dueño no la ve nadie y no la puede hacer nadie.
+    asesor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # La regla que la creó (`app/core/agenda.py`). Texto y no un tipo enumerado de la base:
+    # añadir una regla no debe exigir un `ALTER TYPE`, igual que con la procedencia de las
+    # actividades.
+    regla = Column(String(40), nullable=False, index=True)
+    clave = Column(String(80), nullable=False)
+
+    estado = Column(String(20), nullable=False, default=ABIERTA, server_default=ABIERTA, index=True)
+    # Para cuándo. La bandeja «Hoy» enseña lo vencido y lo de hoy; lo de pasado mañana
+    # espera su turno.
+    vence_el = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    # Por qué existe esta tarea, en una frase y sin datos de nadie: el nombre y la empresa
+    # salen del prospecto al pintarla. Lo que se guarda aquí viaja a la bitácora y a los
+    # respaldos, y no tiene por qué llevar a una persona dentro.
+    motivo = Column(String(200), nullable=False)
+    datos = Column(JSON, nullable=True, default=dict)
+
+    creada_en = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    cerrada_en = Column(DateTime(timezone=True), nullable=True)
+    # Quién la cerró. Nulo cuando la cerró el sistema porque ocurrió lo que esperaba.
+    cerrada_por_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    lead = relationship("Lead")
+    asesor = relationship("User", foreign_keys=[asesor_id])
+
+    __table_args__ = (
+        Index("uq_tareas_regla_lead_clave", "regla", "lead_id", "clave", unique=True),
+        # La consulta de la bandeja: las mías, abiertas, por fecha de vencimiento.
+        Index("idx_tareas_asesor_estado_vence", "asesor_id", "estado", "vence_el"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Tarea(id={self.id}, lead_id={self.lead_id}, regla='{self.regla}', "
+            f"estado='{self.estado}', vence_el={self.vence_el})>"
+        )
+
+
+class Aviso(Base):
+    """
+    Algo que alguien tiene que enterarse de que pasó. Dentro del panel y en ningún otro sitio.
+
+    Por qué no es una tarea
+    -----------------------
+    Una tarea se hace; un aviso se lee. «Volver a llamar» pide trabajo y se cierra cuando el
+    trabajo ocurre. «Este HOT lleva 24 horas sin que nadie lo toque» no pide un trabajo
+    concreto —puede resolverse llamando, delegando o decidiendo que no vale la pena—: pide
+    que alguien se entere. Juntarlos habría obligado a inventar un estado «leída pero no
+    hecha» y a decidir si un aviso sin leer cuenta como trabajo pendiente en la bandeja.
+
+    Por qué no sale del panel
+    -------------------------
+    Ni correo ni WhatsApp. Un aviso que sale del sistema necesita una cuenta externa, una
+    dirección de envío verificada y una política de qué hacer cuando rebota; y, sobre todo,
+    saca de la aplicación el nombre de una persona que aceptó un aviso de privacidad para
+    otra cosa. Queda explícitamente fuera del capítulo 28.
+    """
+    __tablename__ = "avisos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Para quién es. Si la cuenta desaparece, sus avisos también.
+    usuario_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    regla = Column(String(40), nullable=False, index=True)
+    clave = Column(String(80), nullable=False)
+
+    texto = Column(String(300), nullable=False)
+    datos = Column(JSON, nullable=True, default=dict)
+
+    creado_en = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
+    # Nulo mientras no se haya leído: es lo que cuenta la campana.
+    leido_en = Column(DateTime(timezone=True), nullable=True)
+
+    lead = relationship("Lead")
+    usuario = relationship("User", foreign_keys=[usuario_id])
+
+    __table_args__ = (
+        # Mismo criterio que en las tareas: la pasada puede repetirse sin llenar la campana
+        # del mismo aviso. Incluye al destinatario porque el mismo hecho sí puede avisar a
+        # dos personas distintas —al asesor primero y al líder después—, y esos son dos
+        # avisos, no uno repetido.
+        Index("uq_avisos_usuario_regla_lead_clave", "usuario_id", "regla", "lead_id", "clave", unique=True),
+        # La consulta de la campana: los míos, sin leer, los más nuevos primero.
+        Index("idx_avisos_usuario_leido_creado", "usuario_id", "leido_en", "creado_en"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Aviso(id={self.id}, usuario_id={self.usuario_id}, lead_id={self.lead_id}, "
+            f"regla='{self.regla}', leido={self.leido_en is not None})>"
         )
 
 

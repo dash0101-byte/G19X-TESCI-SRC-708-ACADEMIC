@@ -63,6 +63,10 @@ TABLAS_DEL_PROSPECTO: Dict[str, str] = {
     "score_history_monthly": "resumen_mensual_de_puntuacion",
     "crm_integration_logs": "integraciones_crm",
     "webhook_deliveries": "entregas_de_webhook",
+    # Capítulo 28. Lo que el sistema mandó hacer sobre esta persona y a quién se lo avisó
+    # también es tratamiento de sus datos: entra en la exportación y se va en la supresión.
+    "tareas": "tareas",
+    "avisos": "avisos",
 }
 
 # Lo que el sistema NO puede alcanzar desde la base, dicho en la propia exportación. Una

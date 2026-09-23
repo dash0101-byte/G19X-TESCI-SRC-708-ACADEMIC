@@ -45,18 +45,29 @@ from typing import Callable, Dict, List, Optional
 
 from sqlalchemy.orm import Query, Session
 
+from app.core.agenda import ESTADOS_CERRADOS
 from app.core.audit import (
     ACCION_CONSERVACION_PURGA,
+    ENTIDAD_AVISO,
     ENTIDAD_EVENTO_SIN_ASOCIAR,
     ENTIDAD_REGISTRO_CRM,
     ENTIDAD_SESION,
+    ENTIDAD_TAREA,
     ENTIDAD_TRABAJO,
     RESULTADO_ERROR,
     RESULTADO_OK,
     registrar_evento,
 )
 from app.core.config import settings
-from app.models.entities import CRMIntegrationLog, JobStatus, ScoringJob, UnmatchedEvent, utc_now
+from app.models.entities import (
+    Aviso,
+    CRMIntegrationLog,
+    JobStatus,
+    ScoringJob,
+    Tarea,
+    UnmatchedEvent,
+    utc_now,
+)
 from app.services.session_service import consulta_tokens_caducados, purgar_tokens_caducados
 
 logger = logging.getLogger(__name__)
@@ -84,6 +95,27 @@ def _avisos_sin_asociar_vencidos(db: Session, corte: datetime.datetime) -> Query
     # Desde que el aviso LLEGÓ, no desde que ocurrió: lo que se conserva es lo que el sistema
     # recogió, y un evento de hace un año entregado ayer tiene que dar tiempo a vincularlo.
     return db.query(UnmatchedEvent).filter(UnmatchedEvent.received_at < corte)
+
+
+def _tareas_vencidas(db: Session, corte: datetime.datetime) -> Query:
+    """
+    Solo las **cerradas**, y desde que se cerraron.
+
+    Una tarea abierta no caduca por vieja. Sigue siendo trabajo que nadie hizo, y borrarla
+    sería hacerla desaparecer en lugar de hacerla: la bandeja quedaría limpia sin que nada
+    hubiera ocurrido, que es exactamente lo contrario de lo que este capítulo existe para
+    conseguir. Si una tarea de hace un año molesta, se marca hecha.
+    """
+    return db.query(Tarea).filter(
+        Tarea.estado.in_(ESTADOS_CERRADOS),
+        Tarea.cerrada_en.isnot(None),
+        Tarea.cerrada_en < corte,
+    )
+
+
+def _avisos_vencidos(db: Session, corte: datetime.datetime) -> Query:
+    """Solo los **leídos**, y desde que se leyeron: uno sin leer no ha cumplido todavía."""
+    return db.query(Aviso).filter(Aviso.leido_en.isnot(None), Aviso.leido_en < corte)
 
 
 def _borrar(consulta: Callable[[Session, datetime.datetime], Query]):
@@ -130,6 +162,17 @@ PLAZOS: List[Plazo] = [
     Plazo(
         "bandeja_sin_asociar", "unmatched_events", "CONSERVACION_SIN_ASOCIAR_DIAS", ENTIDAD_EVENTO_SIN_ASOCIAR,
         _avisos_sin_asociar_vencidos, _borrar(_avisos_sin_asociar_vencidos),
+    ),
+    # Capítulo 28. Las tareas y los avisos hablan de una persona concreta —cuelgan de
+    # `leads`—, así que entran en la tabla de conservación como todo lo demás y no quedan
+    # sin plazo, que es el defecto que el capítulo 22 existió para cerrar.
+    Plazo(
+        "tareas", "tareas", "CONSERVACION_TAREAS_DIAS", ENTIDAD_TAREA,
+        _tareas_vencidas, _borrar(_tareas_vencidas),
+    ),
+    Plazo(
+        "avisos", "avisos", "CONSERVACION_AVISOS_DIAS", ENTIDAD_AVISO,
+        _avisos_vencidos, _borrar(_avisos_vencidos),
     ),
 ]
 

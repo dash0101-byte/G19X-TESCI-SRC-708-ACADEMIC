@@ -428,6 +428,10 @@ services:
       CONSERVACION_TRABAJOS_DIAS: ${CONSERVACION_TRABAJOS_DIAS:-90}
       CONSERVACION_REGISTROS_CRM_DIAS: ${CONSERVACION_REGISTROS_CRM_DIAS:-90}
       CONSERVACION_SIN_ASOCIAR_DIAS: ${CONSERVACION_SIN_ASOCIAR_DIAS:-90}
+      # Capitulo 28. Solo caduca lo cerrado: una tarea abierta no se borra por vieja, y un
+      # aviso sin leer tampoco. Minimos: 30 y 14 dias.
+      CONSERVACION_TAREAS_DIAS: ${CONSERVACION_TAREAS_DIAS:-180}
+      CONSERVACION_AVISOS_DIAS: ${CONSERVACION_AVISOS_DIAS:-90}
       LOG_FORMAT: ${LOG_FORMAT:-json}
     depends_on:
       postgres:

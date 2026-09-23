@@ -18,12 +18,15 @@ from app.core.database import Base
 from app.models.entities import (
     ActivityType,
     AuditLog,
+    Aviso,
     CRMIntegrationLog,
     Lead,
     LeadActivity,
     ScoreCategory,
     ScoreHistory,
     ScoreHistoryMonthly,
+    Tarea,
+    User,
     WebhookDelivery,
 )
 from app.services import derechos_del_titular
@@ -114,6 +117,32 @@ def titular(db_session):
                 lead_id=lead.id,
                 response_data={"lead_id": lead.id, "email": lead.email},
                 expires_at=_ahora() + datetime.timedelta(minutes=15),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    # Capítulo 28: lo que el sistema mandó hacer sobre ella y a quién se lo avisó. Va
+    # después del primer commit porque necesita el id de una cuenta ya existente.
+    asesor = db_session.query(User).first()
+    db_session.add_all(
+        [
+            Tarea(
+                lead_id=lead.id,
+                asesor_id=asesor.id,
+                regla="primer_contacto",
+                clave=str(asesor.id),
+                vence_el=_ahora() + datetime.timedelta(hours=24),
+                motivo="Prospecto recién asignado, sin contacto todavía.",
+                datos={"asignado_en": _ahora().isoformat()},
+            ),
+            Aviso(
+                usuario_id=asesor.id,
+                lead_id=lead.id,
+                regla="hot_sin_contacto",
+                clave="h24",
+                texto="Un prospecto HOT lleva 24 h sin contacto.",
+                datos={"horas": 24},
             ),
         ]
     )

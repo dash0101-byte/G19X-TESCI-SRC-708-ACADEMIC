@@ -98,6 +98,8 @@ def _aviso(db, n, *, llego_hace, ocurrio_hace=None, desde=AHORA):
 def test_las_tablas_que_20_5_dejaba_sin_caducidad_tienen_plazo():
     assert {plazo.tabla for plazo in PLAZOS} == {
         "refresh_tokens", "scoring_jobs", "crm_integration_logs", "unmatched_events",
+        # Capítulo 28: nacen con plazo el mismo día que nacen.
+        "tareas", "avisos",
     }
     assert {plazo.ajuste for plazo in PLAZOS} == set(CONSERVACION_MINIMA_DIAS)
 
@@ -249,12 +251,16 @@ def test_el_guion_diario_aplica_los_plazos(db_session, capsys):
     assert retencion_historial.main([]) == 0
 
     salida = capsys.readouterr().out
-    for tabla in ("refresh_tokens", "scoring_jobs", "crm_integration_logs", "unmatched_events"):
-        assert f"[CADUCIDAD] {tabla}:" in salida
+    for plazo in PLAZOS:
+        assert f"[CADUCIDAD] {plazo.tabla}:" in salida
     assert db_session.query(RefreshToken).count() == 0
     assert db_session.query(UnmatchedEvent).count() == 0
     assert db_session.query(CRMIntegrationLog).count() == 0
-    assert db_session.query(AuditLog).filter(AuditLog.action == "conservacion.purga").count() == 4
+    # Un asiento por plazo: la lista y la bitácora dicen lo mismo, y añadir un plazo sin
+    # anotarlo rompe aquí.
+    assert db_session.query(AuditLog).filter(
+        AuditLog.action == "conservacion.purga"
+    ).count() == len(PLAZOS)
 
 
 def test_si_el_historial_falla_los_plazos_se_aplican_y_la_pasada_sale_con_1(db_session, monkeypatch):

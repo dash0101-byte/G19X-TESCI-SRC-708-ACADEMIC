@@ -121,6 +121,15 @@ ACCION_EVENTO_DESCARTAR = "evento.descartar"
 # Sin actor, como la purga del historial, y sin datos de contacto.
 ACCION_INTEGRACION_ENTREGA = "integracion.entrega"
 
+# --- El motor de reglas (capítulo 28) ---
+# Una pasada de una regla: cuántas tareas y cuántos avisos creó, cuántas cerró y si falló.
+# Sin actor, como la purga: no la pidió nadie, la disparó el reloj. Sin datos de contacto:
+# la bitácora cuenta cuántos, nunca quiénes.
+ACCION_REGLA_EJECUCION = "regla.ejecucion"
+# Una persona dice que ya hizo una tarea. Es una afirmación sobre su propio trabajo y por
+# eso lleva actor; el sistema cerrando una tarea porque ocurrió lo que esperaba, no.
+ACCION_TAREA_HECHA = "tarea.hecha"
+
 ENTIDAD_SESION = "sesion"
 ENTIDAD_LEAD = "lead"
 ENTIDAD_ENDPOINT = "endpoint"
@@ -132,6 +141,9 @@ ENTIDAD_HISTORIAL = "historial_de_puntuacion"
 ENTIDAD_EVENTO_SIN_ASOCIAR = "evento_sin_asociar"
 ENTIDAD_INTEGRACION = "integracion"
 ENTIDAD_REGISTRO_CRM = "registro_crm"
+ENTIDAD_REGLA = "regla"
+ENTIDAD_TAREA = "tarea"
+ENTIDAD_AVISO = "aviso"
 
 
 def _recortar(valor: Optional[str], limite: int) -> Optional[str]:
