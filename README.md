@@ -439,6 +439,10 @@ con un `TypeError` en lugar de devolver datos de más en silencio.
 | `GET /api/v1/publicaciones/{id}/vista-previa` | Cualquier rol | La página de interés tal como la verá el interesado, en cualquier estado y sin contar visita |
 | `GET /interes/{slug}` | Público, sin sesión | El HTML de la página, con las etiquetas Open Graph y de X de esa publicación dentro |
 | `GET /interes/{slug}/tarjeta.png` | Público, sin sesión | La imagen 1200×630 de vista previa, dibujada en el servidor |
+| `GET /api/v1/agenda/hoy` | Cualquier rol | Lo que hay que hacer hoy, por score; el líder puede pedir la bandeja de su cartera |
+| `POST /api/v1/agenda/tareas/{id}/hecha` | Su dueño | «Ya la hice»; una tarea ajena responde 404 |
+| `GET /api/v1/agenda/avisos` | Cualquier rol | La campana, siempre la propia |
+| `GET /api/v1/agenda/enfriandose` | Líder y administrador | Los HOT desatendidos y con qué asesor están |
 | `GET /api/v1/publicaciones/comparativa` | `Sales_Lead`, `System_Admin` | Perfiles, score medio y avances de cada publicación |
 | `GET /api/v1/publicaciones/nuevos-sin-asesor` | `Sales_Lead`, `System_Admin` | Cuántos prospectos de LinkedIn siguen sin asignar |
 | `GET /api/v1/interes/{slug}` | **Sin sesión** | La publicación y las listas del formulario |
@@ -1218,6 +1222,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **25** | [Reporte 25](docs/reportes/Reporte_25_Del_Post_de_LinkedIn_al_Prospecto_Puntuado_Publicaciones_Pagina_de_Interes_e_Informe_por_Publicacion.md) | Del post de LinkedIn al prospecto puntuado: publicaciones con enlace propio, página de interés pública y defendida, ficha «Llegó por», informe y comparativa por publicación, y guarda del CI. |
 | **26** | [Reporte 26](docs/reportes/Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md) | Publicaciones completas: estados y cierre automático, vistas previas del post y de la página, opciones de «¿Qué necesitas?» por publicación, asesor responsable, post real, duplicar, y visitas sin datos personales con tasa de envío y gráfico por día. |
 | **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, vista previa del enlace con etiquetas Open Graph servidas por el servidor, y las claves viejas de JWT guardadas por su huella. |
+| **28** | [Reporte 28](docs/reportes/Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md) | El sistema dice qué hacer hoy: seis reglas en la pasada diaria que dejan tareas y avisos sin salir del panel, bandeja «Hoy» ordenada por score, campana de avisos, los HOT que se enfrían para el líder, y guarda del CI con 31 defectos reintroducidos. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos y 12 preguntas de sínodo con respuestas modelo. |
 
 ---

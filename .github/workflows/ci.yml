@@ -580,6 +580,15 @@ jobs:
       - name: La pagina publica conserva sus defensas
         run: python scripts/guarda_de_la_pagina_publica.py
 
+      # ----------------------------------------------------------------------
+      # Capitulo 28: el motor de reglas decide solo, de madrugada y sin nadie delante, y
+      # eso hace que sus fallos sean silenciosos: duplicar no rompe nada el primer dia y
+      # deja la bandeja inservible la primera semana. Esta guarda comprueba propiedades
+      # —idempotencia, escalado, que nada sale del panel, que el trabajo pendiente no
+      # puntua, el alcance, los plazos y la bitacora— en lugar de casos.
+      - name: El motor de reglas conserva sus defensas
+        run: python scripts/guarda_del_motor_de_reglas.py
+
       # La suite levanta su propio SQLite en memoria y declara sus datos por fixtures.
       # No se siembra ninguna base de datos antes: hacerlo acoplaba los tests a un script
       # de demostración y los volvía dependientes del orden de ejecución.

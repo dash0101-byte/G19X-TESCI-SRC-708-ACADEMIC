@@ -49,6 +49,7 @@ REPORT_FILES = [
     ("Reporte_25_Del_Post_de_LinkedIn_al_Prospecto_Puntuado_Publicaciones_Pagina_de_Interes_e_Informe_por_Publicacion.md", "Capítulo 25: Del Post de LinkedIn al Prospecto Puntuado — Publicaciones, Página de Interés e Informe por Publicación"),
     ("Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md", "Capítulo 26: Publicaciones Completas — Ciclo de Vida, Opciones, Responsable y Visitas"),
     ("Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md", "Capítulo 27: Una Publicación, Varias Redes — Difusión, Textos por Red y Atribución"),
+    ("Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md", "Capítulo 28: El Sistema Dice Qué Hacer Hoy — Motor de Reglas, Tareas y Avisos"),
 ]
 
 

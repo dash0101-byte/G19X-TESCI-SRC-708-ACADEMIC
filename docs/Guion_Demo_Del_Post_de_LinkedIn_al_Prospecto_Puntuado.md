@@ -376,6 +376,14 @@ El esfuerzo va a que la historia de la sección 2 funcione de punta a punta.
 > - Paso 6: el informe añade una **fila por red** con visitas, envíos, tasa, perfiles y score medio.
 > - Detalle en el capítulo 27 de la Memoria (`docs/reportes/Reporte_27_...`).
 
+> **Actualización, capítulo 28 «El sistema dice qué hacer hoy» (23-09-2026).**
+> - Cierra las **dos notas** que la prueba con personas había dejado «para mirar con lupa»: el asesor ya no busca lo nuevo en una lista ordenada por score, y el líder ya no busca un contador escondido en otra pestaña. El panel abre en **«Hoy»** y dice qué toca.
+> - Seis reglas corren en la pasada diaria que ya existía: primer contacto al asignar, volver a llamar cuando nadie contesta, recordatorio la víspera de una reunión, aviso al asesor cuando un HOT lleva horas sin contacto, escalado al líder cuando ese aviso no bastó, y marca de dormido tras un mes de silencio.
+> - Nada sale del panel: ni correo, ni WhatsApp, ni servicios externos. Los avisos viven en una **campana** en la barra.
+> - Una llamada contestada cierra «volver a llamar» en el momento de registrarla, no al día siguiente. Marcar una tarea hecha solo puede hacerlo su dueño, aunque el líder la vea.
+> - El paso 5 del guion cambia: después de asignar, el asesor **no busca la ficha**; la encuentra en «Hoy», con el motivo escrito y un clic hasta la ficha 360. El ensayo automático recorre ese camino.
+> - Detalle en el capítulo 28 de la Memoria (`docs/reportes/Reporte_28_...`).
+
 Ninguno se corrige en este documento. Van en orden de dependencia para la demo.
 
 | Id | Hueco | Paso afectado | Regla |

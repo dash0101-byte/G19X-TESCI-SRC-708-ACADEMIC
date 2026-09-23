@@ -146,6 +146,14 @@ Una hoja **por persona**. Quien conduce escribe; la persona no escribe nada.
 - **Falta**: quiere hacer algo que el sistema no hace. → **no se toca ahora**; se anota
   abajo y se decide después.
 
+> **Cerrado en el capítulo 28 (23-09-2026).** Los dos sitios de abajo se corrigieron sin
+> esperar a la sesión: los dos describían a alguien **buscando**, y un sistema que sabe la
+> respuesta y obliga a buscarla no está terminado. El panel abre ahora en «Hoy» con lo que
+> le toca a cada uno, y el líder ve los HOT que se enfrían debajo de su propia bandeja. Se
+> dejan escritos tal cual porque siguen siendo lo que hay que observar cuando la sesión se
+> celebre: lo que se arregló fue el síntoma que se había anotado, no la prueba de que ya
+> nadie tenga que buscar nada.
+
 ### Dos sitios donde mirar con lupa
 
 Salieron del ensayo previo. No se han tocado porque no llegaron a impedir la tarea, y esta
