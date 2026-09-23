@@ -100,7 +100,9 @@ REGLAS: Dict[str, Regla] = {
         Regla(
             clave=PROSPECTO_DORMIDO,
             etiqueta="Prospecto dormido",
-            crea=CREA_AMBOS,
+            # Avisa, y además deja la marca en la ficha. La marca no es una tarea: nadie
+            # tiene que hacer nada con ella, es un hecho sobre el prospecto.
+            crea=CREA_AVISO,
             para=PARA_ASESOR,
             descripcion="Nadie ha tocado este prospecto en mucho tiempo; queda marcado como dormido.",
         ),

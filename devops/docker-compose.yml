@@ -432,6 +432,14 @@ services:
       # aviso sin leer tampoco. Minimos: 30 y 14 dias.
       CONSERVACION_TAREAS_DIAS: ${CONSERVACION_TAREAS_DIAS:-180}
       CONSERVACION_AVISOS_DIAS: ${CONSERVACION_AVISOS_DIAS:-90}
+      # Plazos del motor de reglas (capitulo 28). Cada uno con su minimo; ademas, el aviso
+      # al lider tiene que superar al del asesor o el servicio no arranca.
+      REGLA_PRIMER_CONTACTO_HORAS: ${REGLA_PRIMER_CONTACTO_HORAS:-24}
+      REGLA_HOT_SIN_CONTACTO_HORAS: ${REGLA_HOT_SIN_CONTACTO_HORAS:-24}
+      REGLA_HOT_LIDER_HORAS: ${REGLA_HOT_LIDER_HORAS:-48}
+      REGLA_VOLVER_A_LLAMAR_DIAS: ${REGLA_VOLVER_A_LLAMAR_DIAS:-2}
+      REGLA_RECORDATORIO_DE_REUNION_HORAS: ${REGLA_RECORDATORIO_DE_REUNION_HORAS:-24}
+      REGLA_DORMIDO_DIAS: ${REGLA_DORMIDO_DIAS:-30}
       LOG_FORMAT: ${LOG_FORMAT:-json}
     depends_on:
       postgres:

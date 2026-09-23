@@ -638,6 +638,14 @@ async def registrar_evento(
             return repetido
         raise
 
+    # Capítulo 28. Lo que esta actividad deja de tener sentido se cierra AQUÍ y no en la
+    # pasada de mañana: el asesor no puede ver en su bandeja una llamada que acaba de hacer.
+    # Va sin confirmar, dentro de la transacción de la actividad: si la actividad se
+    # descarta, la tarea que cerró vuelve a estar abierta.
+    from app.services.motor_de_reglas import cerrar_lo_cumplido
+
+    cerrar_lo_cumplido(db, lead, actividad, commit=False)
+
     if scoring is None:
         from app.services.scoring_service import ScoringService
 

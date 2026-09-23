@@ -1,7 +1,7 @@
 import datetime
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.entities import ActivityType, CallOutcome, MessageDirection, ScoreCategory
 
@@ -25,6 +25,28 @@ class ActivityCreate(BaseModel):
     )
     channel: Optional[str] = Field(None, max_length=50, description="Por defecto, el del tipo")
     notes: Optional[str] = Field(None, max_length=500, description="Nota del asesor; los mensajes no llevan")
+    # Capítulo 28. `occurred_at` es cuándo se AGENDÓ la reunión y no puede estar en el
+    # futuro; esto es cuándo ES, y por definición está en el futuro. Sin este dato el
+    # recordatorio de la víspera no puede existir: recordar sobre la fecha en que se agendó
+    # avisaría siempre tarde. Calendly ya lo manda con el mismo nombre.
+    inicio_de_la_reunion: Optional[datetime.datetime] = Field(
+        None, description="Cuándo es la reunión; solo en reuniones agendadas y siempre en el futuro."
+    )
+
+    @model_validator(mode="after")
+    def _la_fecha_es_de_la_reunion(self) -> "ActivityCreate":
+        if self.inicio_de_la_reunion is None:
+            return self
+        if self.activity_type != ActivityType.MEETING_SCHEDULED:
+            raise ValueError(
+                "«inicio_de_la_reunion» solo tiene sentido en una reunión agendada."
+            )
+        momento = self.inicio_de_la_reunion
+        if momento.tzinfo is None:
+            momento = momento.replace(tzinfo=datetime.timezone.utc)
+        if momento <= datetime.datetime.now(datetime.timezone.utc):
+            raise ValueError("La reunión tiene que ser en el futuro; una pasada no se recuerda.")
+        return self
 
 
 class ActivityResponse(BaseModel):

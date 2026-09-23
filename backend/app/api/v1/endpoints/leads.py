@@ -437,6 +437,13 @@ async def add_lead_activity(
         resultado_de_llamada=activity_in.call_outcome,
         canal=activity_in.channel,
         notas=activity_in.notes,
+        # Con el mismo nombre que manda Calendly: el recordatorio de la víspera lee un solo
+        # dato, venga de una integración o del asesor.
+        datos=(
+            {"inicio_de_la_reunion": activity_in.inicio_de_la_reunion.isoformat()}
+            if activity_in.inicio_de_la_reunion is not None
+            else {}
+        ),
     )
     try:
         resultado = await registro_de_actividad.registrar_evento(db, evento, lead=lead)

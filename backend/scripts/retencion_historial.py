@@ -11,6 +11,12 @@ asociar». Hasta el capítulo 22 esas tablas no tenían plazo, y la de sesiones 
 función de purga, que nada llamaba. Es la misma pasada y no un servicio nuevo a propósito: un
 proceso más que supervisar es un proceso más que puede quedarse parado sin que nadie lo vea.
 
+Y desde el capítulo 28, el **motor de reglas** (`app/services/motor_de_reglas.py`): lo que
+cada asesor tiene que hacer hoy. Por el mismo argumento de arriba, y porque el motor y la
+purga miran la misma clase de cosa —qué ha pasado con cada prospecto desde la última vez—,
+no hacía falta un segundo reloj para preguntarlo. El motor corre **antes** de las purgas:
+una tarea recién creada no se puede encontrar con que su prospecto ya no está.
+
 Este guion solo ejecuta las reglas y deja constancia: cada pieza tiene su asiento en la
 bitácora, y un fallo en una no impide las demás.
 
@@ -41,6 +47,7 @@ from app.core.audit import ACCION_HISTORIAL_RETENCION, ENTIDAD_HISTORIAL, regist
 from app.core.config import RETENCION_MINIMA_DEL_HISTORIAL_MESES, settings  # noqa: E402
 from app.core.database import SessionLocal  # noqa: E402
 from app.services.caducidad_service import aplicar_caducidad  # noqa: E402
+from app.services.motor_de_reglas import ejecutar as ejecutar_reglas  # noqa: E402
 from app.services.retencion_service import LOTE_POR_DEFECTO, aplicar_retencion  # noqa: E402
 
 INTERVALO_SUGERIDO = 86400
@@ -67,8 +74,35 @@ def _resumir_historial(db, meses: int, lote: int, simular: bool) -> None:
         )
 
 
+def _ejecutar_reglas(db, simular: bool) -> int:
+    """
+    El motor de reglas. Devuelve cuántas reglas fallaron.
+
+    Simular no ejecuta nada. Una simulación que creara tareas no sería una simulación, y
+    contar «cuántas crearía» exigiría escribir la mitad del motor otra vez solo para
+    responder a una pregunta que nadie ha hecho todavía.
+    """
+    if simular:
+        print("[REGLAS] Simulacion: el motor no se ejecuta.")
+        return 0
+    fallos = 0
+    for resultado in ejecutar_reglas(db):
+        if resultado.error:
+            fallos += 1
+            print(
+                f"[REGLAS] {resultado.regla}: fallo ({resultado.error}). "
+                "Queda anotado en la bitacora; las demas reglas se aplicaron."
+            )
+            continue
+        print(
+            f"[REGLAS] {resultado.regla}: {resultado.tareas} tareas, {resultado.avisos} avisos, "
+            f"{resultado.cerradas} cerradas, {resultado.marcados} marcados."
+        )
+    return fallos
+
+
 def una_pasada(meses: int, lote: int, simular: bool) -> int:
-    """Historial y plazos, cada pieza por su lado. Devuelve 1 si alguna falló."""
+    """Historial, reglas y plazos, cada pieza por su lado. Devuelve 1 si alguna falló."""
     fallos = 0
     db = SessionLocal()
     try:
@@ -78,6 +112,13 @@ def una_pasada(meses: int, lote: int, simular: bool) -> int:
             db.rollback()
             fallos += 1
             print(f"[RETENCION] El historial no se pudo resumir ({exc.__class__.__name__}: {exc}).")
+
+        try:
+            fallos += _ejecutar_reglas(db, simular)
+        except Exception as exc:  # noqa: BLE001  (se informa y siguen los plazos)
+            db.rollback()
+            fallos += 1
+            print(f"[REGLAS] El motor no se pudo ejecutar ({exc.__class__.__name__}: {exc}).")
 
         verbo = "se borrarian" if simular else "borradas"
         for resultado in aplicar_caducidad(db, simular=simular):
