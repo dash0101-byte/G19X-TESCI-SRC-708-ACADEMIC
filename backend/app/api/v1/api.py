@@ -1,4 +1,5 @@
 from app.api.v1.endpoints import (
+    agenda,
     analytics,
     audit,
     auth,
@@ -37,3 +38,6 @@ api_router.include_router(campaigns.router, prefix="/campaigns", tags=["Campaña
 api_router.include_router(publicaciones.router, prefix="/publicaciones", tags=["Publicaciones"])
 # Sin sesión: es la página pública a la que llevan los enlaces de las publicaciones.
 api_router.include_router(interes.router, prefix="/interes", tags=["Página de interés"])
+# Lo que hay que hacer hoy (capítulo 28). Solo lee y cierra: quien decide qué hay que hacer
+# es el motor de reglas, en la pasada diaria, sin nadie delante.
+api_router.include_router(agenda.router, prefix="/agenda", tags=["Agenda del día"])

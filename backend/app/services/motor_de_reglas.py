@@ -264,10 +264,10 @@ def _clave_del_episodio(lead: Lead) -> str:
     las dos cosas.
     """
     momento = lead.last_activity_at or lead.created_at
-    return _aware(momento).date().isoformat()
+    return aware(momento).date().isoformat()
 
 
-def _aware(momento: datetime.datetime) -> datetime.datetime:
+def aware(momento: datetime.datetime) -> datetime.datetime:
     """SQLite devuelve las fechas sin zona; compararlas con una que sí la tiene revienta."""
     if momento.tzinfo is None:
         return momento.replace(tzinfo=datetime.timezone.utc)
@@ -354,7 +354,7 @@ def regla_volver_a_llamar(ctx: Contexto) -> ResultadoDeRegla:
             # La llamada concreta. Otro intento fallido mañana es otra tarea, y el mismo
             # intento releído por la pasada del jueves no lo es.
             clave=str(llamada.id),
-            vence_el=_aware(llamada.occurred_at)
+            vence_el=aware(llamada.occurred_at)
             + datetime.timedelta(days=settings.REGLA_VOLVER_A_LLAMAR_DIAS),
             motivo="La última llamada no la contestaron.",
             datos={"resultado": llamada.call_outcome},
@@ -414,14 +414,14 @@ def _momento_de_la_reunion(actividad: LeadActivity) -> Optional[datetime.datetim
     if not crudo:
         return None
     try:
-        return _aware(datetime.datetime.fromisoformat(str(crudo).replace("Z", "+00:00")))
+        return aware(datetime.datetime.fromisoformat(str(crudo).replace("Z", "+00:00")))
     except ValueError:
         # Un dato ilegible de una integración no puede tumbar la pasada entera.
         logger.warning("Reunión %s con fecha ilegible; no se recuerda.", actividad.id)
         return None
 
 
-def _hot_desatendidos(ctx: Contexto, horas: int) -> List[Lead]:
+def hot_desatendidos(ctx: Contexto, horas: int) -> List[Lead]:
     corte = ctx.ahora - datetime.timedelta(hours=horas)
     return (
         ctx.db.query(Lead)
@@ -443,7 +443,7 @@ def regla_hot_sin_contacto(ctx: Contexto) -> ResultadoDeRegla:
     en dos pantallas distintas.
     """
     resultado = ResultadoDeRegla(HOT_SIN_CONTACTO)
-    for lead in _hot_desatendidos(ctx, settings.REGLA_HOT_SIN_CONTACTO_HORAS):
+    for lead in hot_desatendidos(ctx, settings.REGLA_HOT_SIN_CONTACTO_HORAS):
         if lead.assigned_rep_id is None:
             continue
         if _aviso(
@@ -472,7 +472,7 @@ def regla_hot_sin_contacto_lider(ctx: Contexto) -> ResultadoDeRegla:
     if not ctx.lideres:
         return resultado
 
-    for lead in _hot_desatendidos(ctx, settings.REGLA_HOT_LIDER_HORAS):
+    for lead in hot_desatendidos(ctx, settings.REGLA_HOT_LIDER_HORAS):
         clave = _clave_del_episodio(lead)
         ya_avisado = (
             ctx.db.query(Aviso.id)
