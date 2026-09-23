@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
+import BandejaDeHoy from './components/BandejaDeHoy';
 import LoginScreen from './components/LoginScreen';
 import KPICards from './components/KPICards';
 import AnalyticsCharts from './components/AnalyticsCharts';
@@ -25,7 +26,7 @@ import {
 } from './services/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('hoy');
   // La identidad y el rol vienen del servidor tras autenticarse; el cliente ya no los
   // elige ni los guarda en localStorage, donde eran editables desde la consola.
   const [user, setUser] = useState(null);
@@ -52,7 +53,7 @@ export default function App() {
   const handleLogout = async () => {
     await logout();
     setUser(null);
-    setActiveTab('dashboard');
+    setActiveTab('hoy');
     setSummary(null);
     setCampaigns([]);
     setLeads([]);
@@ -284,10 +285,20 @@ export default function App() {
         currentRole={currentRole}
         user={user}
         onOpenSessionModal={() => setIsSessionModalOpen(true)}
+        onSelectLead={handleSelectLead}
       />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', width: '100%', padding: '24px 20px', flex: 1 }}>
         
+        {/* Lo que hay que hacer hoy (capítulo 28). El líder ve además los HOT que se
+            enfrían y con qué asesor están. */}
+        {activeTab === 'hoy' && (
+          <BandejaDeHoy
+            onSelectLead={handleSelectLead}
+            esDireccion={currentRole === 'Sales_Lead' || currentRole === 'System_Admin'}
+          />
+        )}
+
         {/* KPI Top Cards (Visible on Dashboard and Leads tab) */}
         {(activeTab === 'dashboard' || activeTab === 'leads') && (
           <KPICards

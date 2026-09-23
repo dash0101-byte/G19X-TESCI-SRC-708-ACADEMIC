@@ -159,6 +159,39 @@ function crearServidor(cuenta) {
       return responder(nueva, 201);
     }
 
+    // La agenda del dia (capitulo 28). La campana se monta con cualquier rol, asi que
+    // estas rutas hacen falta en los cuatro papeles, no solo en el del asesor.
+    if (ruta === '/agenda/hoy') {
+      const mio = estado.prospecto.assigned_rep_id === estado.usuario.id;
+      const tareas = mio ? [{
+        id: 1,
+        regla: 'primer_contacto',
+        regla_etiqueta: 'Primer contacto',
+        motivo: 'Asignado y todavía sin contactar.',
+        estado: 'abierta',
+        vence_el: '2026-09-18T20:00:00Z',
+        vencida: false,
+        creada_en: '2026-09-17T23:30:00Z',
+        prospecto: {
+          id: estado.prospecto.id,
+          nombre: `${estado.prospecto.first_name} ${estado.prospecto.last_name}`,
+          empresa: estado.prospecto.company,
+          score: estado.prospecto.current_score,
+          categoria: estado.prospecto.score_category,
+          dormido_desde: null,
+        },
+      }] : [];
+      return responder({
+        asesor_id: estado.usuario.id,
+        tareas,
+        vencidas: 0,
+        para_hoy: tareas.length,
+        mas_adelante: 0,
+      });
+    }
+    if (ruta === '/agenda/avisos') return responder({ sin_leer: 0, avisos: [] });
+    if (ruta === '/agenda/enfriandose') return responder({ total: 0, filas: [] });
+
     if (ruta === '/publicaciones/nuevos-sin-asesor') {
       return responder({ total: estado.prospecto.assigned_rep_id ? 0 : 1 });
     }
@@ -254,6 +287,8 @@ describe('A. Marketing', () => {
     render(<App />);
     await screen.findByText(/Juan Méndez/);
 
+    // Desde el capítulo 28 el panel abre en «Hoy»: lo primero que se ve es qué toca. Para
+    // crear una publicación hay que ir a su pestaña, que es lo que hace cualquiera.
     // Tarea 2: crear la publicación.
     await usuario.click(screen.getByRole('button', { name: /Publicaciones/ }));
     await usuario.click(await screen.findByRole('button', { name: '+ Nueva publicación' }));
@@ -385,7 +420,9 @@ describe('D. Asesor', () => {
     await screen.findByText(/Alejandro Morales/);
 
     // Lo que la hoja avisa que hay que mirar: hasta que el líder no reparte, no hay nada.
-    await waitFor(() => expect(servidor.peticiones.some((p) => p.ruta === '/leads')).toBe(true));
+    // Ni en la lista ni en la bandeja: sin cartera no hay trabajo que hacer.
+    await waitFor(() => expect(servidor.peticiones.some((p) => p.ruta === '/agenda/hoy')).toBe(true));
+    expect(await screen.findByText(/Nada pendiente para hoy/)).toBeInTheDocument();
     expect(screen.queryByText('Lucía Prado')).not.toBeInTheDocument();
     unmount();
 
@@ -393,8 +430,11 @@ describe('D. Asesor', () => {
     render(<App />);
     await screen.findByText(/Alejandro Morales/);
 
-    // Tarea 2: abrir su ficha.
-    await usuario.click(await screen.findByText('Lucía Prado'));
+    // Tarea 2: encontrarla. Esta era una de las dos notas de la prueba con personas —el
+    // asesor buscando lo nuevo en una lista ordenada por score, donde una ficha que llega
+    // fría queda abajo—. Ahora no hay que buscarla: el panel abre diciendo qué toca.
+    expect(await screen.findByText('Llamar por primera vez')).toBeInTheDocument();
+    await usuario.click(await screen.findByRole('button', { name: /Lucía Prado/ }));
 
     // Tarea 3: las cuatro preguntas se responden en la propia ficha.
     expect(await screen.findByRole('heading', { name: /Llegó por/ })).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import React from 'react';
+import Campana from './Campana';
 
 export default function Navbar({
   activeTab,
@@ -7,6 +8,7 @@ export default function Navbar({
   currentRole,
   user: authUser,
   onOpenSessionModal,
+  onSelectLead,
 }) {
   // Etiquetas de presentación por rol. El nombre y el correo ya no se deducen del rol:
   // vienen de la cuenta autenticada que devolvió el servidor.
@@ -76,6 +78,16 @@ export default function Navbar({
 
         {/* Navigation Tabs */}
         <nav style={{ display: 'flex', gap: '4px', background: 'var(--bg-surface)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+          {/* Primera, y a propósito: al entrar, lo que se quiere saber es qué toca hoy.
+              El tablero cuenta cómo va todo, que es otra pregunta y menos urgente. */}
+          <button
+            id="tab-hoy"
+            onClick={() => setActiveTab('hoy')}
+            className={`btn btn-sm ${activeTab === 'hoy' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ border: 'none' }}
+          >
+            ☀️ Hoy
+          </button>
           <button
             id="tab-dashboard"
             onClick={() => setActiveTab('dashboard')}
@@ -124,6 +136,11 @@ export default function Navbar({
         {/* Action Buttons & User Profile Pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           
+          {/* La campana va aquí y no dentro de una pestaña: un aviso tiene que poder
+              verse se esté donde se esté, y si hubiera que entrar a buscarlo dejaría de
+              ser un aviso para ser otra lista más. */}
+          <Campana onSelectLead={onSelectLead} />
+
           <button
             id="btn-new-lead"
             onClick={onOpenNewLead}

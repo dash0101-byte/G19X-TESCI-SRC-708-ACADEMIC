@@ -566,3 +566,39 @@ export function fetchComparativaDePublicaciones() {
 export function fetchNuevosSinAsesor() {
   return apiFetch('/publicaciones/nuevos-sin-asesor', {}, 'Error al contar los nuevos sin asesor');
 }
+
+// ============================================================================
+// La agenda del día (capítulo 28)
+// ============================================================================
+// Solo lee y cierra. Quien decide qué hay que hacer es el motor de reglas, en la
+// pasada diaria: ninguna de estas llamadas crea una tarea ni un aviso, así que
+// abrir el panel dos veces no cambia lo que hay que hacer hoy.
+
+export function fetchBandejaDeHoy({ asesorId = null } = {}) {
+  const ruta = asesorId ? `/agenda/hoy?asesor_id=${asesorId}` : '/agenda/hoy';
+  return apiFetch(ruta, {}, 'Error al cargar lo que hay que hacer hoy');
+}
+
+export function marcarTareaHecha(tareaId) {
+  return apiFetch(`/agenda/tareas/${tareaId}/hecha`, { method: 'POST' }, 'Error al cerrar la tarea');
+}
+
+export function fetchAvisos({ soloSinLeer = false } = {}) {
+  const ruta = soloSinLeer ? '/agenda/avisos?solo_sin_leer=true' : '/agenda/avisos';
+  return apiFetch(ruta, {}, 'Error al cargar los avisos');
+}
+
+// Sin `ids`, marca todos los propios. El cuerpo va siempre, aunque sea vacío: el
+// endpoint recibe la lista dentro de un objeto y un cuerpo ausente no es lo mismo
+// que uno sin lista.
+export function marcarAvisosLeidos(ids = null) {
+  return apiFetch(
+    '/agenda/avisos/leidos',
+    { method: 'POST', body: JSON.stringify(ids ? { ids } : {}) },
+    'Error al marcar los avisos como leídos',
+  );
+}
+
+export function fetchHotQueSeEnfrian() {
+  return apiFetch('/agenda/enfriandose', {}, 'Error al cargar los prospectos que se enfrían');
+}
