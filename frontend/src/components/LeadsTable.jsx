@@ -168,11 +168,15 @@ export default function LeadsTable({
                     {/* Canal */}
                     <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       {lead.source}
-                      {/* Llegó por una publicación de LinkedIn y todavía no lo atiende
-                          nadie: es lo que el líder tiene que repartir. */}
-                      {lead.source === 'LinkedIn' && !lead.assigned_rep_id && (
+                      {/* Llegó por una publicación y todavía no lo atiende nadie: es lo
+                          que el líder tiene que repartir. Lo decide el servidor
+                          (`esperando_asesor`), no esta condición: cuando lo decidía aquí
+                          preguntando por «LinkedIn», una ficha llegada por WhatsApp salía
+                          sin marca aunque el contador de al lado la estuviera contando, y
+                          el líder no tenía manera de saber cuál de los dos mentía. */}
+                      {lead.esperando_asesor && (
                         <span className="badge" style={{ marginLeft: '6px', fontSize: '0.6rem' }}>
-                          Nuevo desde LinkedIn
+                          Nuevo, sin asesor
                         </span>
                       )}
                     </td>

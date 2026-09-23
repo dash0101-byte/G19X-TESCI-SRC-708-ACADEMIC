@@ -478,7 +478,7 @@ describe('la comparativa y el contador del líder', () => {
     render(<Publicaciones puedeGestionar />);
     await esperarPublicacion(PUBLICACION.name);
 
-    expect(await screen.findByText(/Nuevos desde LinkedIn sin asesor/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nuevos de publicaciones, sin asesor/)).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
 
     const comparativa = screen.getByRole('table');
@@ -498,7 +498,7 @@ describe('la comparativa y el contador del líder', () => {
 
     expect(fetchComparativaDePublicaciones).not.toHaveBeenCalled();
     expect(fetchNuevosSinAsesor).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Nuevos desde LinkedIn sin asesor/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nuevos de publicaciones, sin asesor/)).not.toBeInTheDocument();
   });
 });
 

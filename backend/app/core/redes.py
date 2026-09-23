@@ -172,6 +172,18 @@ CANALES_DE_PUBLICACION: List[str] = [REDES[c].canal for c in ORDEN] + [CANAL_SIN
 MIN_REDES = 1
 
 
+def es_de_publicacion(source: Optional[str]) -> bool:
+    """
+    Si esta ficha llegó por una publicación, sea cual sea la red.
+
+    Vive aquí, y no repetida en cada sitio, porque hasta el capítulo 29 había **dos**
+    respuestas a la misma pregunta: el contador del líder miraba todos los canales y la
+    marca del listado solo «LinkedIn». El líder veía un número y encontraba menos fichas
+    marcadas, sin ninguna manera de saber cuál de los dos mentía.
+    """
+    return (source or "") in CANALES_DE_PUBLICACION
+
+
 def etiqueta_de(red: Optional[str]) -> str:
     """Cómo se llama esta red en la pantalla. «Sin red» para lo que no se reconoció."""
     entrada = REDES.get(red or "")

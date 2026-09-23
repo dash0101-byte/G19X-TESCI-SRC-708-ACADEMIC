@@ -341,7 +341,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
         >
           <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-mono)' }}>{sinAsesor}</strong>
           <span>
-            Nuevos desde LinkedIn sin asesor.
+            Nuevos de publicaciones, sin asesor.
             {sinAsesor > 0 && ' Están esperando a que alguien los atienda.'}
           </span>
         </div>

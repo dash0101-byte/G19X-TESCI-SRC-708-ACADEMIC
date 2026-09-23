@@ -14,7 +14,8 @@ Lo que se comprueba, por el orden del capítulo:
    donde la red no se lleva el texto.
 5. **El modelo**: ninguno de los canales nuevos lo conoce, así que todos son neutros. Un
    prospecto puntúa igual venga por donde venga.
-6. **El informe**: una fila por red con visitas, envíos, tasa, perfiles y score medio.
+6. **El informe**: una fila por red con visitas, envíos, tasa, perfiles y score medio, y
+   el contador de «sin asesor» contando lo mismo que marca el listado (capítulo 29).
 7. **Los permisos**: como antes, edita el líder y el administrador.
 """
 import datetime
@@ -23,7 +24,7 @@ import pytest
 from app.core import redes as r
 from app.core.publicaciones import CANAL_LINKEDIN
 from app.core.vector_del_modelo import CATEGORIAS_DEL_MODELO
-from app.models.entities import Campaign, Lead, LeadActivity, VisitaDePublicacion
+from app.models.entities import Campaign, Lead, LeadActivity, User, VisitaDePublicacion
 from app.services import ciclo_de_publicaciones as ciclo
 from app.services import informe_de_publicaciones as informes
 from app.services.pagina_de_interes import NO_DISPONIBLE
@@ -525,6 +526,52 @@ def test_el_contador_de_sin_asesor_cuenta_todos_los_canales(client, publicacion,
     _enviar(client, publicacion, correo="tres@example.com")
 
     assert informes.nuevos_sin_asesor(db_session) == 3
+
+
+def test_la_marca_del_listado_cuenta_a_los_mismos_que_el_contador(
+    client, publicacion, lead_headers, db_session
+):
+    """
+    El número del líder y las fichas marcadas en el listado tienen que ser los mismos.
+
+    Hasta el capítulo 29 no lo eran: el contador miraba todos los canales de publicación y
+    el listado preguntaba `source === 'LinkedIn'`. El líder leía «3 esperando» y encontraba
+    una sola marca, sin ninguna manera de saber cuál de los dos números era el bueno. Esta
+    prueba compara los dos lados, así que separarlos otra vez falla aquí.
+    """
+    _enviar(client, publicacion, red="whatsapp", correo="uno@example.com")
+    _enviar(client, publicacion, red="facebook", correo="dos@example.com")
+    _enviar(client, publicacion, correo="tres@example.com")
+
+    contador = informes.nuevos_sin_asesor(db_session)
+    listado = client.get("/api/v1/leads?limit=200", headers=lead_headers).json()["items"]
+    marcados = [f for f in listado if f["esperando_asesor"]]
+
+    assert contador == 3
+    assert len(marcados) == contador
+    # Ninguno de los tres es de LinkedIn —el que llegó sin etiqueta se guarda como
+    # «Publicación»—, así que si la marca volviera a preguntar por «LinkedIn» esta lista
+    # quedaría vacía mientras el contador sigue diciendo tres.
+    assert {f["source"] for f in marcados} == {"WhatsApp", "Facebook", r.CANAL_SIN_RED}
+
+
+def test_la_marca_se_apaga_en_cuanto_alguien_la_atiende(client, publicacion, lead_headers, db_session):
+    """La marca dice «nadie la atiende», no «llegó por una publicación»."""
+    _enviar(client, publicacion, red="whatsapp", correo="cuatro@example.com")
+    ficha = db_session.query(Lead).filter(Lead.email == "cuatro@example.com").one()
+
+    def marcada() -> bool:
+        listado = client.get("/api/v1/leads?limit=200", headers=lead_headers).json()["items"]
+        return next(f["esperando_asesor"] for f in listado if f["id"] == ficha.id)
+
+    assert marcada() is True
+
+    asesor = db_session.query(User).filter(User.role == "Commercial_Executive").first()
+    ficha.assigned_rep_id = asesor.id
+    db_session.commit()
+
+    assert marcada() is False
+    assert informes.nuevos_sin_asesor(db_session) == 0
 
 
 # ==============================================================================

@@ -24,7 +24,8 @@ import App from './App.jsx';
 import PaginaDeInteres from './components/PaginaDeInteres.jsx';
 
 // El cliente llama a rutas relativas bajo `/api/v1`; el ensayo se queda con lo que va
-// detrás, que es lo que identifica al endpoint.
+// detrás, que es lo que identifica al endpoint, y **aparte** con la consulta, porque hay
+// cosas que solo viajan ahí.
 const PREFIJO = /^.*\/api\/v1/;
 const ENLACE_BASE = 'http://localhost:3000/interes';
 
@@ -39,6 +40,37 @@ const CUENTAS = {
   },
 };
 
+// La difusión por red que calcula el servidor (capítulo 27). Cada red lleva **su** enlace,
+// con la etiqueta `?r=…` que es lo que luego deja decir por dónde llegó cada perfil.
+function difusionDe(slug, descripcion) {
+  const enlace = (red) => `${ENLACE_BASE}/${slug}?r=${red}`;
+  const textoDeWhatsApp = `${descripcion} ${enlace('whatsapp')}`;
+  return [
+    {
+      clave: 'linkedin', etiqueta: 'LinkedIn', activa: true,
+      enlace: enlace('linkedin'),
+      texto: `${descripcion}\n\n${enlace('linkedin')}`,
+      longitud: descripcion.length + enlace('linkedin').length + 2, maximo: 3000,
+      compartir: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(enlace('linkedin'))}`,
+      admite_texto: false,
+      aviso: 'LinkedIn solo recibe el enlace: copia el texto y pégalo en el post.',
+    },
+    {
+      clave: 'whatsapp', etiqueta: 'WhatsApp', activa: true,
+      enlace: enlace('whatsapp'),
+      texto: textoDeWhatsApp,
+      longitud: textoDeWhatsApp.length, maximo: 400,
+      compartir: `https://wa.me/?text=${encodeURIComponent(textoDeWhatsApp)}`,
+      admite_texto: true, aviso: null,
+    },
+    {
+      clave: 'facebook', etiqueta: 'Facebook', activa: false,
+      enlace: enlace('facebook'), texto: '', longitud: 0, maximo: 3000,
+      compartir: null, admite_texto: false, aviso: null,
+    },
+  ];
+}
+
 const PUBLICACION_DE_AGOSTO = {
   id: 5,
   name: 'Post · Equipos de TI en 30 días (agosto)',
@@ -48,6 +80,7 @@ const PUBLICACION_DE_AGOSTO = {
   public_slug: 'av6_RW2x45Ip_PqJQUWMeA',
   enlace_publico: `${ENLACE_BASE}/av6_RW2x45Ip_PqJQUWMeA`,
   texto_para_linkedin: `Montar un equipo de TI completo tarda meses.\n\n${ENLACE_BASE}/av6_RW2x45Ip_PqJQUWMeA`,
+  difusion: difusionDe('av6_RW2x45Ip_PqJQUWMeA', 'Montar un equipo de TI completo tarda meses.'),
   is_active: true, budget: 3500, created_at: '2026-08-20T10:00:00Z',
 };
 
@@ -64,7 +97,7 @@ const LUCIA = {
   last_score_update: '2026-09-17T22:10:00Z', last_activity_at: '2026-09-17T22:10:00Z',
   privacy_notice_accepted_at: '2026-09-17T22:10:00Z', privacy_notice_source: 'pagina_de_interes',
   created_at: '2026-09-17T22:10:00Z', updated_at: '2026-09-17T22:10:00Z',
-  assigned_rep_id: null, campaign_id: 6,
+  assigned_rep_id: null, campaign_id: 6, esperando_asesor: true,
   raw_metadata: { perfil_de_linkedin: 'https://linkedin.com/in/lucia-prado-demo', necesidad: 'vacantes' },
 };
 
@@ -95,6 +128,10 @@ function crearServidor(cuenta) {
     usuario: cuenta,
     publicaciones: [{ ...PUBLICACION_DE_AGOSTO }],
     prospecto: { ...LUCIA },
+    // La tarea que el motor de reglas deja al asignar (capítulo 28). Vive en el estado y
+    // no en la respuesta, porque cerrarla tiene que notarse en la siguiente lectura: si la
+    // bandeja se recargara y volviera a salir, el asesor no sabría si se guardó.
+    tarea: { id: 1, abierta: true },
     peticiones: [],
   };
 
@@ -107,9 +144,14 @@ function crearServidor(cuenta) {
 
   const fetchSimulado = vi.fn(async (url, opciones = {}) => {
     const metodo = (opciones.method || 'GET').toUpperCase();
-    const ruta = String(url).split('?')[0].replace(PREFIJO, '');
+    const [camino, consulta = ''] = String(url).split('?');
+    const ruta = camino.replace(PREFIJO, '');
     const cuerpo = opciones.body ? JSON.parse(opciones.body) : null;
-    estado.peticiones.push({ metodo, ruta, cuerpo });
+    // La consulta se guarda aparte. No es un detalle: la red por la que se repartió el
+    // enlace viaja ahí (`?r=whatsapp`), así que un ensayo que la tire no puede notar que
+    // se pierda la atribución —que es exactamente lo que pasaba hasta el capítulo 29—.
+    const params = new URLSearchParams(consulta);
+    estado.peticiones.push({ metodo, ruta, consulta, cuerpo, red: params.get('r') });
 
     if (ruta === '/auth/refresh') {
       return responder({ access_token: 'token-de-ensayo', token_type: 'bearer', expires_in: 900, user: estado.usuario });
@@ -154,6 +196,7 @@ function crearServidor(cuenta) {
         created_at: '2026-09-17T21:00:00Z',
         enlace_publico: `${ENLACE_BASE}/${slug}`,
         texto_para_linkedin: `${cuerpo.description}\n\n${ENLACE_BASE}/${slug}`,
+        difusion: difusionDe(slug, cuerpo.description),
       };
       estado.publicaciones = [...estado.publicaciones, nueva];
       return responder(nueva, 201);
@@ -162,9 +205,9 @@ function crearServidor(cuenta) {
     // La agenda del dia (capitulo 28). La campana se monta con cualquier rol, asi que
     // estas rutas hacen falta en los cuatro papeles, no solo en el del asesor.
     if (ruta === '/agenda/hoy') {
-      const mio = estado.prospecto.assigned_rep_id === estado.usuario.id;
+      const mio = estado.prospecto.assigned_rep_id === estado.usuario.id && estado.tarea.abierta;
       const tareas = mio ? [{
-        id: 1,
+        id: estado.tarea.id,
         regla: 'primer_contacto',
         regla_etiqueta: 'Primer contacto',
         motivo: 'Asignado y todavía sin contactar.',
@@ -188,6 +231,16 @@ function crearServidor(cuenta) {
         para_hoy: tareas.length,
         mas_adelante: 0,
       });
+    }
+    if (/^\/agenda\/tareas\/\d+\/hecha$/.test(ruta) && metodo === 'POST') {
+      const id = Number(ruta.split('/')[3]);
+      // Una tarea ajena responde 404, igual que el servidor de verdad: no 403, que
+      // confirmaría que existe.
+      if (id !== estado.tarea.id || estado.prospecto.assigned_rep_id !== estado.usuario.id) {
+        return responder({ detail: 'Tarea no encontrada' }, 404);
+      }
+      estado.tarea.abierta = false;
+      return responder({ id, estado: 'hecha', cerrada_en: '2026-09-17T23:45:00Z' });
     }
     if (ruta === '/agenda/avisos') return responder({ sin_leer: 0, avisos: [] });
     if (ruta === '/agenda/enfriandose') return responder({ total: 0, filas: [] });
@@ -224,6 +277,13 @@ function crearServidor(cuenta) {
           score_medio: filas.length ? filas[0].score : 0,
           de_otros_asesores: 0, alcance_completo: true,
         },
+        // Por dónde llegó cada uno (capítulo 27). Lucía abrió el enlace de WhatsApp, así
+        // que el perfil tiene que contar ahí y no en LinkedIn.
+        por_red: id === 6 ? [
+          { red: 'linkedin', etiqueta: 'LinkedIn', visitas: 9, envios: 0, tasa_de_envio: 0, perfiles: 0, score_medio: 0 },
+          { red: 'whatsapp', etiqueta: 'WhatsApp', visitas: 3, envios: 1, tasa_de_envio: 33.3, perfiles: filas.length, score_medio: filas.length ? filas[0].score : 0 },
+        ] : [],
+        por_dia: [], grafico_recortado: false,
         filas, total: filas.length, limit: 50, offset: 0,
       });
     }
@@ -311,6 +371,45 @@ describe('A. Marketing', () => {
     // pantalla de acceso, y eso solo se descubre siguiéndolo.
     expect(copiado).toContain(`${ENLACE_BASE}/nuevoSlugDeLaPrueba01`);
   });
+
+  // Tarea 4 (capítulo 27): la misma publicación, repartida por dos redes. Lo que se
+  // comprueba aquí no es que existan los botones, sino que **cada red se lleva un enlace
+  // distinto**: si las dos repartieran el mismo, el informe por red de la tarea 2 del
+  // líder no podría decir nada, y esa es toda la razón de que haya redes.
+  it('reparte la misma publicación por dos redes, cada una con su enlace', async () => {
+    const usuario = prepararUsuario();
+    render(<App />);
+    await screen.findByText(/Juan Méndez/);
+    await usuario.click(screen.getByRole('button', { name: /Publicaciones/ }));
+
+    const lista = await screen.findByRole('list', { name: 'Publicaciones' });
+    const fila = within(lista).getByText(PUBLICACION_DE_AGOSTO.name).closest('li');
+    await usuario.click(within(fila).getByRole('button', { name: 'Compartir en redes' }));
+
+    const redes = await within(fila).findByRole('list', { name: 'Redes activas' });
+    const deLinkedIn = within(redes).getByText('LinkedIn').closest('li');
+    const deWhatsApp = within(redes).getByText('WhatsApp').closest('li');
+
+    // LinkedIn no se lleva el texto en su enlace de compartir: el aviso lo dice en la
+    // pantalla, para que nadie pulse y se encuentre el post vacío.
+    expect(within(deLinkedIn).getByText(/copia el texto y pégalo en el post/)).toBeInTheDocument();
+    const compartirEnLinkedIn = within(deLinkedIn).getByRole('link', { name: /Compartir en LinkedIn/ });
+    expect(compartirEnLinkedIn).toHaveAttribute('target', '_blank');
+    expect(compartirEnLinkedIn).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+    // WhatsApp cuenta lo que lleva escrito, porque su texto sí viaja en el enlace y ahí
+    // hay un máximo que no se puede pasar.
+    expect(within(deWhatsApp).getByText(/\/ 400$/)).toBeInTheDocument();
+
+    await usuario.click(within(deLinkedIn).getByRole('button', { name: 'Copiar texto' }));
+    await usuario.click(within(deWhatsApp).getByRole('button', { name: 'Copiar texto' }));
+
+    const [textoLinkedIn] = escribirEnPortapapeles.mock.calls[0];
+    const [textoWhatsApp] = escribirEnPortapapeles.mock.calls[1];
+    expect(textoLinkedIn).toContain('?r=linkedin');
+    expect(textoWhatsApp).toContain('?r=whatsapp');
+    expect(textoWhatsApp).not.toContain('?r=linkedin');
+  });
 });
 
 // ============================================================================
@@ -324,7 +423,10 @@ describe('B. Interesado', () => {
 
   it('abre el enlace, lee de qué va y pide que le contacten', async () => {
     const usuario = userEvent.setup();
-    render(<PaginaDeInteres slug="nuevoSlugDeLaPrueba01" />);
+    // Llega por el enlace de WhatsApp, que es una de las dos redes por las que marketing
+    // acaba de repartir. La etiqueta viaja sola: no hay nada que la persona tenga que
+    // hacer, ni nada que vea.
+    render(<PaginaDeInteres slug="nuevoSlugDeLaPrueba01" red="whatsapp" />);
 
     // Tarea 2: lo primero que ve es de qué va, no un formulario a secas.
     expect(await screen.findByRole('heading', { name: PUBLICACION_DE_AGOSTO.name })).toBeInTheDocument();
@@ -350,6 +452,14 @@ describe('B. Interesado', () => {
     const envio = servidor.peticiones.find((p) => p.metodo === 'POST' && p.ruta.startsWith('/interes/'));
     expect(envio.cuerpo.linkedin).toBe('linkedin.com/in/lucia-prado-demo?utm_source=share&utm_medium=member_ios');
     expect(envio.cuerpo.aviso_de_privacidad).toBe(true);
+    // Por dónde entró, para que el líder pueda saberlo sin preguntárselo a nadie. Viaja
+    // en la consulta y no en el cuerpo, porque es de la petición y no de la persona:
+    // nadie lo escribe ni lo ve.
+    expect(envio.red).toBe('whatsapp');
+    // Y también al abrir la página, o una visita contaría como «sin red» aunque el envío
+    // acabase bien clasificado.
+    const apertura = servidor.peticiones.find((p) => p.metodo === 'GET' && p.ruta.startsWith('/interes/'));
+    expect(apertura.red).toBe('whatsapp');
   });
 });
 
@@ -375,18 +485,25 @@ describe('C. Líder', () => {
     await screen.findByText(/Juan Méndez/);
     await usuario.click(screen.getByRole('button', { name: /Publicaciones/ }));
 
-    // Tarea 1: cuántos han llegado por LinkedIn y siguen sin asesor.
-    expect(await screen.findByText(/Nuevos desde LinkedIn sin asesor/)).toBeInTheDocument();
+    // Tarea 1: cuántos han llegado por una publicación y siguen sin asesor. El contador
+    // cuenta todas las redes desde el capítulo 27, así que ya no puede nombrar una sola.
+    expect(await screen.findByText(/Nuevos de publicaciones, sin asesor/)).toBeInTheDocument();
 
     // Tarea 2: las dos publicaciones, uno al lado de otra.
     const comparativa = screen.getByRole('table');
     expect(within(comparativa).getByRole('row', { name: /septiembre/ })).toHaveTextContent('41.3');
     expect(within(comparativa).getByRole('row', { name: /agosto/ })).toHaveTextContent('32.8');
 
-    // Tarea 3: de la publicación nueva a la ficha de quien respondió.
-    const lista = await screen.findByRole('list', { name: 'Publicaciones' });
-    const fila = within(lista).getByText('Post · Equipos de TI en 30 días (septiembre)').closest('li');
-    await usuario.click(within(fila).getByRole('button', { name: 'Ver informe' }));
+    // Tarea 3 (capítulo 27): por qué red llegó. Marketing repartió por dos; el informe
+    // tiene que decir cuál trajo el perfil, no solo cuántos llegaron en total.
+    const lista0 = await screen.findByRole('list', { name: 'Publicaciones' });
+    const fila0 = within(lista0).getByText('Post · Equipos de TI en 30 días (septiembre)').closest('li');
+    await usuario.click(within(fila0).getByRole('button', { name: 'Ver informe' }));
+    const porRed = await screen.findByRole('table', { name: 'Resultados por red de difusión' });
+    expect(within(porRed).getByRole('row', { name: /WhatsApp/ })).toHaveTextContent('1');
+    expect(within(porRed).getByRole('row', { name: /LinkedIn/ })).toHaveTextContent('9');
+
+    // Tarea 4: de la publicación nueva a la ficha de quien respondió.
     await usuario.click(await screen.findByRole('button', { name: 'Lucía Prado' }));
 
     // La ficha dice por dónde llegó y qué pidió, sin preguntárselo a nadie.
@@ -394,7 +511,7 @@ describe('C. Líder', () => {
     expect(screen.getByText(/Cubrir vacantes de TI/)).toBeInTheDocument();
     expect(screen.getByText(/Aceptó el aviso de privacidad el/)).toBeInTheDocument();
 
-    // Tarea 4: asignársela al asesor.
+    // Tarea 5: asignársela al asesor.
     await usuario.selectOptions(await screen.findByLabelText('Asignar a'), String(CUENTAS.asesor.id));
     await usuario.click(screen.getByRole('button', { name: 'Asignar' }));
 
@@ -456,5 +573,15 @@ describe('D. Asesor', () => {
       expect(actividad.cuerpo.activity_type).toBe('PHONE_CALL');
       expect(actividad.cuerpo.call_outcome).toBe('NO_CONTESTO');
     });
+
+    // Tarea 5 (capítulo 28): darla por atendida y que la bandeja se quede vacía. Se
+    // comprueba después de recargar del servidor, no con la fila quitada a mano: si la
+    // bandeja solo la escondiera, mañana volvería a aparecer y nadie sabría por qué.
+    await usuario.click(screen.getByRole('button', { name: 'Cerrar Ficha' }));
+    await usuario.click(await screen.findByRole('button', { name: 'Ya está' }));
+    expect(await screen.findByText(/Nada pendiente para hoy/)).toBeInTheDocument();
+    expect(servidor.peticiones.some(
+      (p) => p.metodo === 'POST' && p.ruta === '/agenda/tareas/1/hecha',
+    )).toBe(true);
   });
 });

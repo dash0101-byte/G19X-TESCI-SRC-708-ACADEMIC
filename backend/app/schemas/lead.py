@@ -1,8 +1,9 @@
 import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
+from app.core.redes import es_de_publicacion
 from app.core.telefono import TelefonoInvalido, normalizar_telefono
 from app.models.entities import ActivityType, LeadStatus, QualificationStatus, ScoreCategory
 from app.schemas.activity import ActivityResponse
@@ -111,6 +112,20 @@ class LeadResponse(LeadBase):
     updated_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def esperando_asesor(self) -> bool:
+        """
+        Llegó por una publicación y todavía no la atiende nadie.
+
+        Lo decide el servidor y no el navegador a propósito: es la **misma** condición que
+        cuenta el contador del líder (`nuevos_sin_asesor`). Calculada dos veces, en dos
+        lenguajes, volvería a pasar lo del capítulo 27 —el número decía tres y en la lista
+        había una sola marca, porque el listado seguía preguntando por «LinkedIn» cuando
+        ya se llegaba por seis redes—.
+        """
+        return self.assigned_rep_id is None and es_de_publicacion(self.source)
 
 
 class LeadDetailResponse(LeadResponse):

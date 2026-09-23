@@ -119,20 +119,35 @@ describe('cómo se lee cada fila', () => {
   });
 });
 
-describe('lo que llega por una publicación de LinkedIn', () => {
-  it('se marca mientras no lo atienda nadie', () => {
-    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn', assigned_rep_id: null }] });
-    expect(screen.getByText('Nuevo desde LinkedIn')).toBeInTheDocument();
+// La marca la decide el servidor (`esperando_asesor`), que aplica la misma condición que
+// el contador del líder. Aquí solo se comprueba que el listado la dibuja cuando viene y no
+// cuando no viene: si la tabla volviera a decidirlo por su cuenta —como hacía hasta el
+// capítulo 29, preguntando por «LinkedIn»—, una ficha de WhatsApp saldría sin marca
+// mientras el contador la cuenta.
+describe('lo que llega por una publicación y espera asesor', () => {
+  it('se marca cuando el servidor dice que espera', () => {
+    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn', assigned_rep_id: null, esperando_asesor: true }] });
+    expect(screen.getByText('Nuevo, sin asesor')).toBeInTheDocument();
+  });
+
+  it('se marca igual si llegó por otra red', () => {
+    montar({ leads: [{ ...PROSPECTO, source: 'WhatsApp', assigned_rep_id: null, esperando_asesor: true }] });
+    expect(screen.getByText('Nuevo, sin asesor')).toBeInTheDocument();
   });
 
   it('deja de marcarse en cuanto tiene asesor', () => {
-    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn', assigned_rep_id: 3 }] });
-    expect(screen.queryByText('Nuevo desde LinkedIn')).not.toBeInTheDocument();
+    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn', assigned_rep_id: 3, esperando_asesor: false }] });
+    expect(screen.queryByText('Nuevo, sin asesor')).not.toBeInTheDocument();
   });
 
   it('un prospecto de publicidad pagada no lleva la marca', () => {
-    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn Ads', assigned_rep_id: null }] });
-    expect(screen.queryByText('Nuevo desde LinkedIn')).not.toBeInTheDocument();
+    montar({ leads: [{ ...PROSPECTO, source: 'LinkedIn Ads', assigned_rep_id: null, esperando_asesor: false }] });
+    expect(screen.queryByText('Nuevo, sin asesor')).not.toBeInTheDocument();
+  });
+
+  it('la marca no dice ninguna red: la red ya está en la misma celda', () => {
+    montar({ leads: [{ ...PROSPECTO, source: 'WhatsApp', assigned_rep_id: null, esperando_asesor: true }] });
+    expect(screen.queryByText(/Nuevo desde/)).not.toBeInTheDocument();
   });
 });
 

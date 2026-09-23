@@ -702,6 +702,9 @@ def nuevos_sin_asesor(db: Session) -> int:
     «LinkedIn». Desde el capítulo 27 una ficha de la misma publicación puede llegar como
     «WhatsApp» o «Facebook»; con el filtro de antes, el líder habría dejado de ver a la
     mayoría de los que están esperando justo cuando empezaron a llegar por más sitios.
+
+    La misma condición que marca las fichas en el listado (`es_de_publicacion`), para que
+    el número y la lista no puedan discrepar.
     """
     return (
         db.query(func.count(Lead.id))

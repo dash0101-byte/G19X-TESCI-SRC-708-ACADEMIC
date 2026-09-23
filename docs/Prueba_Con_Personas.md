@@ -83,12 +83,18 @@ prospecto que llega de LinkedIn no tiene asesor hasta que alguien se lo asigna.
 2. Crea una publicación para anunciar en LinkedIn que PluriOne monta equipos de TI en 30
    días. Ponle el texto que publicarías de verdad y di a quién va dirigida.
 3. Consigue el texto listo para pegar en LinkedIn, **con su enlace**, sin escribirlo a mano.
-4. Pega ese texto en cualquier sitio donde se pueda leer (un bloc de notas) y pásale el
-   enlace a quien hace de interesado.
+4. La misma publicación va también por **WhatsApp**. Consigue el texto de WhatsApp, y
+   después di en voz alta si crees que los dos enlaces son el mismo o son distintos.
+5. Pega el texto de WhatsApp en cualquier sitio donde se pueda leer (un bloc de notas) y
+   pásale **ese** enlace a quien hace de interesado.
+
+> La tarea 4 trae el capítulo 27. Lo que se observa no es si encuentra el botón, sino qué
+> contesta: si dice «el mismo», el panel no le ha explicado para qué sirven las redes, y
+> todo el informe por red de la tarea 3 del líder se vuelve inexplicable.
 
 ### B. Interesado — **desde el teléfono**, sin cuenta
 
-1. Abre el enlace que te acaban de pasar.
+1. Abre el enlace que te acaban de pasar. **Tal cual**, sin quitarle nada.
 2. Decide si lo que ofrece te interesa: lee lo que dice la página.
 3. Pide que te contacten. Eres **Lucía Prado**, *Head of Engineering* en *Fábrica de
    Software Norte* (unos 80 empleados, software). Necesitas cubrir vacantes de TI.
@@ -103,21 +109,37 @@ prospecto que llega de LinkedIn no tiene asesor hasta que alguien se lo asigna.
 
 ### C. Líder — entra como `lider.ventas@plurione.com`
 
-1. Averigua cuántas personas han llegado por LinkedIn y **todavía no tienen asesor**.
+1. Averigua cuántas personas han llegado por una publicación y **todavía no tienen asesor**.
 2. Mira qué ha traído la publicación nueva y compárala con la de agosto: cuál trajo más
    perfiles, cuál los trajo mejores.
-3. Entra en la ficha de la persona que acaba de escribir y averigua **por qué publicación**
-   llegó y qué necesita.
-4. Asígnasela al asesor comercial (Alejandro Morales).
+3. Averigua **por qué red** llegó la persona que acaba de escribir: se repartió por dos.
+4. Entra en su ficha y averigua **por qué publicación** llegó y qué necesita.
+5. Asígnasela al asesor comercial (Alejandro Morales).
+6. Antes de salir, di si hay algún prospecto **caliente que se esté enfriando** y con quién
+   está.
+
+> Las tareas 3 y 6 son de los capítulos 27 y 28. En la 1, apunte si lo primero que mira es
+> el tablero: el contador vive en «Publicaciones». En la 6, si busca en algún sitio antes
+> de mirar su propia bandeja.
 
 ### D. Asesor — entra como `asesor.comercial@plurione.com`
 
-1. Entra al panel y averigua si tienes algo nuevo que atender.
-2. Abre la ficha de la persona que acaba de llegar de LinkedIn.
+1. Entra al panel y averigua si tienes algo que hacer hoy. **Antes de tocar nada**, di en
+   voz alta qué crees que te está pidiendo el sistema y por qué.
+2. Abre la ficha de la persona que acaba de llegar.
 3. Responde, sin preguntarle a nadie: ¿de dónde salió?, ¿qué pidió?, ¿aceptó que le
    escribamos y cuándo?, ¿dónde está su perfil de LinkedIn?
 4. Llámala (de mentira) y deja constancia de que la llamaste y de que no contestó.
-5. Di qué harías mañana con ella.
+5. Deja el trabajo de hoy como lo dejarías de verdad al terminar con ella.
+6. Di qué esperas encontrarte mañana al entrar.
+
+> Las tareas 1, 5 y 6 son del capítulo 28. La 1 es la que más importa: hasta el capítulo 28
+> el asesor tenía que **buscar** la ficha nueva en una lista ordenada por score. Si ahora
+> sigue yéndose a «Prospectos» en lugar de leer lo que tiene delante, la bandeja no ha
+> resuelto nada y hay que anotarlo tal cual.
+>
+> En la 5, **no** se le dice que existe «Ya está». Si cierra la tarea, la bandeja le está
+> hablando; si no, apunte qué hizo en su lugar —recargar, salir, dejarlo abierto—.
 
 ---
 
@@ -135,6 +157,10 @@ Una hoja **por persona**. Quien conduce escribe; la persona no escribe nada.
 | 3 | | S / N | | | |
 | 4 | | S / N | | | |
 | 5 | | S / N | | | |
+| 6 | | S / N | | | |
+
+Seis filas porque las listas más largas —líder y asesor— tienen seis tareas desde los
+capítulos 27 y 28. Las que tengan menos dejan las últimas en blanco.
 
 **«¿Sola?»** es «sí» solo si nadie le dijo nada. Una pista pequeña ya es un «no».
 
@@ -146,25 +172,32 @@ Una hoja **por persona**. Quien conduce escribe; la persona no escribe nada.
 - **Falta**: quiere hacer algo que el sistema no hace. → **no se toca ahora**; se anota
   abajo y se decide después.
 
-> **Cerrado en el capítulo 28 (23-09-2026).** Los dos sitios de abajo se corrigieron sin
-> esperar a la sesión: los dos describían a alguien **buscando**, y un sistema que sabe la
-> respuesta y obliga a buscarla no está terminado. El panel abre ahora en «Hoy» con lo que
-> le toca a cada uno, y el líder ve los HOT que se enfrían debajo de su propia bandeja. Se
-> dejan escritos tal cual porque siguen siendo lo que hay que observar cuando la sesión se
-> celebre: lo que se arregló fue el síntoma que se había anotado, no la prueba de que ya
-> nadie tenga que buscar nada.
+> **Estado a 23-09-2026 (capítulos 28 y 29).** De los dos sitios de abajo, **uno se cerró y
+> el otro sigue abierto**. La nota que había aquí decía que los dos, y no era verdad: lo que
+> el capítulo 28 le dio al líder son los HOT que se enfrían, que es otra pregunta distinta
+> de cuántos están esperando a que los repartan. Se corrige aquí porque una hoja de
+> observación que se da la razón a sí misma no sirve para observar nada.
+>
+> - **El asesor, buscando lo nuevo: cerrado.** El panel abre en «Hoy» y dice qué toca. La
+>   marca del listado, además, dejó de preguntar por «LinkedIn» en el capítulo 29.
+> - **El líder, buscando el contador: abierto.** Sigue en la pestaña «Publicaciones». Es la
+>   tarea 1 de su lista, y es lo que hay que mirar en la sesión.
+>
+> Los dos se dejan escritos tal cual. Lo que se arregló del primero fue el síntoma que se
+> había anotado, no la prueba de que ya nadie tenga que buscar nada.
 
 ### Dos sitios donde mirar con lupa
 
-Salieron del ensayo previo. No se han tocado porque no llegaron a impedir la tarea, y esta
-fase corrige con notas de personas, no con sospechas:
+Salieron del ensayo previo. Se escriben como estaban, porque lo que hay que observar es lo
+mismo aunque una de las dos ya se haya tocado:
 
-- **El asesor, buscando lo nuevo.** La marca «Nuevo desde LinkedIn» del listado solo sale
-  mientras el prospecto no tiene asesor: en cuanto el líder se lo asigna, desaparece. El
-  asesor recibe una ficha más en una lista ordenada por score, y una que llega fría queda
-  abajo. Anote cuánto tarda en encontrarla y si la busca por el nombre.
-- **El líder, buscando el contador.** «Nuevos desde LinkedIn sin asesor» vive en la pestaña
-  «Publicaciones». Anote si lo primero que mira es el tablero.
+- **El asesor, buscando lo nuevo.** La marca del listado solo sale mientras el prospecto no
+  tiene asesor: en cuanto el líder se lo asigna, desaparece. El asesor recibía una ficha más
+  en una lista ordenada por score, y una que llega fría queda abajo. Anote cuánto tarda en
+  encontrarla, si la busca por el nombre, y —desde el capítulo 28— si llega a mirar «Hoy» o
+  se va derecho a «Prospectos» por costumbre.
+- **El líder, buscando el contador.** El contador de los que esperan asesor vive en la
+  pestaña «Publicaciones». Anote si lo primero que mira es el tablero.
 
 ### Frases que hay que apuntar tal cual
 
@@ -197,6 +230,49 @@ funcionalidad nueva se anota en la última columna como «para después» y se l
 documento del guion (`Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md`, sección 4),
 que es donde viven los huecos.
 
+### Estado de esta hoja, a 23-09-2026
+
+**La tabla de arriba está vacía y es correcto que lo esté: la sesión con personas todavía no
+se ha celebrado.** Se deja en blanco a propósito. Rellenarla con lo que se supone que dirá
+alguien convertiría este documento en lo contrario de lo que es.
+
+Lo que sí hay son notas de **ensayo**, de recorrer el guion sin nadie delante. Valen para
+arreglar lo que está roto; no valen para decir que alguien entendió una pantalla. Van
+clasificadas con los mismos tres tipos, y con su origen dicho:
+
+| Nº | Origen | Qué pasaba | Tipo | Qué se hizo |
+| :-: | :--- | :--- | :--- | :--- |
+| E-1 | Ensayo, fase 4 | El enlace copiado llevaba a la pantalla de acceso | bloquea | Corregido (§4) |
+| E-2 | Ensayo, fase 4 | El perfil de LinkedIn se rechazaba pegado tal cual | bloquea | Corregido (§4) |
+| E-3 | Ensayo, fase 4 | El panel solo se servía en `localhost` | bloquea | Corregido (§4) |
+| E-4 | Ensayo, fase 4 | El error empezaba por «Value error,» | confunde | Corregido (§4) |
+| E-5 | Ensayo, fase 4 | El asesor tenía que buscar la ficha nueva en una lista por score | confunde | Corregido en el capítulo 28: bandeja «Hoy» |
+| E-6 | Ensayo, fase 4 | El contador de sin asignar vive en «Publicaciones», no en el tablero | confunde | **No corregido.** Sigue ahí; es lo que mide la tarea 1 del líder |
+| E-7 | Ensayo, capítulo 29 | El contador decía «Nuevos desde LinkedIn» y contaba seis redes, mientras el listado solo marcaba las de LinkedIn: el número y la lista no cuadraban | confunde | Corregido (§5) |
+| E-8 | Ensayo, capítulo 29 | El ensayo automático tiraba la parte de la consulta, así que no podía notar que se perdiera la red de llegada | bloquea (la prueba, no el panel) | Corregido (§5) |
+| I-1 | Guion, hueco H-6 | Un prospecto de publicación llega sin asesor salvo que salga `HOT` | idea para después | Sin tocar; sigue en el guion |
+| I-2 | Capítulo 28 | Las reglas las escribe el sistema, no el usuario | idea para después | Fuera de alcance, escrito en el Reporte 28 |
+
+**E-6 se deja a propósito.** Es exactamente la clase de nota que esta fase existe para
+resolver *con personas*: mover un contador de pestaña porque a uno le parece es cambiar una
+pantalla por una corazonada. Si en la sesión el líder mira el tablero primero, se mueve.
+
+### El criterio «nadie se atasca»: **no cumplido**
+
+No por haber fallado, sino por no haberse medido. Un criterio que habla de personas solo lo
+cumplen personas. Lo que hay hasta ahora es:
+
+- las cuatro listas de tareas recorridas **automáticamente** en cada ejecución del CI
+  (`frontend/src/EnsayoDelGuion.test.jsx`), incluidas las tareas nuevas de los capítulos 27
+  y 28;
+- ocho notas de ensayo, siete de ellas corregidas;
+- cero hojas de observación rellenadas.
+
+Lo que un ensayo automático no puede decir, y por lo que la sesión sigue pendiente: si la
+palabra que hay en pantalla significa para la persona lo que significa para quien la
+escribió. Una prueba que busca «Llamar por primera vez» lo encuentra siempre; un asesor que
+no sepa qué se espera de él al leerlo se queda parado, y eso no lo detecta ninguna prueba.
+
 ---
 
 ## 4. Lo que ya se corrigió antes de sentar a nadie
@@ -222,3 +298,20 @@ la hoja.
 Conocido y **no** corregido aquí, porque es funcionalidad y no un atasco del guion: un
 prospecto de LinkedIn llega sin asesor y solo se asigna solo si sale `HOT` (hueco **H-6**
 del guion). Por eso el líder reparte antes de que el asesor empiece.
+
+---
+
+## 5. Lo que se corrigió al añadir las tareas nuevas (23-09-2026)
+
+Añadir al guion lo que trajeron los capítulos 26, 27 y 28 —repartir por dos redes, y el
+asesor atendiendo desde «Hoy»— destapó dos cosas. Las dos se corrigieron, porque las dos
+entran en «bloquea o confunde»; ninguna es funcionalidad nueva.
+
+| Qué pasaba | Por qué importaba | Qué se cambió |
+| :--- | :--- | :--- |
+| El contador del líder decía **«Nuevos desde LinkedIn sin asesor»** y contaba los seis canales de publicación; el listado, en cambio, solo marcaba `source === 'LinkedIn'` | El líder leía «3 esperando» e iba a la lista a repartirlos: encontraba **una** marca. Dos números que no cuadran y ninguna manera de saber cuál miente. Con una sola red nunca se notó; con seis, dos de cada tres fichas quedaban invisibles | La condición pasa al servidor, que ya la tenía para el contador: `LeadResponse.esperando_asesor` la calcula con la misma `es_de_publicacion`, y el listado solo la dibuja. La marca pasa a decir **«Nuevo, sin asesor»**, sin nombrar red —la red ya está en esa misma celda— y el contador, «Nuevos de publicaciones, sin asesor» |
+| El ensayo automático **tiraba la parte de la consulta** de cada petición | La red por la que se repartió el enlace viaja ahí (`?r=whatsapp`). El ensayo no podía ver la atribución, así que habría dado por bueno un panel que la perdiera entera: justo lo que el capítulo 27 añadió | El servidor simulado guarda la consulta aparte. El interesado entra ahora por el enlace de WhatsApp y el ensayo comprueba que la etiqueta viaja **en la apertura y en el envío** |
+
+Las dos llevan prueba: `tests/test_una_publicacion_varias_redes.py` compara el contador con
+las fichas marcadas y falla si vuelven a separarse, y el ensayo del guion cubre las tareas
+nuevas de los dos papeles.
