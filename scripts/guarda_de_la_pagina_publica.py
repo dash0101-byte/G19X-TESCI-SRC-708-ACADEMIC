@@ -31,7 +31,12 @@ Falla —con un mensaje que dice qué se perdió— si la página:
    llegada deja de marcar el canal de la ficha o las visitas dejan de repartirse por red;
    alguno de esos canales pasa a ser una categoría que el modelo conoce, con lo que la red
    empezaría a mover el score; el texto de una red se pasa de su tope o se come el enlace;
-   o un botón de compartir lleva credenciales en la dirección.
+   o un botón de compartir lleva credenciales en la dirección;
+8. **pierde la tarjeta de las redes** (capítulo 27): el HTML servido deja de traer las
+   etiquetas Open Graph y de X —que es lo único que lee un rastreador, porque no ejecuta
+   JavaScript—; un título con comillas o con marcado consigue romperlas o meter etiquetas
+   de más; una publicación que no está activa filtra su título; o la imagen de vista previa
+   deja de ser un PNG de 1 200 x 630 dibujado aquí.
 
 Por qué además de la suite: las pruebas de `test_pagina_de_interes.py` comprueban casos; esta
 guarda comprueba **propiedades**. Un campo nuevo `comentarios: str` no rompe ninguna prueba
@@ -634,6 +639,124 @@ def comprobar_redes(cliente) -> None:
         db.close()
 
 
+def comprobar_vista_previa(cliente) -> None:
+    """
+    La tarjeta que enseñan las redes al pegar el enlace (capítulo 27).
+
+    Las propiedades que no pueden perderse:
+
+    * **Las etiquetas están en el HTML servido.** Quien las lee no ejecuta JavaScript: si
+      dejaran de estar, el enlace volvería a salir como una tarjeta vacía y nadie se
+      enteraría hasta compartirlo.
+    * **Lo que no está activo no filtra nada.** Un borrador, una pausada, una cerrada y un
+      enlace inventado dan las mismas etiquetas genéricas y el mismo código de respuesta.
+    * **Todo va escapado.** Un título con comillas o con `<script>` entra como texto; se
+      comprueba analizando el HTML, que es lo que hace el rastreador.
+    * **La imagen es un PNG de 1 200 × 630** dibujado aquí, no pedido a ningún servicio.
+    """
+    import re
+    import struct
+    from html.parser import HTMLParser
+
+    from app.core.etiquetas_sociales import TITULO_GENERICO
+
+    # El tamaño va escrito aquí, no leído de `tarjeta.py`. Es lo que piden LinkedIn y X
+    # para la imagen ancha, no una preferencia nuestra: leerlo del módulo que se comprueba
+    # haría una comprobación que pasa siempre, porque cambiaría con él.
+    ANCHO_DE_LA_TARJETA, ALTO_DE_LA_TARJETA = 1200, 630
+
+    print("8. La tarjeta de las redes")
+
+    class Lector(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.meta, self.etiquetas = {}, []
+
+        def handle_starttag(self, tag, attrs):
+            self.etiquetas.append(tag)
+            d = dict(attrs)
+            clave = d.get("property") or d.get("name")
+            if tag == "meta" and clave:
+                self.meta[clave] = d.get("content", "")
+
+    def leer(texto):
+        lector = Lector()
+        lector.feed(texto)
+        return lector
+
+    db = SessionLocal()
+    try:
+        titulo = 'Guarda " con <script>alert(1)</script> y & TI'
+        activa = _publicacion(db, name=titulo, estado="activa", description="Texto de la guarda.")
+        borrador = _publicacion(db, name=titulo, estado="borrador")
+
+        # Se captura la excepción además de mirar el código: que la página reviente con una
+        # publicación que no está activa es uno de los fallos que esto busca, y un rastro de
+        # pila lo enterraría en un paso del CI que solo se lee por su título.
+        try:
+            respuesta = cliente.get(f"/interes/{activa.public_slug}")
+        except Exception as error:  # noqa: BLE001  cualquier excepción aquí es el fallo
+            fallo(f"la página pública revienta al servirse: {type(error).__name__}: {error}.")
+            return
+        if respuesta.status_code != 200 or not respuesta.headers.get("content-type", "").startswith("text/html"):
+            fallo(f"la página pública ya no sirve HTML: {respuesta.status_code} {respuesta.headers.get('content-type')}.")
+            return
+
+        # Sin lo que hay dentro de los <script>: es lo único que ve un rastreador.
+        sin_js = re.sub(r"<script[ >].*?</script>", "", respuesta.text, flags=re.S)
+        leido = leer(sin_js)
+        faltan = [e for e in ("og:title", "og:description", "og:url", "og:image", "twitter:card") if e not in leido.meta]
+        if faltan:
+            fallo(f"el HTML servido ya no trae las etiquetas de la tarjeta: faltan {faltan}.")
+        if leido.meta.get("twitter:card") != "summary_large_image":
+            fallo(f"X dejaría de enseñar la imagen ancha: twitter:card={leido.meta.get('twitter:card')!r}.")
+
+        # El escape: el título entra entero y no aparece ninguna etiqueta de más.
+        if leido.meta.get("og:title") != titulo:
+            fallo(f"el título no llega entero a la etiqueta: {leido.meta.get('og:title')!r}.")
+        # Dos problemas distintos, dos mensajes: meter una etiqueta en el documento y
+        # duplicar una etiqueta de la tarjeta no se arreglan igual.
+        if "script" in leido.etiquetas:
+            fallo(f"un título con marcado mete etiquetas en el documento: {leido.etiquetas}.")
+        veces = respuesta.text.count('property="og:title"')
+        if veces != 1:
+            fallo(f"el documento trae {veces} etiquetas og:title; la red leería la que no es.")
+
+        # Lo que no está activo no dice nada de sí mismo.
+        try:
+            del_borrador = cliente.get(f"/interes/{borrador.public_slug}")
+            inventado = cliente.get("/interes/estoMeLoInvento00000x")
+        except Exception as error:  # noqa: BLE001
+            fallo(f"una publicación que no está activa revienta la página: {type(error).__name__}: {error}.")
+            return
+        if del_borrador.status_code != inventado.status_code:
+            fallo("el código de respuesta distingue un borrador de un enlace inventado.")
+        if leer(del_borrador.text).meta.get("og:title") != TITULO_GENERICO:
+            fallo("un borrador filtra su título en las etiquetas de la tarjeta.")
+        if titulo.split('"')[0] in del_borrador.text:
+            fallo("un borrador filtra su título en el cuerpo del documento.")
+
+        # La imagen, dibujada aquí.
+        try:
+            png = cliente.get(f"/interes/{activa.public_slug}/tarjeta.png")
+        except Exception as error:  # noqa: BLE001
+            fallo(f"la imagen de la tarjeta revienta al dibujarse: {type(error).__name__}: {error}.")
+            return
+        if png.status_code != 200 or png.headers.get("content-type") != "image/png":
+            fallo(f"la imagen de la tarjeta ya no es un PNG: {png.status_code} {png.headers.get('content-type')}.")
+        elif png.content[:8] != b"\x89PNG\r\n\x1a\n":
+            fallo("la imagen de la tarjeta no empieza por la firma de un PNG.")
+        else:
+            ancho, alto = struct.unpack(">II", png.content[16:24])
+            if (ancho, alto) != (ANCHO_DE_LA_TARJETA, ALTO_DE_LA_TARJETA):
+                fallo(
+                    f"la imagen de la tarjeta mide {ancho}x{alto} y no "
+                    f"{ANCHO_DE_LA_TARJETA}x{ALTO_DE_LA_TARJETA}, que es lo que piden las redes."
+                )
+    finally:
+        db.close()
+
+
 def main() -> int:
     init_db()
     db = SessionLocal()
@@ -657,6 +780,7 @@ def main() -> int:
     comprobar_heuristico()
     comprobar_ciclo(cliente)
     comprobar_redes(cliente)
+    comprobar_vista_previa(cliente)
     comprobar_limites(cliente, slug)
 
     if fallos:
@@ -664,8 +788,8 @@ def main() -> int:
         return 1
     print(
         "\nLímite de envíos, sin texto libre, listas del modelo, treinta segundos sin datos "
-        "supuestos, heurístico sin suposiciones, ciclo de la publicación y redes de difusión: "
-        "la página pública conserva sus defensas."
+        "supuestos, heurístico sin suposiciones, ciclo de la publicación, redes de difusión y "
+        "tarjeta de las redes: la página pública conserva sus defensas."
     )
     return 0
 

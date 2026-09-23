@@ -166,6 +166,7 @@ class Settings(BaseSettings):
         "INTERES_LIMITE_POR_IP",
         "INTERES_LIMITE_POR_PUBLICACION",
         "INTERES_LIMITE_DE_LECTURAS_POR_IP",
+        "INTERES_LIMITE_DE_TARJETAS_POR_IP",
     )
     @classmethod
     def _validar_limite_de_integracion(cls, valor: str) -> str:
@@ -193,6 +194,18 @@ class Settings(BaseSettings):
     # lectura tiene su propio límite, más alto: no escribe nada, y lo que frena es recorrer
     # enlaces en bucle.
     INTERES_LIMITE_DE_LECTURAS_POR_IP: str = "120/hour"
+    # El HTML de la página y su imagen de vista previa (capítulo 27) tienen su propia cuenta.
+    # Quien los pide casi siempre es un rastreador de una red social, no una persona: si
+    # gastaran el cupo de lectura, unas cuantas veces compartido el enlace dejarían sin poder
+    # abrir la página a quien la quisiera ver. Y la imagen se dibuja al pedirla, así que sin
+    # un tope sería una forma barata de hacer trabajar al servidor.
+    INTERES_LIMITE_DE_TARJETAS_POR_IP: str = "240/hour"
+
+    # Con qué arranca la aplicación en el HTML que sirve el servidor para `/interes/{slug}`.
+    # Son nombres fijos a propósito (`vite.config.js`): el servidor tiene que poder
+    # nombrarlos sin conocer la huella que el compilador le pone al resto de los archivos.
+    PAGINA_PUBLICA_SCRIPT: str = "/assets/app.js"
+    PAGINA_PUBLICA_HOJA: str = "/assets/app.css"
 
     # --- Publicaciones ---
     # Dirección bajo la que se sirve el enlace público de cada publicación:

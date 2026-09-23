@@ -278,6 +278,9 @@ palabra que pudiera ser una clave y falla si alguna encaja con la lista
 * `test_claves_comprometidas.py` (9): la lista son huellas, el mecanismo sigue prohibiendo y
   ninguna clave prohibida ha vuelto al árbol del proyecto.
 * `qr.test.js` (17) y `CompartirEnRedes.test.jsx` (16) en el cliente.
+* `test_vista_previa_en_redes.py` (32): las etiquetas en el HTML servido, el escape con
+  cinco títulos hostiles, lo que no filtran las publicaciones que no están activas, la
+  imagen y que nada de esto cuenta una visita.
 
 ### La guarda del CI
 
@@ -338,19 +341,129 @@ reprodujo en local contra la misma imagen, en un contenedor de usar y tirar atad
 
 | Comprobación | Resultado |
 |---|---|
-| Backend | **1158 pruebas**, 93 % de cobertura |
+| Backend | **1190 pruebas**, 93 % de cobertura |
 | Cliente | **302 pruebas** en 21 ficheros, 94,6 % |
 | `ruff` y `eslint` | Sin avisos |
-| Guarda del CI | Séptima comprobación añadida; pasa |
-| Reintroducción de defectos | **38 de 38** detectados; todos los ficheros restaurados con el hash verificado |
+| Guarda del CI | Comprobaciones séptima y octava añadidas; pasa |
+| Reintroducción de defectos | **48 de 48** detectados; todos los ficheros restaurados con el hash verificado |
 | Migración en SQLite | Ida, vuelta y otra vez ida; ninguna visita perdida |
 | Migración en PostgreSQL 16 (imagen del CI) | `upgrade`, `check` sin diferencias, reversión sumando visitas, `upgrade` otra vez |
 | Navegador, 375 px, datos de la demo | Se abre `?r=whatsapp`, se envía el formulario y la ficha queda con canal **WhatsApp**; la ficha 360 dice «vía WhatsApp»; el informe reparte 3 visitas y 1 envío a WhatsApp y 13 y 3 a «Sin red» |
 | Permisos | Asesor 403 al cambiar redes; líder 200; red inventada 422 |
+| Imagen de producción | `docker build` del backend con el lock nuevo (`--require-hashes`); dentro, Pillow 12.3.0, la fuente Inter y una tarjeta de 1200×630 dibujada con acentos |
+| Tarjeta social | HTML pedido con un `GET` y analizado como lo hace un rastreador: etiquetas de la publicación; un borrador da el mismo documento genérico |
 
 ---
 
-## 27.12. Lo que este capítulo no hizo
+## 27.12. La vista previa del enlace en las redes
+
+Con los botones de compartir ya funcionando apareció el problema siguiente: el enlace se
+pegaba y salía **como una tarjeta vacía**. Un rectángulo gris, el nombre del sistema y
+ninguna descripción. El enlace funcionaba, pero nadie lo pulsaba, porque no decía nada.
+
+La causa es sencilla y no se ve desde el navegador. Cuando alguien pega una dirección,
+LinkedIn, WhatsApp, Facebook o X la piden **como un programa**: descargan el HTML, leen sus
+etiquetas y se van. **No ejecutan JavaScript.** Y `/interes/{slug}` la servía el cliente:
+lo que el rastreador leía era el `index.html` genérico del panel, el mismo para todas las
+publicaciones. Poner las etiquetas al montar la aplicación no habría arreglado nada, porque
+el rastreador ya se fue.
+
+### Quién sirve ahora esa página
+
+El servidor. `GET /interes/{slug}` devuelve el documento **con las etiquetas dentro**, y
+después carga la aplicación igual que antes. En un despliegue, nginx manda `/interes/` al
+backend (`frontend/nginx.conf`); en desarrollo el servidor de Vite sigue sirviendo la ruta,
+y las etiquetas se comprueban pidiéndoselas directamente al backend, que es exactamente lo
+que ve un rastreador.
+
+Eso obligó a un detalle de construcción: el HTML tiene que **nombrar** el archivo con el que
+arranca la aplicación, y el servidor no puede conocer la huella que el compilador le pone.
+Así que la entrada y su hoja de estilos salen con nombre fijo —`assets/app.js` y
+`assets/app.css`—, y esos dos, y solo esos dos, se revalidan en lugar de cachearse un año.
+El resto de los archivos conserva su huella y su caché. Una prueba compara el nombre que
+escribe el servidor con el que declara `vite.config.js`: son dos archivos distintos del
+proyecto, y si uno cambia y el otro no, la página pública se queda sin aplicación y eso solo
+se ve al desplegar.
+
+### Qué se dice, y de quién
+
+Solo de una publicación **activa** se dicen su título y su texto. Un borrador, una pausada,
+una cerrada y un enlace inventado dan las **mismas** etiquetas genéricas, la misma imagen de
+marca y el mismo **200**.
+
+Lo del 200 es deliberado. Si el HTML respondiera 404 para unos y 200 para otros, el código
+de respuesta diría desde fuera qué enlaces existen —y el capítulo 26 cerró exactamente ese
+hueco al hacer que «no disponible» fuera idéntico en los cuatro casos—. Una prueba compara
+los dos documentos carácter a carácter, salvo el propio enlace, y exige que sean el mismo.
+
+Estas dos rutas tampoco **cuentan visitas**. La visita la cuenta la petición que hace la
+aplicación al montarse, que es cuando alguien abrió la página de verdad; contarla aquí
+sumaría una por cada vez que el enlace se pega en un chat y el recuento dejaría de medir lo
+que dice medir.
+
+### El escape
+
+Todo lo que viene de la base pasa por `html.escape(..., quote=True)`. El título lo escribe
+una persona y admite cualquier carácter desde el capítulo 25: unas comillas cierran el
+atributo `content="…"` y lo que venga detrás deja de ser texto para pasar a ser marcado.
+
+Las pruebas no buscan cadenas, **analizan el HTML** con un analizador —que es lo que hace el
+rastreador— y comprueban, para cinco títulos hostiles, que el valor llega entero al atributo,
+que el documento sigue teniendo una sola etiqueta `og:title` y que no ha aparecido ninguna
+etiqueta que no pusiéramos nosotros. Uno de esos títulos lo intenta a propósito:
+
+```
+Post "/><meta property="og:title" content="secuestrado
+```
+
+Sin escape, el documento tendría dos `og:title` y la red leería el segundo.
+
+### La imagen
+
+1 200 × 630, dibujada en el servidor al pedirla, sin mandarle el título a ningún servicio de
+tarjetas. Lleva la marca, el título repartido en tres líneas como mucho y el nombre del
+sistema abajo.
+
+Se dibuja con **Pillow**, que es la dependencia nueva de este capítulo. Entra fijada por su
+huella en `requirements.lock`, y la regeneración del lock no movió ninguna otra versión:
+cincuenta y tres paquetes antes, cincuenta y cuatro ahora. Se usa **solo para escribir**: no
+se abre aquí ninguna imagen que venga de fuera, que es donde está históricamente la
+superficie de esa biblioteca.
+
+La tipografía es la **Inter que ya usa el cliente**, el mismo archivo `.woff2` que viaja en
+el bundle del navegador, copiado a `backend/app/recursos/` con su licencia OFL al lado. No
+es una fuente nueva en el proyecto. La que trae Pillow por defecto se descartó al probarla:
+no tiene acentos, y «días» salía «d☐as». Hay una prueba que lo fija, y que además comprueba
+que la comprobación sirve de algo, enseñando que con la fuente por defecto **sí** sale el
+recuadro.
+
+No se guarda en ninguna parte: cuesta unas decenas de milisegundos y así nunca enseña un
+título que ya se cambió. Lleva `ETag`, así que quien la pida otra vez no la vuelve a
+descargar, y cinco minutos de caché, para que corregir un título no obligue a volver a
+compartir el enlace.
+
+### Cómo está comprobado
+
+* **Como lo lee un rastreador**: un `GET` al HTML servido y un analizador, sin montar la
+  aplicación. Una prueba borra además todo lo que hay dentro de `<script>` y exige que las
+  etiquetas sigan ahí.
+* **En el navegador**, contra la base de la demo: se pidió `/interes/{slug}` con `fetch` y
+  se analizó el HTML recibido —`og:title`, `og:description`, `og:url`, `og:image` y
+  `twitter:card` con los valores de la publicación—; la página siguió montando su formulario
+  de catorce campos desde ese mismo HTML; y la imagen se abrió directamente, con el propio
+  navegador rotulando la pestaña «tarjeta.png (1200×630)».
+* **La guarda del CI** gana su **octava** comprobación, con las propiedades: que las
+  etiquetas están en el HTML servido, que un título con marcado no rompe nada, que lo que no
+  está activo no filtra su título y que la imagen es un PNG de 1 200 × 630.
+
+Lo que **no** se ha hecho: pegar el enlace en LinkedIn, en WhatsApp o en X y mirar la tarjeta
+de verdad. Para eso hace falta que la dirección sea pública, y la de la demo es `localhost`.
+Las etiquetas son las que esas redes documentan y el HTML se comprueba como ellas lo leen,
+pero el último paso queda pendiente y está en los límites del capítulo.
+
+---
+
+## 27.13. Lo que este capítulo no hizo
 
 * **No publica en ninguna red automáticamente.** No hay API, ni cuentas, ni claves. Los
   botones abren la dirección pública de compartir y publica quien pulsa. Estaba fuera del
@@ -359,6 +472,10 @@ reprodujo en local contra la misma imagen, en un contenedor de usar y tirar atad
 * **No se reentrenó el modelo.** Los seis canales nuevos son desconocidos para él y por
   tanto neutros. Darles peso exige reentrenar con datos reales de cada canal, que todavía no
   existen.
+* **La tarjeta no se ha visto en una red de verdad.** El HTML se comprueba como lo lee
+  un rastreador, y las etiquetas son las que LinkedIn, WhatsApp, Facebook y X
+  documentan, pero pegar el enlace y mirar la tarjeta exige una dirección pública, y la
+  de la demo es `localhost`.
 * **El código QR no se ha escaneado con un teléfono.** Se comprueban las propiedades
   matemáticas y estructurales que exige la norma, que es lo verificable sin un lector, pero
   nadie ha impreso uno y lo ha leído con una cámara. Es lo primero que habría que hacer

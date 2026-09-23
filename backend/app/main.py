@@ -19,6 +19,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.api import paginas_publicas
 from app.api.v1.api import api_router
 from app.core import metricas
 from app.core.config import settings
@@ -324,6 +325,11 @@ def metrics(request: Request, db: Session = Depends(get_db)):
 
 # Montar Router v1
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# El HTML de la página de interés y su imagen de vista previa (capítulo 27). Va **antes**
+# del comodín de la SPA: si se registrara después, el comodín se quedaría con `/interes/...`
+# y devolvería el índice genérico del panel, que es justo lo que esto viene a corregir.
+app.include_router(paginas_publicas.router, tags=["Página de interés"])
 
 if os.path.exists(assets_path):
     app.mount("/assets", StaticFiles(directory=assets_path), name="static_assets")

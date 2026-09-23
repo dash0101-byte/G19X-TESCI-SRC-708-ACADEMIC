@@ -4,6 +4,25 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Nombres FIJOS para la entrada de la aplicación y su hoja de estilos.
+        //
+        // Desde el capítulo 27 el HTML de `/interes/{slug}` lo sirve el backend, con las
+        // etiquetas de la tarjeta social dentro. Ese HTML tiene que nombrar estos dos
+        // archivos, y el backend no puede conocer la huella que el compilador les pondría.
+        // El resto —los trozos que se cargan bajo demanda, las fuentes, las imágenes—
+        // conserva su huella y su caché de un año.
+        entryFileNames: 'assets/app.js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: (info) =>
+          info.names?.some((n) => n.endsWith('.css'))
+            ? 'assets/app.css'
+            : 'assets/[name]-[hash][extname]',
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {

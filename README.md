@@ -34,7 +34,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1158 pruebas en el backend (93 % de cobertura) y 302 en
+> **Calidad en las dos mitades.** 1190 pruebas en el backend (93 % de cobertura) y 302 en
 > el cliente (94,6 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
 > con 34 guardas de regresión de configuración peligrosa.
 
@@ -437,6 +437,8 @@ con un `TypeError` en lugar de devolver datos de más en silencio.
 | `POST /api/v1/campaigns/{id}/duplicar` | `Sales_Lead`, `System_Admin` | Copia en borrador con enlace propio |
 | `GET /api/v1/publicaciones/{id}/informe` | Cualquier rol | Perfiles que trajo una publicación; el asesor ve los suyos y **un número** con el resto; visitas, tasa de envío y perfiles por día |
 | `GET /api/v1/publicaciones/{id}/vista-previa` | Cualquier rol | La página de interés tal como la verá el interesado, en cualquier estado y sin contar visita |
+| `GET /interes/{slug}` | Público, sin sesión | El HTML de la página, con las etiquetas Open Graph y de X de esa publicación dentro |
+| `GET /interes/{slug}/tarjeta.png` | Público, sin sesión | La imagen 1200×630 de vista previa, dibujada en el servidor |
 | `GET /api/v1/publicaciones/comparativa` | `Sales_Lead`, `System_Admin` | Perfiles, score medio y avances de cada publicación |
 | `GET /api/v1/publicaciones/nuevos-sin-asesor` | `Sales_Lead`, `System_Admin` | Cuántos prospectos de LinkedIn siguen sin asignar |
 | `GET /api/v1/interes/{slug}` | **Sin sesión** | La publicación y las listas del formulario |
@@ -480,6 +482,14 @@ API, sin cuentas y sin claves; publica quien pulsa, con su sesión. Donde la red
 el enlace (LinkedIn, Facebook) o no tiene forma de compartir desde la web (Instagram), al
 lado va «Copiar texto». Hay además un **código QR** descargable del enlace, generado en el
 navegador, para Instagram y para material impreso.
+
+Al pegar el enlace, la red enseña una **tarjeta** con el título, el texto y una imagen de
+1200×630 de esa publicación. Quien la dibuja es el servidor: LinkedIn, WhatsApp, Facebook y X
+piden la dirección y leen el HTML **sin ejecutar JavaScript**, así que `/interes/{slug}` se
+sirve desde el backend con las etiquetas ya dentro. Una publicación que no está activa —o un
+enlace inventado— da etiquetas genéricas y la misma respuesta, sin filtrar su título. La
+imagen se genera en local con Pillow y la tipografía del propio cliente; no interviene ningún
+servicio de tarjetas.
 
 Por dónde llegó cada persona queda registrado: en la actividad, en la ficha 360 («Llegó por
 la publicación X, vía WhatsApp») y como **canal** de la ficha. Una red desconocida o
@@ -1050,7 +1060,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1158 pruebas
+### Backend — 1190 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1207,7 +1217,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **24** | [Reporte 24](docs/reportes/Reporte_24_Modelo_sin_Datos_Inventados_Ingresos_Ausentes_Canales_Separados_y_Aporte_con_Intervalo.md) | Un solo vector del modelo con versión, ingresos ausentes como ausencia, canales y resultados de llamada separados y aporte sobre el heurístico con intervalo. |
 | **25** | [Reporte 25](docs/reportes/Reporte_25_Del_Post_de_LinkedIn_al_Prospecto_Puntuado_Publicaciones_Pagina_de_Interes_e_Informe_por_Publicacion.md) | Del post de LinkedIn al prospecto puntuado: publicaciones con enlace propio, página de interés pública y defendida, ficha «Llegó por», informe y comparativa por publicación, y guarda del CI. |
 | **26** | [Reporte 26](docs/reportes/Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md) | Publicaciones completas: estados y cierre automático, vistas previas del post y de la página, opciones de «¿Qué necesitas?» por publicación, asesor responsable, post real, duplicar, y visitas sin datos personales con tasa de envío y gráfico por día. |
-| **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, y las claves viejas de JWT guardadas por su huella. |
+| **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, vista previa del enlace con etiquetas Open Graph servidas por el servidor, y las claves viejas de JWT guardadas por su huella. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos y 12 preguntas de sínodo con respuestas modelo. |
 
 ---

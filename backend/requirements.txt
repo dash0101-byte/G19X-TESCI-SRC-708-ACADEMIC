@@ -18,6 +18,11 @@ PyJWT>=2.10.0,<3.0.0
 # bcrypt directo: passlib 1.7.4 es incompatible con bcrypt>=5 (falla al leer __about__).
 bcrypt>=4.1.0,<6.0.0
 email-validator>=2.1.0
+# Pillow solo para **escribir** la imagen de vista previa de las publicaciones
+# (`app/core/tarjeta.py`): 1200x630 en PNG, a partir del titulo y de la fuente que ya
+# trae el cliente. No se decodifica ninguna imagen de fuera, que es donde esta
+# historicamente la superficie de esta biblioteca.
+pillow>=11.0.0,<13.0.0
 # Teléfonos en E.164: validar al guardar y normalizar lo existente (Fase 15).
 phonenumbers>=8.13.0
 # Limitación de tasa por IP en login, webhook CRM e inferencia de scoring.
