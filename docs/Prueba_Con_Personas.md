@@ -7,6 +7,13 @@ justo lo que hay que arreglar.
 Quien conduce no ayuda salvo que la persona se quede parada más de un minuto. Entonces
 anota *qué* tuvo que decir, porque esa frase es el defecto.
 
+> **Esto no es el guion de la exposición.** Aquí las tareas se escriben **sin decir dónde
+> pulsar**, porque lo que se mide es si la persona lo encuentra sola. Para enseñar la
+> demostración —donde sí se dice dónde pulsar, y cada paso lleva su frase— está el
+> [guion cronometrado](Guion_Cronometrado_de_la_Demo.md).
+
+---
+
 ---
 
 ## 0. Preparar la pila (quien conduce, 10 minutos antes)

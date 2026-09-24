@@ -12,6 +12,19 @@ Este documento es el punto de partida de lo que viene. Hace tres cosas:
 
 No cambia código. Los huecos que describe se cierran en fases posteriores, con su propio `/goal`.
 
+> **Tres documentos, tres usos.** Éste cuenta **la historia y sus reglas**, y es el que
+> explica por qué cada paso es como es. Para **enseñarla** delante de un sínodo está el
+> [guion cronometrado](Guion_Cronometrado_de_la_Demo.md), que reparte los minutos y dice qué
+> frase va con cada pantalla. Para **ponerla a prueba** con personas está
+> [Prueba_Con_Personas.md](Prueba_Con_Personas.md), donde las tareas se escriben sin decir
+> dónde pulsar, precisamente para medir si alguien lo encuentra solo.
+>
+> Los huecos que este documento describía como pendientes se fueron cerrando en los
+> capítulos 26 a 30. Los que siguen abiertos están todos, con lo que depende cada uno, en
+> [Congelacion_y_Trabajo_Futuro.md](Congelacion_y_Trabajo_Futuro.md).
+
+---
+
 ---
 
 ## 0. Punto de partida: el respaldo
