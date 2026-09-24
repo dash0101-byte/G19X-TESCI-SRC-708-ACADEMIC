@@ -344,14 +344,14 @@ El esfuerzo va a que la historia de la sección 2 funcione de punta a punta.
 > - En el informe entra tanto quien está atribuido a la campaña como quien envió su perfil por su enlace, por lo mismo que la tarjeta.
 > - **Alcance:** el asesor ve los suyos y un número con el resto (`de_otros_asesores`), sin un solo nombre; el líder y el administrador, la publicación entera. Una campaña que no es publicación responde 404. Una publicación desactivada **sí** conserva su informe: se desactiva para dejar de recibir perfiles, no para borrar los que trajo.
 > - La consulta queda en la bitácora (`publicacion.informe`) con sus filtros y el número de filas, **nunca con las filas**: la bitácora se lee con otro criterio de acceso que la cartera.
-> - La **comparativa** entre publicaciones y el contador **«Nuevos desde LinkedIn sin asesor»** son de dirección. La comparativa no se acota por cartera —hacerlo ordenaría asesores, no publicaciones— y `tests/test_informe_de_publicaciones.py` comprueba que sus números coinciden con los del informe, que se calculan por otro camino.
+> - La **comparativa** entre publicaciones y el contador de prospectos sin asesor —entonces **«Nuevos desde LinkedIn sin asesor»**, hoy «Nuevos de publicaciones, sin asesor» (capítulo 29)— son de dirección. La comparativa no se acota por cartera —hacerlo ordenaría asesores, no publicaciones— y `tests/test_informe_de_publicaciones.py` comprueba que sus números coinciden con los del informe, que se calculan por otro camino.
 > - **H-6 a medias:** ya hay dónde repartir. La ficha 360 ofrece «Asignar asesor» a quien puede reasignar, que es lo que faltaba para recorrer la demo sin tocar la base a mano. La asignación **automática** sigue siendo solo para las fichas `HOT`.
 > - **H-8 cerrado**: la comparativa compara publicaciones, que es lo que R-2 decidió que fueran las campañas de LinkedIn.
 
 > **Actualización, fase 4 «Probar con personas» (17-09-2026).**
 > - El guion por rol, la hoja de observación y cómo dejar la pila lista están en `docs/Prueba_Con_Personas.md`; `scripts/preparar_prueba_con_personas.py --force` regenera los datos y añade una publicación de ejemplo con perfiles ya recibidos.
 > - Del ensayo previo salieron tres atascos, y los tres están corregidos: **el enlace copiado no llevaba a la página** (`PUBLICACIONES_URL_BASE` apuntaba a `/p` y la ruta es `/interes`, ahora con una prueba que compara las dos), **el perfil de LinkedIn se rechazaba pegado tal cual** (se completa el esquema y se quitan los parámetros de compartir; el campo ya no es `type="url"`) y **el error enseñaba «Value error,»** delante del mensaje.
-> - Queda anotado para mirar con personas, sin tocarlo todavía: la marca «Nuevo desde LinkedIn» desaparece en cuanto el prospecto tiene asesor, que es justo cuando el asesor va a buscarlo, y el contador de sin asignar vive en «Publicaciones» y no en el tablero.
+> - Queda anotado para mirar con personas, sin tocarlo todavía: la marca del listado desaparece en cuanto el prospecto tiene asesor, que es justo cuando el asesor va a buscarlo, y el contador de sin asignar vive en «Publicaciones» y no en el tablero. *(Lo primero lo resolvió el capítulo 28 con la bandeja «Hoy». Lo segundo sigue abierto.)*
 
 > **Actualización, «Formulario de 30 segundos sin datos supuestos» (21-09-2026).**
 > - Obligatorio solo nombre (un campo), correo, empresa, cargo, tamaño y sector —las listas del modelo—, «¿Qué necesitas?» con botones de un toque y el aviso. Teléfono y perfil de LinkedIn, opcionales y plegados bajo «Añadir más datos».
@@ -384,6 +384,13 @@ El esfuerzo va a que la historia de la sección 2 funcione de punta a punta.
 > - El paso 5 del guion cambia: después de asignar, el asesor **no busca la ficha**; la encuentra en «Hoy», con el motivo escrito y un clic hasta la ficha 360. El ensayo automático recorre ese camino.
 > - Detalle en el capítulo 28 de la Memoria (`docs/reportes/Reporte_28_...`).
 
+> **Actualización, capítulo 29 «Lo que dijeron las personas» (23-09-2026).**
+> - Las cuatro listas de tareas de la prueba con personas recorren ahora lo que trajeron los capítulos 27 y 28: marketing reparte por **dos** redes, el interesado entra por el enlace de WhatsApp, el líder averigua por qué red llegó y si hay algún HOT enfriándose, y el asesor empieza por «Hoy» y cierra su tarea al terminar.
+> - Añadirlas destapó dos defectos y los dos están corregidos: el contador del líder **contaba seis canales y decía «desde LinkedIn»** mientras el listado solo marcaba los de LinkedIn —el número y la lista no cuadraban—, y el ensayo automático **tiraba la parte de la consulta**, así que era ciego a la atribución por red.
+> - La hoja corrige además una nota del capítulo 28 que decía de más: de los dos sitios «para mirar con lupa», el del asesor quedó cerrado y **el del líder no**.
+> - **El criterio «nadie se atasca» sigue sin cumplirse**, y no por haber fallado: la sesión con personas no se ha celebrado y la hoja de observación está vacía a propósito.
+> - Detalle en §25.6 del Reporte 25.
+
 Ninguno se corrige en este documento. Van en orden de dependencia para la demo.
 
 | Id | Hueco | Paso afectado | Regla |
@@ -394,7 +401,7 @@ Ninguno se corrige en este documento. Van en orden de dependencia para la demo.
 | ~~H-2~~ | ~~Nada construye ni ofrece el enlace~~. **Cerrado en la fase 1**: enlace público con slug y botón «Copiar texto para LinkedIn». No usa UTM, porque el slug ya identifica la campaña | 2 | R-2 |
 | H-7 | País `México` y canal `Website` escritos por defecto cuando no llegan | 3, 4 | R-4 |
 | H-9 | Una segunda entrega reemplaza cinco campos de la ficha existente. La página de interés ya no lo hace; `formulario_web`, `linkedin_lead_gen` y el CRM sí | 4 | R-4 |
-| H-6 | **Parcial.** Ya se asigna desde la ficha 360 y el líder ve cuántos esperan («Nuevos desde LinkedIn sin asesor»); la asignación automática sigue siendo solo para las `HOT` | 4, 5 | — |
+| H-6 | **Parcial.** Ya se asigna desde la ficha 360 y el líder ve cuántos esperan («Nuevos de publicaciones, sin asesor»); la asignación automática sigue siendo solo para las `HOT` | 4, 5 | — |
 | — | Los vocabularios de industria, tamaño y canal no coinciden entre modelo, formularios y conectores | 3, 4 | R-3 |
 | H-5 | El conector `linkedin-lead-gen` no acepta la forma real de `leadFormResponses` (necesita cuenta) | 3 | R-1 |
 | ~~H-8~~ | ~~El informe compara campañas, no publicaciones~~. **Cerrado en la fase 3**: comparativa por publicación, con su informe y su tarjeta en la ficha | 6 | R-2 |

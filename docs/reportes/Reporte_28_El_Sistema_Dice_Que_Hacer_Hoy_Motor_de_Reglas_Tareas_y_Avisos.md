@@ -379,6 +379,18 @@ Los 31 se detectan.
   la suite del cliente y el ensayo automático del guion, pero entrar al panel exige iniciar
   sesión, y eso no se hace desde aquí. La sesión con personas sigue sin celebrarse
   (capítulo 25, §25.10).
+* **Este capítulo dio por cerradas dos notas de la hoja, y solo una lo estaba.** La del
+  asesor, sí: la bandeja «Hoy» le quita el tener que buscar. La del líder, no: lo que se le
+  dio fue ver los HOT que se enfrían, que es otra pregunta distinta de cuántos esperan a que
+  los repartan, y ese contador sigue en la pestaña «Publicaciones». Corregido en la hoja en
+  el capítulo 29. Queda escrito porque el error no fue de código: fue **dar por resuelto un
+  síntoma parecido al anotado**, que es la manera más fácil de cerrar una nota de usabilidad
+  sin haberla mirado.
+* **El guion ya recorre la bandeja, y eso todavía no es haberla probado.** Desde el capítulo
+  29 el asesor empieza por «Hoy» y cierra su tarea, y el ensayo automático lo comprueba. Lo
+  que se observará en la sesión es lo que ninguna prueba ve: si al entrar **lee** lo que
+  tiene delante o se va a «Prospectos» por costumbre, y si encuentra «Ya está» sin que nadie
+  se lo nombre.
 * **Nadie ha vivido una semana con la bandeja.** Si las seis reglas producen la cantidad
   adecuada de trabajo —ni tan poco que sobre, ni tanto que se ignore— es justo lo que solo se
   puede saber usándola varios días seguidos. Los plazos se dejan configurables por eso.

@@ -444,7 +444,7 @@ con un `TypeError` en lugar de devolver datos de más en silencio.
 | `GET /api/v1/agenda/avisos` | Cualquier rol | La campana, siempre la propia |
 | `GET /api/v1/agenda/enfriandose` | Líder y administrador | Los HOT desatendidos y con qué asesor están |
 | `GET /api/v1/publicaciones/comparativa` | `Sales_Lead`, `System_Admin` | Perfiles, score medio y avances de cada publicación |
-| `GET /api/v1/publicaciones/nuevos-sin-asesor` | `Sales_Lead`, `System_Admin` | Cuántos prospectos de LinkedIn siguen sin asignar |
+| `GET /api/v1/publicaciones/nuevos-sin-asesor` | `Sales_Lead`, `System_Admin` | Cuántos prospectos de una publicación siguen sin asignar, por cualquier red |
 | `GET /api/v1/interes/{slug}` | **Sin sesión** | La publicación y las listas del formulario |
 | `POST /api/v1/interes/{slug}` | **Sin sesión** | Solicitud de contacto de la página de interés |
 
@@ -675,7 +675,7 @@ lo vincula o lo descarta.
    LinkedIn van plegados bajo «Añadir más datos», y la facturación no se pregunta.
 4. **El sistema crea la ficha puntuada**, atribuida a la publicación, sin asesor y marcada
    «Nuevo desde LinkedIn».
-5. **El líder la ve** en el contador «Nuevos desde LinkedIn sin asesor», la abre y se la
+5. **El líder la ve** en el contador «Nuevos de publicaciones, sin asesor», la abre y se la
    asigna a un asesor desde la propia ficha. El asesor la encuentra con la tarjeta «Llegó
    por»: de qué publicación, qué necesita, cuándo aceptó el aviso y su perfil de LinkedIn.
 6. **El líder compara publicaciones**: perfiles recibidos, cuántos avanzaron de etapa y score

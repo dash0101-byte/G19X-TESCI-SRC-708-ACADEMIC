@@ -7649,7 +7649,8 @@ privacidad. La fuente nueva, `pagina_de_interes`, se registró con
 `actualiza_prospecto=False`: si el correo ya existe, la solicitud se suma al historial **sin
 pisar** lo que el asesor corrigió a mano (H-9 queda cerrado para este camino). La ficha nace
 atribuida a su publicación, sin asesor y con canal `LinkedIn`, que el listado marca como
-«Nuevo desde LinkedIn». `annual_revenue` queda vacío, que es la verdad (capítulo 24): al
+«Nuevo, sin asesor» (entonces «Nuevo desde LinkedIn»; la etiqueta cambió en el capítulo 29,
+cuando el canal dejó de ser siempre LinkedIn). `annual_revenue` queda vacío, que es la verdad (capítulo 24): al
 principio la página pedía un tramo de facturación opcional y lo guardaba como tramo; desde
 §25.8 no lo pregunta.
 
@@ -7685,7 +7686,7 @@ quien envió su perfil por su enlace, por la misma razón que la tarjeta.
 | Filas del informe | Solo las suyas | Todas |
 | Cabecera | Sus números, y aparte **cuántos más hay**, sin un nombre | La publicación entera |
 | Comparativa entre publicaciones | 403 | Sí |
-| «Nuevos desde LinkedIn sin asesor» | 403 | Sí |
+| «Nuevos de publicaciones, sin asesor» | 403 | Sí |
 
 Un total y una media describen la cartera ajena sin abrir una ficha; el criterio es el del
 tablero desde el capítulo 15. Una campaña que no es publicación responde 404, igual que una
@@ -7735,6 +7736,57 @@ persona real. Ninguna la detectaba la suite, porque todas estaban **entre** dos 
 
 **La sesión con personas no se ha hecho.** La hoja está preparada y vacía. El criterio de esa
 fase —«nadie se atasca»— solo lo contesta una sesión real, y no se da por cumplido (§25.10).
+
+### El guion, puesto al día (capítulo 29, 23-09-2026)
+
+Entre la fase 4 y hoy el sistema creció tres capítulos y el guion se quedó donde estaba. Un
+guion que no recorre lo que el sistema hace deja de medir el sistema que hay, así que las
+listas de tareas incorporan lo que trajeron el 26, el 27 y el 28:
+
+* **Marketing** se lleva el texto de **dos** redes, no de una, y tiene que decir en voz alta
+  si cree que los dos enlaces son el mismo. Si dice que sí, el panel no ha explicado para qué
+  sirven las redes y el informe por red del líder se vuelve inexplicable.
+* **El interesado** entra por el enlace de WhatsApp, que es por donde le llegó.
+* **El líder** averigua **por qué red** llegó la persona, y antes de salir dice si hay algún
+  HOT enfriándose y con quién está.
+* **El asesor** empieza por «Hoy» —y antes de tocar nada dice qué cree que le está pidiendo
+  el sistema— y al terminar deja el trabajo como lo dejaría de verdad. No se le dice que
+  existe «Ya está»: si lo encuentra, la bandeja le está hablando; si no, se apunta qué hizo
+  en su lugar.
+
+Todas están además en el ensayo automático, que pasó de cuatro recorridos a cinco.
+
+### Dos defectos que salieron de añadirlas
+
+Ninguno es funcionalidad: los dos son de los que esta fase corrige.
+
+| Qué pasaba | Por qué importaba | Qué se cambió |
+| :--- | :--- | :--- |
+| El contador del líder decía «Nuevos desde LinkedIn sin asesor» y contaba los **seis** canales de publicación; el listado solo marcaba `source === 'LinkedIn'` | El líder leía «3 esperando», iba a la lista a repartirlos y encontraba **una** marca. Dos números que no cuadran, y ninguna manera de saber cuál miente. Con una sola red nunca se notó; desde el capítulo 27 dos de cada tres fichas quedaban invisibles | La condición pasa al servidor, que ya la tenía para el contador: `LeadResponse.esperando_asesor` la calcula con la misma `es_de_publicacion` y el listado solo la dibuja. La marca pasa a «Nuevo, sin asesor», sin nombrar red —ya está en esa celda—, y el contador a «Nuevos de publicaciones, sin asesor» |
+| El ensayo automático **tiraba la parte de la consulta** de cada petición | La red por la que se repartió el enlace viaja ahí (`?r=whatsapp`). El ensayo habría dado por bueno un panel que perdiera entera la atribución del capítulo 27 | El servidor simulado la guarda aparte, y el ensayo comprueba que la etiqueta viaja en la apertura **y** en el envío |
+
+`tests/test_una_publicacion_varias_redes.py` compara ahora el contador con las fichas
+marcadas y falla si vuelven a separarse. El primero venía de **no releer una etiqueta al
+añadir un concepto**: cuando la única red era LinkedIn, «Nuevos desde LinkedIn» era exacto,
+y nada avisa el día que deja de serlo.
+
+### Y una nota de la hoja que decía de más
+
+El capítulo 28 escribió en la hoja que los dos sitios «para mirar con lupa» quedaban
+cerrados. Solo uno lo estaba. Al líder se le dio ver los **HOT que se enfrían**, que es otra
+pregunta distinta de cuántos esperan a que los repartan; ese contador sigue viviendo en la
+pestaña «Publicaciones». La hoja se corrige y la nota queda abierta, porque es exactamente lo
+que la sesión tiene que medir: mover un contador de pestaña porque a uno le parece es cambiar
+una pantalla por una corazonada.
+
+### El criterio, hoy: **no cumplido**
+
+No por haber fallado, sino por no haberse medido. Lo que hay es un guion al día, cinco
+recorridos automáticos en cada ejecución del CI, ocho notas de ensayo —siete corregidas— y
+**cero hojas de observación rellenadas**. Lo que ningún ensayo puede decir es si la palabra
+que hay en pantalla significa para quien la lee lo que significaba para quien la escribió:
+una prueba que busca «Llamar por primera vez» lo encuentra siempre, y un asesor que no sepa
+qué se espera de él al leerlo se queda parado sin que falle nada.
 
 ---
 
@@ -7972,9 +8024,10 @@ recoge las de después de la simplificación.
 * **No se hizo la sesión con personas.** La pila, el guion por papel, la hoja y el ensayo
   automático están; nadie se ha sentado todavía. Los cuatro atascos corregidos salieron de un
   ensayo propio, no de observar a nadie. Dos cosas quedaron anotadas para mirar con lupa y sin
-  tocar, porque no impidieron ninguna tarea: la marca «Nuevo desde LinkedIn» desaparece en
-  cuanto el prospecto tiene asesor —justo cuando el asesor va a buscarlo— y el contador de sin
-  asignar vive en «Publicaciones», no en el tablero.
+  tocar, porque no impidieron ninguna tarea: la marca del listado desaparece en cuanto el
+  prospecto tiene asesor —justo cuando el asesor va a buscarlo— y el contador de sin asignar
+  vive en «Publicaciones», no en el tablero. *La primera la resolvió el capítulo 28 con la
+  bandeja «Hoy»; la segunda sigue abierta, y es lo que hay que mirar en la sesión (§25.6).*
 * **No se lee LinkedIn.** Ni Lead Sync ni Sign In with LinkedIn: las dos necesitan cuentas
   externas. El conector `linkedin-lead-gen` sigue aceptando una forma simplificada que no es
   la de `leadFormResponses` (H-5).
@@ -8165,7 +8218,7 @@ Tres decisiones:
 Una publicación puede tener responsable: un **asesor comercial activo**. Crearla o editarla con
 otra persona —el líder, una cuenta de baja, un id que no existe— responde 422. Las fichas
 **nuevas** que llegan por su página nacen asignadas a él. Por eso también quedan fuera del
-contador «Nuevos desde LinkedIn sin asesor»: ya tienen a alguien detrás.
+contador de prospectos sin asesor: ya tienen a alguien detrás.
 
 Tres casos que no se asignan, a propósito:
 
@@ -8359,7 +8412,12 @@ acuñados.
   tasa es la que es.
 * **El cierre es por día y en UTC.** «Se cierra el 30» cierra a las 23:59:59 UTC del 30, que en
   México es la tarde de ese día.
-* **La sesión con personas sigue sin hacerse** (capítulo 25, §25.6).
+* **La sesión con personas sigue sin hacerse** (capítulo 25, §25.6). Lo que este capítulo
+  añadió —el ciclo de la publicación, las opciones, el responsable y las visitas— **no llegó
+  a las listas de tareas del guion** hasta el capítulo 29, y aun entonces solo en parte: el
+  guion recorre ahora la difusión por dos redes y la bandeja «Hoy», pero cerrar una
+  publicación, duplicarla o mirar su tasa de envío siguen sin tener a nadie delante. Se dice
+  aquí porque es fácil confundir «tiene pruebas» con «se ha probado con alguien».
 
 ---
 
@@ -8857,6 +8915,17 @@ pero el último paso queda pendiente y está en los límites del capítulo.
   publicar, pero no es «vino de WhatsApp» en ningún sentido más profundo.
 * **Las visitas siguen siendo aperturas, no personas.** Como en el capítulo 26.
 * **La sesión con personas reales sigue sin celebrarse.** Arrastrado desde el capítulo 24.
+  El guion sí recorre ya la difusión por dos redes y la atribución (capítulo 29, §25.6): lo
+  que se observará es si marketing entiende que los dos enlaces **no** son el mismo. Si
+  contesta que sí, el informe por red de este capítulo es inexplicable por mucho que sus
+  números sean exactos.
+* **Añadir redes dejó una etiqueta mintiendo durante dos capítulos.** El contador de
+  prospectos sin asesor pasó a contar los seis canales y siguió llamándose «Nuevos desde
+  LinkedIn sin asesor», mientras el listado solo marcaba los de LinkedIn: el líder veía un
+  número y encontraba menos fichas marcadas. Se corrigió en el capítulo 29 moviendo la
+  condición al servidor, que ya la tenía. La lección no es la etiqueta: es que **al ampliar
+  un concepto hay que releer las palabras que lo nombran**, porque «desde LinkedIn» era
+  exacto el día que se escribió y nada avisa el día que deja de serlo.
 
 ---
 
@@ -9247,6 +9316,18 @@ Los 31 se detectan.
   la suite del cliente y el ensayo automático del guion, pero entrar al panel exige iniciar
   sesión, y eso no se hace desde aquí. La sesión con personas sigue sin celebrarse
   (capítulo 25, §25.10).
+* **Este capítulo dio por cerradas dos notas de la hoja, y solo una lo estaba.** La del
+  asesor, sí: la bandeja «Hoy» le quita el tener que buscar. La del líder, no: lo que se le
+  dio fue ver los HOT que se enfrían, que es otra pregunta distinta de cuántos esperan a que
+  los repartan, y ese contador sigue en la pestaña «Publicaciones». Corregido en la hoja en
+  el capítulo 29. Queda escrito porque el error no fue de código: fue **dar por resuelto un
+  síntoma parecido al anotado**, que es la manera más fácil de cerrar una nota de usabilidad
+  sin haberla mirado.
+* **El guion ya recorre la bandeja, y eso todavía no es haberla probado.** Desde el capítulo
+  29 el asesor empieza por «Hoy» y cierra su tarea, y el ensayo automático lo comprueba. Lo
+  que se observará en la sesión es lo que ninguna prueba ve: si al entrar **lee** lo que
+  tiene delante o se va a «Prospectos» por costumbre, y si encuentra «Ya está» sin que nadie
+  se lo nombre.
 * **Nadie ha vivido una semana con la bandeja.** Si las seis reglas producen la cantidad
   adecuada de trabajo —ni tan poco que sobre, ni tanto que se ignore— es justo lo que solo se
   puede saber usándola varios días seguidos. Los plazos se dejan configurables por eso.

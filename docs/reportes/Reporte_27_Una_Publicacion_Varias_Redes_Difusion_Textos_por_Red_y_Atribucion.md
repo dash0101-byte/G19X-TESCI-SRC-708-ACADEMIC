@@ -486,3 +486,14 @@ pero el último paso queda pendiente y está en los límites del capítulo.
   publicar, pero no es «vino de WhatsApp» en ningún sentido más profundo.
 * **Las visitas siguen siendo aperturas, no personas.** Como en el capítulo 26.
 * **La sesión con personas reales sigue sin celebrarse.** Arrastrado desde el capítulo 24.
+  El guion sí recorre ya la difusión por dos redes y la atribución (capítulo 29, §25.6): lo
+  que se observará es si marketing entiende que los dos enlaces **no** son el mismo. Si
+  contesta que sí, el informe por red de este capítulo es inexplicable por mucho que sus
+  números sean exactos.
+* **Añadir redes dejó una etiqueta mintiendo durante dos capítulos.** El contador de
+  prospectos sin asesor pasó a contar los seis canales y siguió llamándose «Nuevos desde
+  LinkedIn sin asesor», mientras el listado solo marcaba los de LinkedIn: el líder veía un
+  número y encontraba menos fichas marcadas. Se corrigió en el capítulo 29 moviendo la
+  condición al servidor, que ya la tenía. La lección no es la etiqueta: es que **al ampliar
+  un concepto hay que releer las palabras que lo nombran**, porque «desde LinkedIn» era
+  exacto el día que se escribió y nada avisa el día que deja de serlo.

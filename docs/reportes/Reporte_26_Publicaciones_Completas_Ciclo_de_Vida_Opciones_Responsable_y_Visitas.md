@@ -154,7 +154,7 @@ Tres decisiones:
 Una publicación puede tener responsable: un **asesor comercial activo**. Crearla o editarla con
 otra persona —el líder, una cuenta de baja, un id que no existe— responde 422. Las fichas
 **nuevas** que llegan por su página nacen asignadas a él. Por eso también quedan fuera del
-contador «Nuevos desde LinkedIn sin asesor»: ya tienen a alguien detrás.
+contador de prospectos sin asesor: ya tienen a alguien detrás.
 
 Tres casos que no se asignan, a propósito:
 
@@ -348,4 +348,9 @@ acuñados.
   tasa es la que es.
 * **El cierre es por día y en UTC.** «Se cierra el 30» cierra a las 23:59:59 UTC del 30, que en
   México es la tarde de ese día.
-* **La sesión con personas sigue sin hacerse** (capítulo 25, §25.6).
+* **La sesión con personas sigue sin hacerse** (capítulo 25, §25.6). Lo que este capítulo
+  añadió —el ciclo de la publicación, las opciones, el responsable y las visitas— **no llegó
+  a las listas de tareas del guion** hasta el capítulo 29, y aun entonces solo en parte: el
+  guion recorre ahora la difusión por dos redes y la bandeja «Hoy», pero cerrar una
+  publicación, duplicarla o mirar su tasa de envío siguen sin tener a nadie delante. Se dice
+  aquí porque es fácil confundir «tiene pruebas» con «se ha probado con alguien».
