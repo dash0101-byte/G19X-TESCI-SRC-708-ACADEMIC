@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { addLeadActivity, recalculateLeadScore, updateLead } from '../services/api';
 import AsignarAsesor from './AsignarAsesor';
+import CerrarProspecto from './CerrarProspecto';
 import LlegoPor from './LlegoPor';
 import { ingresosDelFormulario } from '../services/prospecto';
 import {
   AYUDA_DE_TIPO,
   DIRECCIONES,
+  ETAPAS_EDITABLES,
   NOMBRES_DE_ETAPA,
   RESULTADOS_DE_LLAMADA,
   TIPOS_DECLARABLES,
   TIPOS_DE_MENSAJE,
   describirCambioDeScore,
+  esEtapaDeCierre,
   nombreDeActividad,
   nombreDeEtapa,
   nombreDeFuente,
@@ -39,6 +42,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
   const [activityNotes, setActivityNotes] = useState('');
   const [isSubmittingAct, setIsSubmittingAct] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  // El formulario de cierre (capitulo 30). Empieza plegado: cerrar un prospecto no es una
+  // accion que se haga a diario, y tenerla siempre abierta la pone a la altura de registrar
+  // una llamada, que si lo es.
+  const [cerrando, setCerrando] = useState(false);
   // Lo que pasó al registrar: el cambio real del score («47,8 → 58,6») o el motivo del
   // rechazo. El selector prometía «+25 pts», que no era lo que el score se movía.
   const [cambioDeScore, setCambioDeScore] = useState(null);
@@ -128,7 +135,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
         industry: editForm.industry,
         company_size: editForm.company_size || null,
         annual_revenue: ingresosDelFormulario(editForm.annual_revenue),
-        status: editForm.status,
+        // La etapa solo viaja si no es de cierre. Un prospecto ya ganado o perdido se
+        // edita sin tocarla: el servidor responderia 422 —cerrar exige motivo, fecha y
+        // tramo— y el asesor no podria corregirle el telefono a un cliente ganado.
+        ...(esEtapaDeCierre(editForm.status) ? {} : { status: editForm.status }),
         source: editForm.source,
         raw_metadata: {
           ...(lead.raw_metadata || {}),
@@ -448,15 +458,25 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       value={editForm.status}
                       onChange={(e) => handleEditChange('status', e.target.value)}
                     >
-                      {/* Todas las etapas: si faltaba la del prospecto —«En conversación» y «No
-                          calificado» no estaban—, el selector enseñaba otra y guardar la
-                          cambiaba sin que nadie lo pidiera. */}
-                      {Object.entries(NOMBRES_DE_ETAPA).map(([etapa, nombre]) => (
-                        <option key={etapa} value={etapa}>{nombre}</option>
+                      {/* Todas las etapas menos las de cierre: si faltara la del prospecto
+                          —«En conversación» y «No calificado» no estaban—, el selector
+                          enseñaría otra y guardar la cambiaría sin que nadie lo pidiera.
+                          «Ganado» y «Perdido» salieron de aquí en el capítulo 30: cerrar
+                          exige un motivo, y el botón de abajo es el único camino. */}
+                      {ETAPAS_EDITABLES.map((etapa) => (
+                        <option key={etapa} value={etapa}>{NOMBRES_DE_ETAPA[etapa]}</option>
                       ))}
+                      {/* La del prospecto, si ya está cerrado: deshabilitada, para que el
+                          selector no enseñe una etapa que no es la suya. */}
+                      {esEtapaDeCierre(editForm.status) && (
+                        <option value={editForm.status} disabled>
+                          {NOMBRES_DE_ETAPA[editForm.status]} (cerrado)
+                        </option>
+                      )}
                     </select>
                     <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Pasar a «Propuesta enviada» o «Reunión agendada» deja la actividad registrada en el historial.
+                      Para darlo por ganado o perdido, use «Cerrar el prospecto»: hace falta el motivo.
                     </p>
                   </div>
                   <div>
@@ -639,6 +659,62 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
             <AsignarAsesor lead={lead} onAsignado={onLeadUpdated} />
 
             <LlegoPor llegoPor={lead.llego_por} />
+
+            {/* Como acabo, si acabo (capitulo 30). La tarjeta solo se pinta cuando hay
+                desenlace registrado: un cierre anterior a este capitulo no tiene motivo, y
+                una tarjeta vacia sugeriria un dato perdido en lugar de uno que nunca hubo. */}
+            {lead.desenlace && (
+              <div
+                className="glass-panel"
+                style={{ padding: '16px', marginBottom: '20px', border: '1px solid var(--border-medium)' }}
+              >
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', marginBottom: '6px' }}>
+                  🏁 {lead.desenlace.resultado_etiqueta} · {lead.desenlace.motivo_etiqueta}
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                  Cerrado el {new Date(`${lead.desenlace.cerrado_el}T00:00:00`).toLocaleDateString('es-MX')}
+                  {lead.desenlace.tramo_etiqueta ? ` · ${lead.desenlace.tramo_etiqueta}` : ''}
+                </p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  Tenía {Math.round(lead.desenlace.score_al_cierre)} puntos
+                  ({lead.desenlace.categoria_al_cierre}) al cerrarse. Ese es el número que el
+                  panel usa para saber si el score acertaba; no se recalcula.
+                </p>
+              </div>
+            )}
+
+            {/* Cerrar, o corregir un cierre. El asesor que atiende al prospecto es quien
+                sabe por que acabo asi, de modo que es quien lo cierra. */}
+            {cerrando ? (
+              <div style={{ marginBottom: '20px' }}>
+                <CerrarProspecto
+                  lead={lead}
+                  onCancelar={() => setCerrando(false)}
+                  onCerrado={(registrado) => {
+                    setCerrando(false);
+                    setSaveSuccessMsg(
+                      `Prospecto ${registrado.resultado_etiqueta.toLowerCase()} por «${registrado.motivo_etiqueta}».`
+                      + (registrado.tareas_descartadas
+                        ? ` Se descartaron ${registrado.tareas_descartadas} tarea(s) pendiente(s).`
+                        : ''),
+                    );
+                    // La verdad de como quedo la ficha la tiene el servidor: se recarga en
+                    // vez de remendar el objeto local, que es como el score y la etapa
+                    // acaban diciendo cosas distintas en dos sitios de la misma pantalla.
+                    if (onLeadUpdated) onLeadUpdated();
+                  }}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ marginBottom: '20px' }}
+                onClick={() => setCerrando(true)}
+              >
+                {lead.desenlace ? '🏁 Corregir el desenlace' : '🏁 Cerrar el prospecto'}
+              </button>
+            )}
 
             {/* AI Explanation & Recommendations (XAI) */}
             <div

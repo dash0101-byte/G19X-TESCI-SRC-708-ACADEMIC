@@ -121,6 +121,19 @@ export default function Navbar({
           >
             📣 Publicaciones
           </button>
+          {/* Qué se gana, qué se pierde y por qué (capítulo 30). De dirección, como la
+              comparativa de publicaciones: los cierres de un solo asesor comparados entre
+              publicaciones dan un orden que no es el real. */}
+          {canAccessAdmin && (
+            <button
+              id="tab-desenlaces"
+              onClick={() => setActiveTab('desenlaces')}
+              className={`btn btn-sm ${activeTab === 'desenlaces' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ border: 'none' }}
+            >
+              🏁 Desenlaces
+            </button>
+          )}
           {canAccessAdmin && (
             <button
               id="tab-admin"

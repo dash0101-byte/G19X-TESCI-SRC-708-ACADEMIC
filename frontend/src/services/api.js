@@ -602,3 +602,38 @@ export function marcarAvisosLeidos(ids = null) {
 export function fetchHotQueSeEnfrian() {
   return apiFetch('/agenda/enfriandose', {}, 'Error al cargar los prospectos que se enfrían');
 }
+
+// ============================================================================
+// El desenlace (capítulo 30)
+// ============================================================================
+// Cerrar un prospecto vive bajo `/leads` porque es algo que se le hace a un
+// prospecto y necesita el alcance de cartera; leer las opciones y el panel vive
+// bajo `/desenlaces`, que solo lee. Ninguna de las tres reentrena nada.
+
+export function fetchOpcionesDeCierre() {
+  return apiFetch('/desenlaces/opciones', {}, 'Error al cargar los motivos de cierre');
+}
+
+// `cierre` es {resultado, motivo, cerrado_el, tramo}. El servidor rechaza un motivo que
+// no esté en la lista de ese resultado, un tramo en un perdido y un ganado sin tramo: la
+// validación no se repite aquí a propósito, porque dos copias de una lista cerrada se
+// desincronizan y la que manda es la del servidor.
+export function cerrarProspecto(leadId, cierre) {
+  return apiFetch(
+    `/leads/${leadId}/desenlace`,
+    { method: 'POST', body: JSON.stringify(cierre) },
+    'Error al registrar el desenlace del prospecto',
+  );
+}
+
+export function fetchPanelDeDesenlaces({ desde = '', hasta = '' } = {}) {
+  const params = new URLSearchParams();
+  if (desde) params.set('desde', desde);
+  if (hasta) params.set('hasta', hasta);
+  const consulta = params.toString();
+  return apiFetch(
+    consulta ? `/desenlaces/panel?${consulta}` : '/desenlaces/panel',
+    {},
+    'Error al cargar el panel de desenlaces',
+  );
+}

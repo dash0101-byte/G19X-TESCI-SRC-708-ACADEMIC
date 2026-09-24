@@ -34,6 +34,23 @@ export const NOMBRES_DE_ETAPA = {
   LOST: 'Perdido',
 };
 
+// Las etapas que se cierran con un desenlace (capítulo 30). El servidor responde 422 si
+// alguna llega por la edición de la ficha: cerrar exige motivo, fecha y —si se ganó— el
+// tramo del acuerdo, y eso lo pide `POST /leads/{id}/desenlace`.
+export const ETAPAS_DE_CIERRE = ['WON', 'LOST'];
+
+// Lo que el selector de etapa de la ficha puede ofrecer. Se calcula desde la tabla de
+// arriba en lugar de escribirse a mano: una etapa nueva aparece en el selector el día que
+// se crea, y el día que otra pase a cerrarse con motivo desaparece de él sin que haya que
+// acordarse de este archivo.
+export const ETAPAS_EDITABLES = Object.keys(NOMBRES_DE_ETAPA).filter(
+  (etapa) => !ETAPAS_DE_CIERRE.includes(etapa),
+);
+
+export function esEtapaDeCierre(etapa) {
+  return ETAPAS_DE_CIERRE.includes(etapa);
+}
+
 export const RESULTADOS_DE_LLAMADA = {
   CONECTO: 'Conectó',
   NO_CONTESTO: 'No contestó',

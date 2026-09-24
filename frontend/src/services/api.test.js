@@ -518,6 +518,11 @@ describe('el catálogo de endpoints', () => {
     ['fetchEventosSinAsociar', [], 'GET', '/api/v1/eventos-sin-asociar'],
     ['vincularEventoSinAsociar', [11, 7], 'POST', '/api/v1/eventos-sin-asociar/11/vincular'],
     ['descartarEventoSinAsociar', [11], 'DELETE', '/api/v1/eventos-sin-asociar/11'],
+    // El desenlace (capítulo 30). Cerrar vive bajo `/leads` porque es algo que se le hace
+    // a un prospecto y necesita el alcance de cartera; leer, bajo `/desenlaces`.
+    ['fetchOpcionesDeCierre', [], 'GET', '/api/v1/desenlaces/opciones'],
+    ['cerrarProspecto', [7, { resultado: 'perdido', motivo: 'precio', cerrado_el: '2026-09-01' }], 'POST', '/api/v1/leads/7/desenlace'],
+    ['fetchPanelDeDesenlaces', [], 'GET', '/api/v1/desenlaces/panel'],
   ];
 
   it.each(RUTAS)('%s → %s %s', async (nombre, argumentos, metodo, ruta) => {
@@ -530,6 +535,25 @@ describe('el catálogo de endpoints', () => {
     expect(url.split('?')[0]).toBe(ruta);
     // `apiFetch` no pone `method` en las lecturas: `fetch` usa GET por defecto.
     expect(opciones.method ?? 'GET').toBe(metodo);
+  });
+
+  it('el panel de desenlaces solo manda el periodo cuando lo hay', async () => {
+    // Un `?desde=&hasta=` vacío no es inocente: llega al servidor como dos fechas vacías
+    // que hay que interpretar, y la pregunta «todos los cierres» deja de distinguirse de
+    // «los cierres de un periodo que nadie acotó».
+    const f = fetchSimulado({ '/desenlaces/panel': respuesta(200, {}) });
+
+    await api.fetchPanelDeDesenlaces();
+    expect(f.llamadas[0].url).toBe('/api/v1/desenlaces/panel');
+
+    await api.fetchPanelDeDesenlaces({ desde: '2026-01-01' });
+    expect(f.llamadas[1].url).toBe('/api/v1/desenlaces/panel?desde=2026-01-01');
+
+    await api.fetchPanelDeDesenlaces({ desde: '2026-01-01', hasta: '2026-03-31' });
+    expect(f.llamadas[2].url).toBe('/api/v1/desenlaces/panel?desde=2026-01-01&hasta=2026-03-31');
+
+    await api.fetchPanelDeDesenlaces({ hasta: '2026-03-31' });
+    expect(f.llamadas[3].url).toBe('/api/v1/desenlaces/panel?hasta=2026-03-31');
   });
 
   it('los listados con «incluir inactivos» solo mandan el parámetro cuando se pide', async () => {

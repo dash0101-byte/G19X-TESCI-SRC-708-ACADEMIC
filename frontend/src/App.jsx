@@ -10,6 +10,7 @@ import ScoringSimulator from './components/ScoringSimulator';
 import AdminPanel from './components/AdminPanel';
 import BandejaSinAsociar from './components/BandejaSinAsociar';
 import Publicaciones from './components/Publicaciones';
+import PanelDeDesenlaces from './components/PanelDeDesenlaces';
 import SessionModal from './components/SessionModal';
 import NewLeadModal from './components/NewLeadModal';
 import CambioDeContrasenaObligatorio from './components/CambioDeContrasenaObligatorio';
@@ -357,6 +358,10 @@ export default function App() {
             onSelectLead={handleSelectLead}
           />
         )}
+
+        {/* Qué se gana, qué se pierde y por qué (capítulo 30). Solo dirección: el
+            servidor responde 403 a un asesor, así que la pestaña tampoco se le ofrece. */}
+        {activeTab === 'desenlaces' && <PanelDeDesenlaces />}
 
         {/* Tab 4: Panel de Administración (Solo Admin y Líder) */}
         {activeTab === 'admin' && (
