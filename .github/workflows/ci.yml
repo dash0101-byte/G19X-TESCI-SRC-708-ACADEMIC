@@ -590,6 +590,18 @@ jobs:
         run: python scripts/guarda_del_motor_de_reglas.py
 
       # ----------------------------------------------------------------------
+      # Capitulo 30: cerrar un prospecto es el unico punto de la aplicacion que produce una
+      # etiqueta de entrenamiento, y sus fallos son los que no se ven hasta que hay datos y
+      # ganas de mirarlos: un campo de texto nuevo en el formulario de cierre no rompe
+      # ninguna prueba —nadie lo envia— y llena la tabla que alimenta al modelo de lo que
+      # alguien dijo por telefono. Esta guarda comprueba propiedades: motivo obligatorio,
+      # cero texto libre, que cerrar no reentrena ni mueve el score, que lo cerrado sale del
+      # trabajo, que el contador cuenta lo mismo que el extractor, que el panel no lleva a
+      # nadie dentro y que el desenlace entra en los derechos del titular.
+      - name: El desenlace conserva sus defensas
+        run: python scripts/guarda_de_los_desenlaces.py
+
+      # ----------------------------------------------------------------------
       # Capitulo 29: quien dicta si el criterio «nadie se atasca» se cumple ya no es una
       # frase escrita a mano en un reporte, sino este programa leyendo las hojas de la
       # sesion. Un lector equivocado diria «cumplido» sin que nadie lo notara, asi que

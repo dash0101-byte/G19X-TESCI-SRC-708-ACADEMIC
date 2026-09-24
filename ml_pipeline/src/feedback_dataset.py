@@ -26,6 +26,25 @@ modelos con métricas excelentes y valor nulo:
    Se toma la puntuación más antigua de cada prospecto, que corresponde al momento en que
    entró al embudo. Las posteriores ya están contaminadas por el avance comercial.
 
+## El desenlace registrado (capítulo 30)
+
+Desde el capítulo 30 la etiqueta no se deduce del estado: se **lee**. Cerrar un prospecto
+exige decir cómo acabó, por qué motivo —de una lista cerrada— y en qué fecha, y eso queda
+en la tabla `desenlaces` junto con el score que tenía al cerrarse y la versión del vector
+con que se tomó su instantánea de entrada. El dataset usa esa fila tal cual.
+
+La diferencia no es cosmética. Antes, «cerrado» significaba «alguien dejó la etapa en WON
+en algún momento» y la fecha de la etiqueta era `updated_at`, es decir, la última vez que
+alguien tocó la ficha por cualquier motivo. Ahora hay fecha de cierre de verdad, y el
+motivo viaja como columna de contexto: **no es una variable del modelo** —no entra en
+`COLUMNAS_DEL_MODELO` ni en la huella— porque el motivo se conoce al cerrar y no el día que
+hay que decidir a quién llamar, que es cuando el modelo tiene que servir para algo. Está
+para poder segmentar un análisis después.
+
+Los prospectos que se cerraron **antes** de que existiera el desenlace siguen entrando, con
+su etiqueta deducida del estado, y el manifiesto los cuenta aparte. Inventarles un motivo
+habría sido peor que no tenerlo.
+
 Uso:
     python ml_pipeline/src/feedback_dataset.py --salida ml_pipeline/data/leads_reales.csv
 """
@@ -47,13 +66,20 @@ if os.path.isdir(_BACKEND) and _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
 from app.core.database import SessionLocal  # noqa: E402
+from app.core.desenlaces import (  # noqa: E402
+    GANADO,
+    MINIMO_DE_CASOS,
+    MINIMO_POR_CLASE,
+    etiqueta_de_motivo,
+)
 from app.core.vector_del_modelo import (  # noqa: E402
     COLUMNAS_DEL_MODELO,
     VERSION_DEL_VECTOR,
     es_instantanea_vigente,
     ingresos_o_ausente,
+    instantanea_utilizable,
 )
-from app.models.entities import Lead, LeadStatus, ScoreHistory  # noqa: E402
+from app.models.entities import Desenlace, Lead, LeadStatus, ScoreHistory  # noqa: E402
 from app.services.retencion_service import consulta_instantanea_de_entrada  # noqa: E402
 from model_registry import huella_de_datos  # noqa: E402
 
@@ -64,8 +90,20 @@ ESTADOS_PERDIDOS = {LeadStatus.LOST, LeadStatus.UNQUALIFIED}
 
 # Mínimos por debajo de los cuales reentrenar es contraproducente. Con pocas decenas de
 # ejemplos el modelo memoriza a los clientes concretos que cerraron ese trimestre.
-MINIMO_EJEMPLOS = 200
-MINIMO_POR_CLASE = 50
+#
+# Viven en `app.core.desenlaces` desde el capítulo 30, no aquí, y el motivo es el mismo que
+# llevó el vector del modelo a `app.core.vector_del_modelo`: el contador que enseña el panel
+# del líder tiene que exigir EXACTAMENTE estos números. Dos copias se habrían desincronizado
+# el día que alguien subiera una, y el panel diría «ya se puede reentrenar» mientras este
+# extractor se niega. El nombre local se conserva porque es el que usan las pruebas y el
+# guion de línea de órdenes.
+MINIMO_EJEMPLOS = MINIMO_DE_CASOS
+
+# Columnas de contexto: acompañan a cada fila y NO son variables del modelo. No entran en
+# `COLUMNAS_MODELO` ni en la huella del dataset a propósito —el motivo de un cierre se
+# conoce al cerrar, no el día que hay que decidir a quién llamar—, pero sin ellas no se
+# podría segmentar un análisis por motivo ni acotar una cohorte por fecha real de cierre.
+COLUMNAS_DE_CONTEXTO = ["resultado", "motivo", "motivo_etiqueta", "cerrado_el", "tramo"]
 
 # Variables que consume el modelo, en el mismo orden que `train_model.FEATURE_COLS`: las dos
 # salen de `app.core.vector_del_modelo`.
@@ -95,9 +133,15 @@ def _fila_desde_instantanea(instantanea: Dict[str, Any], lead: Lead) -> Optional
     """Traduce la instantánea al vector que espera el modelo, o None si está incompleta."""
     if not instantanea:
         return None
-    if not es_instantanea_vigente(instantanea):
+    if not instantanea_utilizable(instantanea):
         # Una instantánea de la versión 1 no dice qué mensajes eran de LinkedIn ni cuántas
-        # llamadas quedaron sin respuesta. Traducirla exigiría inventar las dos cosas.
+        # llamadas quedaron sin respuesta: traducirla exigiría inventar las dos cosas. Una
+        # incompleta tampoco sirve, porque rellenarla con ceros le diría al modelo «no hubo
+        # actividad» donde lo que hay es un hueco.
+        #
+        # El criterio es el de `vector_del_modelo` y no uno propio: el contador del panel
+        # (capítulo 30) promete cuántos ejemplos hay, y con dos criterios prometería más de
+        # los que este extractor después encuentra.
         return None
 
     fila: Dict[str, Any] = {
@@ -145,9 +189,20 @@ def construir_dataset(
             .all()
         )
 
+        # Los desenlaces registrados, de una consulta y no de una por prospecto. Desde el
+        # capítulo 30 la etiqueta se LEE de aquí en lugar de deducirse del estado.
+        desenlaces: Dict[int, Desenlace] = {
+            d.lead_id: d
+            for d in db.query(Desenlace)
+            .filter(Desenlace.lead_id.in_([lead.id for lead in leads]))
+            .all()
+        } if leads else {}
+
         filas: List[Dict[str, Any]] = []
         sin_instantanea = 0
         de_un_vector_anterior = 0
+        con_motivo = 0
+        motivos: Dict[str, int] = {}
 
         for lead in leads:
             historial = _instantanea_de_entrada(db, lead.id)
@@ -163,7 +218,30 @@ def construir_dataset(
                     de_un_vector_anterior += 1
                 continue
 
-            fila["converted"] = 1 if lead.status in ESTADOS_GANADOS else 0
+            desenlace = desenlaces.get(lead.id)
+            if desenlace is not None:
+                # La etiqueta que una persona registró, con su motivo y su fecha real de
+                # cierre. No se comprueba que cuadre con `lead.status` y se corrige en
+                # silencio: si algún día discreparan, lo que hay que saber es cuál de los
+                # dos mintió, y eso se responde mirando la bitácora del cierre.
+                fila["converted"] = 1 if desenlace.resultado == GANADO else 0
+                fila["resultado"] = desenlace.resultado
+                fila["motivo"] = desenlace.motivo
+                fila["motivo_etiqueta"] = etiqueta_de_motivo(desenlace.resultado, desenlace.motivo)
+                fila["cerrado_el"] = desenlace.cerrado_el
+                fila["tramo"] = desenlace.tramo
+                con_motivo += 1
+                clave = f"{desenlace.resultado}:{desenlace.motivo}"
+                motivos[clave] = motivos.get(clave, 0) + 1
+            else:
+                # Cerrado antes de que existiera el desenlace, o descartado
+                # (`UNQUALIFIED`), que no tiene lista de motivos propia. Entra igual: la
+                # etiqueta se deduce del estado, como desde el capítulo 18. Inventarle un
+                # motivo habría llenado el análisis de una respuesta que nadie dio.
+                fila["converted"] = 1 if lead.status in ESTADOS_GANADOS else 0
+                for columna in COLUMNAS_DE_CONTEXTO:
+                    fila[columna] = None
+
             fila["lead_id"] = lead.id
             fila["etiquetado_en"] = lead.updated_at
             fila["puntuado_en"] = historial.calculated_at
@@ -201,6 +279,13 @@ def construir_dataset(
             # aparte porque no son un defecto de los datos, sino el precio de no inventar al
             # cambiar el vector, y conviene ver cuánto cuesta.
             "terminales_con_instantanea_de_un_vector_anterior": de_un_vector_anterior,
+            # Capítulo 30. De las filas del dataset, cuántas llevan un desenlace registrado
+            # con motivo y cuántas heredan la etiqueta del estado porque se cerraron antes.
+            # Se cuentan aparte para que la proporción se vea: mientras la segunda cifra
+            # sea grande, un análisis por motivo describe una minoría de los cierres.
+            "con_desenlace_registrado": con_motivo,
+            "etiquetados_solo_por_su_estado": len(filas) - con_motivo,
+            "motivos": dict(sorted(motivos.items())),
             "version_del_vector": VERSION_DEL_VECTOR,
             "base_sin_prospectos": base_vacia,
             "ventana": {
@@ -208,10 +293,13 @@ def construir_dataset(
                 "hasta": df["puntuado_en"].max().isoformat() if len(df) else None,
             },
             "advertencia": (
-                "Etiquetas tomadas del estado terminal del prospecto sobre la instantánea "
-                "de variables del momento de su entrada al embudo. Los prospectos sin "
-                "desenlace conocido se excluyen; contarlos como negativos sesgaría el "
-                "modelo hacia el pesimismo."
+                "Etiquetas tomadas del desenlace registrado del prospecto —o, en los que se "
+                "cerraron antes de que existiera, de su estado terminal— sobre la "
+                "instantánea de variables del momento de su entrada al embudo. El motivo y "
+                "el tramo son contexto y NO variables del modelo: se conocen al cerrar, no "
+                "el día que hay que decidir a quién llamar. Los prospectos sin desenlace "
+                "conocido se excluyen; contarlos como negativos sesgaría el modelo hacia el "
+                "pesimismo."
             ),
         }
 

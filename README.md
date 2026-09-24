@@ -326,7 +326,18 @@ Las instantáneas llevan `version_del_vector`. Las anteriores al capítulo 24 no
 mensajes eran de LinkedIn ni cuántas llamadas quedaron sin respuesta, así que el dataset
 real y el monitor de deriva las **descartan y las cuentan** en lugar de traducirlas.
 
-**Hoy el bucle no tiene datos**: en la base no hay ningún prospecto en estado terminal.
+Desde el capítulo 30 la etiqueta no se deduce del estado: se **lee**. Cerrar un prospecto
+exige decir cómo acabó, por qué motivo —de una lista cerrada— y qué día, y eso queda en la
+tabla `desenlaces` junto con el score que tenía al cerrarse. El dataset usa esa fila tal
+cual, y el motivo viaja como columna de contexto y **no** como variable del modelo: se
+conoce al cerrar, no el día que hay que decidir a quién llamar. Los cierres anteriores a ese
+capítulo siguen entrando con la etiqueta deducida del estado, y el manifiesto los cuenta
+aparte.
+
+**Hoy el bucle no tiene datos**: en la base no hay ningún prospecto en estado terminal. El
+panel de desenlaces dice cuántos faltan —200 ejemplos utilizables, 50 de cada clase— y avisa
+al líder cuando se alcanza el mínimo, **sin reentrenar nada**: quien decide es una persona.
+
 Para que el camino no se pudra hasta que los haya, el pipeline lo recorre entero en cada
 ejecución sobre una base desechable:
 
@@ -689,6 +700,15 @@ lo vincula o lo descarta.
    por»: de qué publicación, qué necesita, cuándo aceptó el aviso y su perfil de LinkedIn.
 6. **El líder compara publicaciones**: perfiles recibidos, cuántos avanzaron de etapa y score
    medio de cada una, y el informe de cada publicación con sus perfiles por score.
+7. **El trato se cierra diciendo por qué** (capítulo 30). Pasar a «Ganado» o «Perdido» no es
+   una opción del selector de etapa: pide un motivo de una lista cerrada, el día en que se
+   cerró y, si se ganó, el tramo del acuerdo. Nada de texto libre. El prospecto sale de la
+   bandeja «Hoy» y deja de recibir tareas y avisos, y su puntuación **no se recalcula**: la
+   que tenga es la que había cuando se decidió.
+8. **El líder mira los desenlaces**, en la pestaña «Desenlaces»: ganados y perdidos por
+   motivo, por publicación, por red y por la categoría que tenían al cerrarse —que es la
+   respuesta a «¿el score acertaba?»—, más un contador de cuánto falta para poder reentrenar.
+   Todo son totales: ni una fila lleva a una persona.
 
 El guion completo, con las reglas que lo gobiernan, está en
 [docs/Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md](docs/Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md),
@@ -802,6 +822,15 @@ el vector de variables y la explicación, y lo que llegó del CRM.
   | `scoring_jobs` (recálculos) | `CONSERVACION_TRABAJOS_DIAS` = 90 | 7 | que terminó; los vivos no se tocan |
   | `crm_integration_logs` | `CONSERVACION_REGISTROS_CRM_DIAS` = 90 | 30 | la sincronización |
   | `unmatched_events` (bandeja «Sin asociar») | `CONSERVACION_SIN_ASOCIAR_DIAS` = 90 | 30 | que llegó el aviso |
+  | `tareas` (capítulo 28) | `CONSERVACION_TAREAS_DIAS` = 180 | 30 | que se **cerró**; una abierta no caduca |
+  | `avisos` (capítulo 28) | `CONSERVACION_AVISOS_DIAS` = 90 | 14 | que se **leyó**; uno sin leer no caduca |
+
+- **El desenlace no tiene plazo propio**, y es una decisión y no un olvido (capítulo 30). Es
+  un hecho sobre el prospecto —como su score—, no trabajo nuestro que se acumule, y purgarlo
+  por antiguo destruiría los ejemplos de entrenamiento que el sistema tardó un ciclo
+  comercial entero en reunir. Vive y muere con la ficha, y la exportación del titular lo
+  dice. De la conversación que llevó al cierre no se guarda nada: el motivo es una clave de
+  una lista cerrada, nunca un texto.
 
 ```bash
 # Qué haría la purga hoy, sin escribir nada
@@ -1073,7 +1102,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1190 pruebas
+### Backend — 1326 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1137,7 +1166,23 @@ del artefacto que puntúa; y el alcance del informe, con el asesor viendo sus pr
 un número del resto, sin nombres. La guarda comprueba propiedades en lugar de casos, y es un
 paso propio del CI.
 
-### Cliente — 302 pruebas
+### El desenlace: cerrar diciendo por qué
+
+```bash
+python -m pytest backend/tests/test_desenlaces.py backend/tests/test_migracion_desenlaces.py -v
+python scripts/guarda_de_los_desenlaces.py
+```
+
+Cubren que la edición de la ficha ya no pueda cerrar un prospecto —y que un prospecto ya
+cerrado se siga pudiendo editar—; que el motivo salga de la lista de su propio desenlace, que
+un ganado necesite tramo y un perdido no lo admita, y que una fecha futura o anterior al alta
+se rechacen; que el score que se guarda sea el del momento y que cerrar no recalcule; que las
+tareas abiertas se descarten y las reglas dejen de proponer trabajo; que el contador cuente
+exactamente lo que el extractor del dataset sabría usar; y que el panel sea de dirección y no
+devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
+es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
+
+### Cliente — 350 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1146,7 +1191,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 302 pruebas
+npm test                # 350 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```
@@ -1200,7 +1245,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 
 ---
 
-## 📑 Suite de 27 Reportes Técnicos de Estadía Profesional
+## 📑 Suite de 29 Reportes Técnicos de Estadía Profesional
 
 | Reporte | Documento | Enfoque de Ingeniería |
 | :-: | :--- | :--- |
@@ -1232,6 +1277,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **26** | [Reporte 26](docs/reportes/Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md) | Publicaciones completas: estados y cierre automático, vistas previas del post y de la página, opciones de «¿Qué necesitas?» por publicación, asesor responsable, post real, duplicar, y visitas sin datos personales con tasa de envío y gráfico por día. |
 | **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, vista previa del enlace con etiquetas Open Graph servidas por el servidor, y las claves viejas de JWT guardadas por su huella. |
 | **28** | [Reporte 28](docs/reportes/Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md) | El sistema dice qué hacer hoy: seis reglas en la pasada diaria que dejan tareas y avisos sin salir del panel, bandeja «Hoy» ordenada por score, campana de avisos, los HOT que se enfrían para el líder, y guarda del CI con 31 defectos reintroducidos. |
+| **29** | [Reporte 29](docs/reportes/Reporte_29_Cerrar_el_Bucle_El_Desenlace_con_su_Motivo_Panel_y_Contador_del_Reentrenamiento.md) | Cerrar el bucle (capítulo 30): el desenlace con motivo de lista cerrada, fecha de cierre y tramo del acuerdo; una sola puerta para cerrar; lo cerrado sale de la bandeja y de las reglas; panel de desenlaces por motivo, publicación, red y score al cerrarse; contador del reentrenamiento con aviso, sin reentrenar nada; y guarda del CI con 18 defectos reintroducidos. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos y 12 preguntas de sínodo con respuestas modelo. |
 
 ---

@@ -50,6 +50,13 @@ REPORT_FILES = [
     ("Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md", "Capítulo 26: Publicaciones Completas — Ciclo de Vida, Opciones, Responsable y Visitas"),
     ("Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md", "Capítulo 27: Una Publicación, Varias Redes — Difusión, Textos por Red y Atribución"),
     ("Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md", "Capítulo 28: El Sistema Dice Qué Hacer Hoy — Motor de Reglas, Tareas y Avisos"),
+    # A partir de aquí el número del reporte y el del capítulo dejan de coincidir. El
+    # capítulo 29 («Lo que dijeron las personas») no escribió un reporte propio: lo que
+    # produjo se incorporó como actualización fechada dentro de los reportes 25 a 28. Se
+    # deja el desajuste en vez de renumerar, porque un reporte que cambia de número rompe
+    # las referencias cruzadas de todos los anteriores. El propio Reporte 29 lo explica en
+    # su primera línea.
+    ("Reporte_29_Cerrar_el_Bucle_El_Desenlace_con_su_Motivo_Panel_y_Contador_del_Reentrenamiento.md", "Capítulo 30: Cerrar el Bucle — El Desenlace con su Motivo, Panel de Desenlaces y Contador del Reentrenamiento"),
 ]
 
 
@@ -140,7 +147,7 @@ Diseñé e implementé una plataforma integral basada en **Clean Architecture (P
 3. **Core Backend RESTful en FastAPI:** 13 endpoints para ingesta multicanal de webhooks CRM con firma HMAC, deduplicación de contactos, bitácoras inmutables, auto-asignación comercial de leads `HOT` y recálculo masivo en segundo plano.
 4. **Explicabilidad con IA (XAI):** Módulo de generación de resúmenes ejecutivos, fortalezas clave y tácticas comerciales accionables para cada prospecto.
 5. **Frontend React.js tipo Power BI:** Tablero analítico en tiempo real, matriz de prospectos interactiva, ficha 360 y simulador interactivo de scoring.
-6. **Aseguramiento de Calidad y DevOps:** Suite de 428 pruebas automatizadas en Pytest (100% aprobadas, 91% de cobertura), contenerización multi-etapa con usuario sin privilegios, e integración continua de diez trabajos en GitHub Actions con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones, catorce controles de regresión sobre configuración peligrosa y umbrales de precisión y de aporte del modelo.
+6. **Aseguramiento de Calidad y DevOps:** Suite de 1326 pruebas automatizadas en Pytest (100% aprobadas, 93% de cobertura) y 350 en el cliente con Vitest, contenerización multi-etapa con usuario sin privilegios, e integración continua de diez trabajos en GitHub Actions con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones, catorce controles de regresión sobre configuración peligrosa y umbrales de precisión y de aporte del modelo.
 7. **Auditoría y Endurecimiento de Seguridad:** Autenticación por tokens JWT firmados con `bcrypt`, secretos fuera del árbol del proyecto, limitación de tasa por IP, cabeceras de seguridad en la pasarela y verificación de integridad del artefacto de Machine Learning (Capítulo 11).
 8. **Gobierno de Datos y Validez del Modelo:** Migraciones versionadas con Alembic, columnas temporales con zona horaria explícita, y diseño del bucle de realimentación que convierte los desenlaces comerciales reales en dataset de reentrenamiento sin fuga de información (Capítulo 12).
 9. **Observabilidad del Modelo en Producción:** Aislamiento de los datos del prospecto respecto del prompt del modelo generativo, registro de auditoría que identifica el motor que produjo cada puntuación, monitoreo de deriva de variables mediante el índice PSI y registro versionado de artefactos entrenados (Capítulo 13).

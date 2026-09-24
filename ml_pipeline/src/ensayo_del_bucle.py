@@ -80,8 +80,15 @@ def _sembrar(db, tamano: int, en_curso: int, semilla: int):
     instantánea y no el estado de hoy.
     """
     import pandas as pd
+    from app.core.desenlaces import GANADO, MOTIVOS, PERDIDO, TRAMOS
     from app.core.vector_del_modelo import CLAVE_DE_VERSION, VERSION_DEL_VECTOR
-    from app.models.entities import Lead, LeadStatus, ScoreCategory, ScoreHistory
+    from app.models.entities import (
+        Desenlace,
+        Lead,
+        LeadStatus,
+        ScoreCategory,
+        ScoreHistory,
+    )
     from synthetic_generator import generate_synthetic_leads_dataset
 
     df = generate_synthetic_leads_dataset(num_samples=tamano + en_curso, random_seed=semilla)
@@ -135,19 +142,41 @@ def _sembrar(db, tamano: int, en_curso: int, semilla: int):
             "days_since_last_activity": int(fila["days_since_last_activity"]),
             CLAVE_DE_VERSION: VERSION_DEL_VECTOR,
         }
-        db.add(
-            ScoreHistory(
-                lead_id=lead.id,
-                score=50.0,
-                score_category=ScoreCategory.WARM,
-                model_version="v1.0.0-hibrido+modelo",
-                ml_probability=0.5,
-                heuristic_score=50.0,
-                decay_factor=1.0,
-                feature_snapshot=instantanea,
-                calculated_at=ahora - datetime.timedelta(days=120),
-            )
+        entrada = ScoreHistory(
+            lead_id=lead.id,
+            score=50.0,
+            score_category=ScoreCategory.WARM,
+            model_version="v1.0.0-hibrido+modelo",
+            ml_probability=0.5,
+            heuristic_score=50.0,
+            decay_factor=1.0,
+            feature_snapshot=instantanea,
+            calculated_at=ahora - datetime.timedelta(days=120),
         )
+        db.add(entrada)
+        db.flush()
+
+        # El desenlace registrado (capitulo 30). El ensayo lo siembra porque es de donde el
+        # extractor toma hoy la etiqueta: sin el, este guion seguiria pasando con el camino
+        # nuevo roto, que es justo la clase de silencio que el ensayo existe para romper.
+        # El motivo se reparte de forma determinista por la lista cerrada; no significa
+        # nada —las etiquetas son sinteticas— y por eso no se mide nada sobre el.
+        if cerrado:
+            lista = MOTIVOS[GANADO if convertido else PERDIDO]
+            db.add(
+                Desenlace(
+                    lead_id=lead.id,
+                    resultado=GANADO if convertido else PERDIDO,
+                    motivo=lista[i % len(lista)].clave,
+                    cerrado_el=(ahora - datetime.timedelta(days=5)).date(),
+                    tramo=TRAMOS[i % len(TRAMOS)].clave if convertido else None,
+                    score_al_cierre=90.0 if convertido else 30.0,
+                    categoria_al_cierre=ScoreCategory.HOT if convertido else ScoreCategory.COLD,
+                    score_history_id=entrada.id,
+                    version_del_vector=VERSION_DEL_VECTOR,
+                    registrado_en=ahora,
+                )
+            )
 
         # El estado de HOY sí lleva las señales posteriores, para los que cerraron.
         if cerrado and convertido:
@@ -234,6 +263,29 @@ def main(argv=None) -> int:
             print("FALLO: el extractor trajo el estado de hoy, no la instantanea de entrada.")
             return 1
         print(f"\nLas {len(ganados)} filas ganadas llevan los ceros del momento de entrada.")
+
+        # Capitulo 30: la etiqueta la pone el desenlace REGISTRADO, no el estado. Si el
+        # extractor volviera a deducirla de `lead.status`, estas columnas llegarian vacias
+        # y el dataset seguiria saliendo del tamano correcto: el fallo no daria sintoma.
+        if "motivo" not in df.columns or df["motivo"].isna().any():
+            print("FALLO: hay filas sin motivo; la etiqueta no vino del desenlace registrado.")
+            return 1
+        descuadre = df[
+            ((df["resultado"] == "ganado") & (df["converted"] != 1))
+            | ((df["resultado"] == "perdido") & (df["converted"] != 0))
+        ]
+        if len(descuadre):
+            print(f"FALLO: {len(descuadre)} filas con la etiqueta cambiada respecto a su desenlace.")
+            return 1
+        if manifiesto.get("con_desenlace_registrado") != len(df):
+            print("FALLO: el manifiesto no cuenta como registrados todos los desenlaces sembrados.")
+            return 1
+        # Y el motivo NO puede haberse convertido en una variable del modelo: se conoce al
+        # cerrar, no el dia que hay que decidir a quien llamar.
+        if set(COLUMNAS_MODELO) & {"motivo", "resultado", "tramo", "cerrado_el"}:
+            print("FALLO: el motivo del cierre se colo entre las variables del modelo.")
+            return 1
+        print(f"Los {len(df)} desenlaces llevan su motivo, y ninguno entro como variable.")
 
         destino = args.conservar or directorio
         os.makedirs(destino, exist_ok=True)
