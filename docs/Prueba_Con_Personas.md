@@ -147,6 +147,24 @@ prospecto que llega de LinkedIn no tiene asesor hasta que alguien se lo asigna.
 
 Una hoja **por persona**. Quien conduce escribe; la persona no escribe nada.
 
+> **Rellénela en fichero, no aquí.** La tabla de abajo describe qué se anota; para anotarlo
+> de verdad:
+>
+> ```bash
+> python scripts/hojas_de_observacion.py crear
+> ```
+>
+> Deja una hoja por papel en `docs/hojas_de_observacion/`, con las tareas ya escritas —las
+> saca de este mismo documento— y un hueco por campo. Al terminar la sesión:
+>
+> ```bash
+> python scripts/hojas_de_observacion.py leer
+> ```
+>
+> arma la tabla de vaciado de §3 y dice si el criterio «nadie se atasca» se cumple. Con las
+> hojas en blanco responde «SIN DATOS», que es la respuesta correcta hasta que alguien se
+> siente delante.
+
 **Persona:** ______________________  **Rol:** ____________  **Fecha:** __________
 **Aparato:** teléfono / portátil  **Navegador:** ____________
 
@@ -266,7 +284,11 @@ cumplen personas. Lo que hay hasta ahora es:
   (`frontend/src/EnsayoDelGuion.test.jsx`), incluidas las tareas nuevas de los capítulos 27
   y 28;
 - ocho notas de ensayo, siete de ellas corregidas;
-- cero hojas de observación rellenadas.
+- cuatro hojas listas para rellenar, y **cero rellenadas**.
+
+El veredicto ya no lo da nadie de palabra: `hojas_de_observacion.py leer` lo calcula de las
+hojas y hoy responde «SIN DATOS». Cuando se celebre la sesión, esa misma orden dirá
+«CUMPLIDO» o nombrará los atascos, y esta sección se reescribe con lo que diga.
 
 Lo que un ensayo automático no puede decir, y por lo que la sesión sigue pendiente: si la
 palabra que hay en pantalla significa para la persona lo que significa para quien la

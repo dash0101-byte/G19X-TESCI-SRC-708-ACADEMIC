@@ -170,10 +170,19 @@ python backend/scripts/seed_data.py --solo-usuarios
 # publicación de ejemplo con perfiles ya recibidos por su enlace público, para que haya
 # algo que comparar. Copia la base antes de vaciarla e imprime enlaces y cuentas.
 python scripts/preparar_prueba_con_personas.py --force
+
+# Las hojas para anotar, una por papel, con las tareas ya escritas (las saca del guion).
+python scripts/hojas_de_observacion.py crear
+
+# Al terminar la sesión: arma la tabla de vaciado y dicta el veredicto.
+# Con las hojas en blanco responde «SIN DATOS», que es la respuesta correcta.
+python scripts/hojas_de_observacion.py leer
 ```
 
 El guion por rol y la hoja para anotar dónde se atasca cada persona están en
-[docs/Prueba_Con_Personas.md](docs/Prueba_Con_Personas.md).
+[docs/Prueba_Con_Personas.md](docs/Prueba_Con_Personas.md). El criterio «nadie se atasca»
+no lo afirma nadie a mano: lo calcula `hojas_de_observacion.py leer` a partir de las hojas
+de la sesión, y mientras no haya sesión responde que no hay datos.
 
 #### 4. Observabilidad del Modelo
 ```bash

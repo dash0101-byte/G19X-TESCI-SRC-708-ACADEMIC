@@ -589,6 +589,15 @@ jobs:
       - name: El motor de reglas conserva sus defensas
         run: python scripts/guarda_del_motor_de_reglas.py
 
+      # ----------------------------------------------------------------------
+      # Capitulo 29: quien dicta si el criterio «nadie se atasca» se cumple ya no es una
+      # frase escrita a mano en un reporte, sino este programa leyendo las hojas de la
+      # sesion. Un lector equivocado diria «cumplido» sin que nadie lo notara, asi que
+      # lleva sus propias pruebas: un atasco tumba el veredicto, una duda no, tres papeles
+      # de cuatro no bastan y una plantilla recien creada no cuenta como observacion.
+      - name: El veredicto de la prueba con personas sale de los datos
+        run: python -m pytest scripts/test_hojas_de_observacion.py -q
+
       # La suite levanta su propio SQLite en memoria y declara sus datos por fixtures.
       # No se siembra ninguna base de datos antes: hacerlo acoplaba los tests a un script
       # de demostración y los volvía dependientes del orden de ejecución.

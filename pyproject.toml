@@ -57,4 +57,6 @@ ignore = [
 # El generador sintético usa `random` para datos de entrenamiento, no para criptografía.
 "ml_pipeline/*" = ["S311"]
 "scripts/*" = ["S311", "T201"]
+# Las pruebas que acompañan a un script son pruebas: `assert` es su forma de expresarse.
+"scripts/test_*.py" = ["S101", "S311", "T201"]
 "backend/scripts/*" = ["S311", "T201"]

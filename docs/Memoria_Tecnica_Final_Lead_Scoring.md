@@ -7716,8 +7716,11 @@ La cuarta fase preparó una prueba con cuatro personas, una por papel. Dejó tre
   siembra con `seed_data.py` —sin duplicar su lógica ni sus guardas— y crea la publicación de
   ejemplo con tres perfiles enviados **por la ruta pública de verdad**, no insertados a mano.
   Imprime el enlace, las cuentas y lo necesario para usar un teléfono de verdad.
-* **El guion por papel y la hoja de observación** (`docs/Prueba_Con_Personas.md`, y una
-  versión rellenable con cronómetro por tarea que Claude puede leer de vuelta).
+* **El guion por papel y la hoja de observación** (`docs/Prueba_Con_Personas.md`). *Este
+  punto decía también «y una versión rellenable con cronómetro por tarea que Claude puede
+  leer de vuelta». **Esa versión no existía**: se anunció y no se construyó, y nadie lo
+  notó en cuatro capítulos porque lo que no se usa no falla. Se construyó en el capítulo 29
+  (§25.6), que es cuando se fue a usar.*
 * **El ensayo automático** (`frontend/src/EnsayoDelGuion.test.jsx`): las cuatro listas de
   tareas, en orden, sobre la aplicación entera y contra un servidor simulado con las
   respuestas del backend de verdad. Si una tarea deja de poderse terminar, falla.
@@ -7779,11 +7782,43 @@ pestaña «Publicaciones». La hoja se corrige y la nota queda abierta, porque e
 que la sesión tiene que medir: mover un contador de pestaña porque a uno le parece es cambiar
 una pantalla por una corazonada.
 
+### El instrumento que faltaba
+
+Al ir a usar la hoja apareció que **lo anunciado en esta misma sección no existía**. Había
+una tabla dentro de un documento largo: se lee bien, no se rellena mientras miras a alguien
+—hay que buscar la fila, contar columnas, no perder el sitio— y no se vuelve a leer después
+sin transcribirla a mano. Una hoja que no se puede rellenar en caliente acaba rellenándose
+de memoria al final del día, y lo que se anota de memoria es lo que uno recuerda.
+
+`scripts/hojas_de_observacion.py` lo resuelve con dos órdenes:
+
+* **`crear`** deja una hoja por papel en `docs/hojas_de_observacion/`, con las tareas ya
+  escritas y un hueco por campo. Las tareas **se leen del guion**, no de una copia: el guion
+  acaba de cambiar con los capítulos 27 y 28, y dos listas que tienen que decir lo mismo
+  acaban diciendo cosas distintas sin que nadie se entere. Una hoja ya rellenada no se pisa
+  salvo que se pida a gritos (`--forzar`).
+* **`leer`** recoge las hojas, arma la tabla de vaciado y **dicta el veredicto**.
+
+El tipo de cada nota —atasco, duda o idea— lo escribe quien conduce, no lo adivina el
+programa: un «no» en «¿Sola?» puede ser un atasco o una pista pequeña, y eso solo lo sabe
+quien estaba delante. El programa suma; no interpreta.
+
+Lo que sí decide es el veredicto, y por eso lleva sus propias pruebas
+(`scripts/test_hojas_de_observacion.py`, 14): un atasco lo tumba, una duda no, tres papeles
+de cuatro no bastan —los cuatro se recorren entre todos, y el atasco de uno para a los que
+vienen detrás— y una plantilla recién creada no cuenta como observación. Un lector
+equivocado diría «cumplido» sin que nadie lo notara.
+
 ### El criterio, hoy: **no cumplido**
 
-No por haber fallado, sino por no haberse medido. Lo que hay es un guion al día, cinco
-recorridos automáticos en cada ejecución del CI, ocho notas de ensayo —siete corregidas— y
-**cero hojas de observación rellenadas**. Lo que ningún ensayo puede decir es si la palabra
+No por haber fallado, sino por no haberse medido. Lo dice ahora el propio sistema: con la
+carpeta de hojas en blanco, `hojas_de_observacion.py leer` responde «SIN DATOS» y termina en
+código 2. El criterio dejó de ser algo que alguien afirma en un documento y pasó a salir de
+los datos de la sesión, que es lo que había que arreglar: mientras lo afirmara una persona,
+un «sí» descuidado y un «sí» medido se escribían igual.
+
+Lo que hay es un guion al día, cinco recorridos automáticos en cada ejecución del CI, ocho
+notas de ensayo —siete corregidas—, cuatro hojas listas para rellenar y **cero rellenadas**. Lo que ningún ensayo puede decir es si la palabra
 que hay en pantalla significa para quien la lee lo que significaba para quien la escribió:
 una prueba que busca «Llamar por primera vez» lo encuentra siempre, y un asesor que no sepa
 qué se espera de él al leerlo se queda parado sin que falle nada.
