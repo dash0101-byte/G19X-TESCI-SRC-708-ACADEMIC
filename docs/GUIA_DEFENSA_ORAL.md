@@ -1,22 +1,43 @@
 # Guía de Defensa Oral y Banco de Preguntas Técnicas de Estadía Profesional
 
-**Proyecto:** Sistema Inteligente de Lead Scoring basado en Inteligencia Artificial y Machine Learning  
-**Empresa:** PluriOne S.A. de C.V. (Develop Talent & Technology)  
-**Autor:** Alumno de Estadía Profesional - Ingeniería en Sistemas Computacionales  
-**Fecha de Sustentación:** Septiembre 2026  
+**Proyecto:** Sistema Inteligente de Lead Scoring basado en Inteligencia Artificial y Machine Learning
+**Empresa:** PluriOne S.A. de C.V. (Develop Talent & Technology)
+**Autor:** Alumno de Estadía Profesional - Ingeniería en Sistemas Computacionales
+**Fecha de Sustentación:** Septiembre 2026
+**Estado del proyecto:** congelado el 24-09-2026 · 30 capítulos · 29 reportes
+
+> **Cómo usar esta guía.** La sección 1 es el reloj de los diez minutos y **sigue el guion
+> de la demostración**: lo que se enseña es la columna vertebral de la exposición, no un
+> apartado más. El detalle segundo a segundo de la parte demostrada, con la frase que hay
+> que decir mientras carga cada pantalla, está en
+> [Guion_Cronometrado_de_la_Demo.md](Guion_Cronometrado_de_la_Demo.md); aquí solo aparece el
+> bloque que ocupa.
+>
+> La sección 2 es el banco de preguntas técnicas. La sección 3 es distinta: son **las
+> preguntas incómodas**, las que apuntan a lo que el sistema deliberadamente **no** hace.
+> Están respondidas sin adornos, porque son las únicas que no se pueden improvisar.
 
 ---
 
 ## 1. Guion Cronometrado de Exposición Ejecutiva (10 Minutos)
 
-| Tiempo | Diapositiva / Sección | Puntos Clave a Defender | Recomendación de Comunicación |
+| Tiempo | Bloque | Qué se defiende | Recomendación |
 | :---: | :--- | :--- | :--- |
-| **0:00 - 1:00**<br>*(1 min)* | **1. Portada y Contexto Institucional** | • Presentación personal y agradecimiento a PluriOne S.A. de C.V. (Develop Talent & Technology).<br>• Mención de asesores (Lic. Xochicuahuitl Gleason, Juan Méndez, Edgar Loheffelmman).<br>• Declaración de confidencialidad y datos 100% sintéticos. | Tono formal, seguro y enfocado en el impacto de ingeniería de software. |
-| **1:00 - 2:30**<br>*(1.5 min)* | **2. Diagnóstico del Problema y Objetivos** | • El cuello de botella: Latencia de primer contacto de 36 horas por atención FIFO manual.<br>• Tasa de conversión de partida baja (12%).<br>• La restricción de ingeniería: Solución local robusta a **$0 USD** escalable a **Microsoft Azure**. | Enfatizar la justificación económica y técnica de la estadía. |
-| **2:30 - 4:30**<br>*(2 min)* | **3. Arquitectura del Sistema y Formulación Matemática** | • *Clean Architecture* con Puertos y Adaptadores (Hexagonal).<br>• Ecuación del algoritmo híbrido: $60\%$ ML + $40\%$ Heurístico $\times \gamma(\Delta t)$.<br>• Justificación matemática de la vida media de 14 días ($\gamma(\Delta t) = (0.5)^{\Delta t / 14}$). | Mostrar claridad metodológica y solidez en ciencias de la computación. |
-| **4:30 - 6:30**<br>*(2 min)* | **4. Demostración Técnica y Explicabilidad (XAI)** | • Ejecución del flujo: Ingesta de Webhook $\rightarrow$ Scoring reactivo $\rightarrow$ Asignación comercial de leads `HOT`.<br>• Presentación de la Ficha 360 y diagnóstico en lenguaje natural de IA (XAI).<br>• Visualización analítica tipo Power BI en React.js. | Demostrar dominio del código y de la experiencia de usuario. |
-| **6:30 - 8:00**<br>*(1.5 min)* | **5. Aseguramiento de Calidad, DevOps y Seguridad** | • Pirámide de QA: **428 pruebas** automatizadas en Pytest (100% aprobadas, 91% de cobertura).<br>• Autenticación real con JWT firmado, sesiones con rotación verificable y **autorización sobre el dato**: un asesor solo ve su cartera.<br>• Contenerización Docker multi-etapa con usuario sin privilegios y **diez trabajos** de CI en GitHub Actions. | Transmitir rigor en buenas prácticas de ingeniería de software. |
-| **8:00 - 10:00**<br>*(2 min)* | **6. Impacto Cuantitativo, ROI y Conclusiones** | • Reducción del tiempo de contacto de 36 horas a $<15$ min.<br>• Incremento proyectado de conversión al $32.5\%$ (+170%).<br>• Ahorro de $100\%$ en licencias de desarrollo.<br>• Conclusiones y agradecimiento al sínodo. | Cierre firme, vinculando los logros de ingeniería con el éxito empresarial. |
+| **0:00 – 1:00**<br>*(1 min)* | **Portada y contexto** | • Presentación personal y agradecimiento a PluriOne S.A. de C.V.<br>• Asesores: Lic. Xochicuahuitl Gleason, Juan Méndez, Edgar Loheffelmman.<br>• Confidencialidad, y que **todo lo que se va a ver son datos sintéticos**. | Decir lo de los datos sintéticos **aquí**, no cuando lo pregunten. Cambia cómo se lee todo lo demás. |
+| **1:00 – 2:00**<br>*(1 min)* | **El problema** | • Atención FIFO sin calificar: **36 horas** de latencia de primer contacto, conversión del **12 %**.<br>• La restricción de ingeniería: local, **$0 USD**, con salida a Microsoft Azure sin reescribir la lógica. | Dos cifras y una restricción. No entrar en arquitectura todavía. |
+| **2:00 – 3:00**<br>*(1 min)* | **La arquitectura, en una diapositiva** | • Puertos y Adaptadores: la lógica no sabe si detrás hay Scikit-Learn o Azure ML.<br>• $S_{\text{final}} = 0.60 \times S_{\text{ML}} + 0.40 \times S_{\text{Heurístico}} \times \gamma(\Delta t)$, con $\gamma(\Delta t) = (0.5)^{\Delta t/14}$.<br>• Por qué 60/40 y no 100 % ML: arranque en frío y reglas de negocio deterministas. | Una sola diapositiva. Si el sínodo quiere profundizar, preguntará: están las Preguntas 1, 2 y 3. |
+| **3:00 – 7:30**<br>*(4.5 min)* | **LA DEMOSTRACIÓN**<br>*Del post a la red social hasta el dato de entrenamiento* | **1.** Marketing crea la publicación → enlace de 128 bits que da el servidor.<br>**2.** Un post, varias redes: **los dos enlaces son distintos**, y por eso después hay atribución.<br>**3.** El interesado envía sus datos desde el teléfono: **ni un campo de texto libre**.<br>**4.** La ficha nace puntuada, atribuida y sin asesor.<br>**5.** El líder la ve en el contador «sin asesor» y la reparte.<br>**6.** El asesor **no tiene que buscarla**: está en «Hoy», con el motivo escrito, y la ficha 360 responde de dónde salió, qué pidió y cuándo aceptó el aviso.<br>**7.** El líder compara publicaciones y ve **por qué red** llegó cada persona.<br>**8.** El trato **se cierra diciendo por qué**: lista cerrada, fecha y tramo. El score **no** se recalcula.<br>**9.** El panel de desenlaces: por motivo, por red, y **qué score tenían al cerrarse**. Más el contador del reentrenamiento. | **Nunca pulsar en silencio.** Cada paso tiene su frase en el guion cronometrado.<br>**El paso 0 es obligatorio:** hacer un envío de prueba antes de empezar, o la primera puntuación tarda **más de 3 s** en lugar de 286 ms mientras todos miran. |
+| **7:30 – 8:45**<br>*(1.25 min)* | **Calidad, seguridad y operación** | • **1326 pruebas** de backend (93 % de cobertura) y **350** de cliente, todas en verde.<br>• **10 trabajos** de integración continua, y **cuatro guardas de propiedades** que fallan cuando el sistema pierde una defensa aunque ninguna prueba se rompa.<br>• Autenticación real con JWT y revocación inmediata; **autorización sobre el dato**: un asesor solo ve su cartera, y un prospecto ajeno responde 404.<br>• Imágenes fijadas por huella, copias con **prueba de restauración**, derechos del titular comprobados tabla por tabla. | Si hay que recortar la exposición, se recorta **aquí**, no en la demostración: esto se puede contestar en preguntas y la demostración, no. |
+| **8:45 – 10:00**<br>*(1.25 min)* | **Lo que se negó a hacer, y cierre** | • **No se reentrenó el modelo** con los canales nuevos: no hay desenlaces reales, y el capítulo 30 construyó justamente el mecanismo para tenerlos.<br>• **No se inventó el peso de los motivos** ni se proyectaron ingresos.<br>• **No se publica un modelo** cuyo intervalo de confianza no alcance el umbral, aunque su estimación puntual lo supere.<br>• El trabajo futuro está en un solo documento, con **de qué depende cada punto**.<br>• Agradecimiento al sínodo. | Este bloque es el que distingue un proyecto terminado de uno abandonado. Decirlo con seguridad, no como disculpa. |
+
+**Dónde está cada cosa si el sínodo la pide:**
+
+| Pregunta previsible | Documento |
+| :--- | :--- |
+| «Enséñeme el detalle de la demostración» | `docs/Guion_Cronometrado_de_la_Demo.md` |
+| «¿Qué queda por hacer?» | `docs/Congelacion_y_Trabajo_Futuro.md` |
+| «¿Dónde está todo esto documentado?» | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` (29 reportes compilados) |
+| «¿Se ha probado con usuarios?» | `docs/Prueba_Con_Personas.md` — y la respuesta honesta es **todavía no**: Pregunta 20 |
 
 ---
 
@@ -154,13 +175,13 @@
 
 ---
 
-### Pregunta 11: El ROC-AUC de 0.9524 parece muy alto. ¿Es creíble?
+### Pregunta 11: El ROC-AUC de 0.9469 parece muy alto. ¿Es creíble?
 **Respuesta Modelo:**
 > *"No como métrica de negocio, y es importante que lo diga yo antes de que lo pregunte el
 > sínodo.
 >
 > El modelo se entrena con datos **sintéticos** cuya etiqueta `converted` se genera con una
-> fórmula conocida a partir de las mismas variables, más ruido gaussiano. El 0.9524 mide,
+> fórmula conocida a partir de las mismas variables, más ruido gaussiano. El 0.9469 mide,
 > por tanto, la capacidad del modelo de reaprender la regla del generador. Eso verifica que
 > el pipeline está íntegro —que las variables llegan, que el preprocesado no las corrompe,
 > que la calibración funciona—, no el rendimiento esperable en producción.
@@ -171,18 +192,25 @@
 > | | ROC-AUC |
 > | :--- | ---: |
 > | Azar | 0.5000 |
-> | Ordenar por una sola columna (`days_since_last_activity`) | 0.9136 |
-> | Heurístico ICP, sin modelo | 0.9110 |
-> | Modelo entrenado | 0.9524 |
+> | Ordenar por una sola columna (`days_since_last_activity`) | 0.9053 |
+> | Heurístico ICP, sin modelo | 0.8950 |
+> | **Modelo entrenado** | **0.9469**  *(IC 95 % [0.9275, 0.9635])* |
 >
 > El número que importa no es el 0.95: es que **ordenar la lista por una columna ya da
-> 0.91**. El aporte real de todo el pipeline de Machine Learning es de **+0.041** sobre lo
-> que el sistema haría sin modelo. Esa es la cifra que defiendo, y por eso el gate de
-> calidad mide también el aporte y no solo el ROC-AUC: el umbral de 0.82 no distinguía
-> nada, porque la regla trivial ya lo superaba.
+> 0.91**. El aporte real de todo el pipeline de Machine Learning es de **+0.0519** sobre lo
+> que el sistema haría sin modelo, **con un intervalo de confianza del 95 % de [0.0296,
+> 0.0761]** calculado con bootstrap pareado —las mismas filas para el modelo y para la
+> regla en cada réplica—. Esa es la cifra que defiendo, y por eso el gate de calidad mide
+> también el aporte y no solo el ROC-AUC: el umbral de 0.82 no distinguía nada, porque la
+> regla trivial ya lo superaba.
+>
+> Y desde el Capítulo 24 publicar exige que el **límite inferior** de los dos intervalos
+> alcance su umbral, no la estimación puntual. Con ese criterio, una cohorte sintética de
+> 1000 prospectos con un aporte de +0.028 e intervalo [-0.002, +0.059] **no se publica**,
+> aunque su ROC-AUC tenga el límite inferior en 0.91.
 >
 > Sostener el 0.94 como logro comercial habría sido más lucido y no habría resistido esta
-> misma pregunta. El Capítulo 12 lo desarrolla."*
+> misma pregunta. Los Capítulos 12 y 24 lo desarrollan."*
 
 ---
 
@@ -346,3 +374,269 @@
 > silencio. El mapa se lee entero antes de escribir nada, y el ensayo se montó justamente
 > sobre ese choque, porque una base de prueba sin colisiones habría dado el mismo resultado
 > con el código roto."*
+
+---
+
+## 3. Las Ocho Preguntas Incómodas (17 – 24)
+
+Las de la sección 2 preguntan **cómo está hecho** algo. Estas preguntan **por qué falta**
+algo, y son las que de verdad se pueden contestar mal.
+
+La regla para las ocho es la misma: **decir primero que sí falta**, después por qué, y
+después qué hay construido alrededor del hueco. Una respuesta que empieza justificándose
+suena a excusa aunque sea verdad; una que empieza reconociendo el hueco tiene permiso para
+explicarlo.
+
+Y una advertencia general: **ninguna de las ocho se arregla el día antes**. Si el sínodo
+encuentra una que no está en esta lista, la respuesta honrada es «no lo había pensado, y
+tiene razón», no una improvisación.
+
+---
+
+### Pregunta 17: El proyecto se llama «del post de LinkedIn al prospecto puntuado». ¿Por qué el sistema no lee LinkedIn?
+**Respuesta Modelo:**
+> *"Porque leer LinkedIn exige una cuenta que el proyecto no tiene, y fingir que la tiene
+> habría sido peor que no tenerla.
+>
+> Concretamente hacen falta dos productos de LinkedIn, **Lead Sync** y **Sign In with
+> LinkedIn**, y los dos pasan por una aplicación aprobada en LinkedIn Developer. Una
+> estadía sin presupuesto y sin la empresa en el proceso de aprobación no los consigue.
+>
+> **Lo que sí hay** es el conector `linkedin-lead-gen`, con su firma HMAC y su ingesta
+> idempotente, aceptando una forma **simplificada** de la carga. Y digo simplificada
+> deliberadamente: no es el esquema `leadFormResponses` real. Está anotado como hueco
+> abierto desde el capítulo 21 y sigue abierto. Conectar LinkedIn de verdad es contrastar
+> su esquema completo y su firma contra lo que el conector acepta, o poner delante un
+> traductor.
+>
+> **Y aquí está lo importante:** que no se lea LinkedIn no deja la historia coja, porque el
+> camino que la demostración enseña no pasa por LinkedIn. Pasa por una **página de interés
+> propia**, con su enlace de 128 bits, que es real, es completa y es la que de verdad
+> atribuye la ficha a su publicación. LinkedIn es por donde se reparte el enlace, no por
+> donde entran los datos.
+>
+> Dicho de otro modo: el sistema no depende de LinkedIn para funcionar. Depende de él para
+> **una integración más**, que está diseñada y no conectada."*
+
+---
+
+### Pregunta 18: Añadió seis canales de difusión y un canal LinkedIn orgánico. ¿Por qué el modelo no los conoce?
+**Respuesta Modelo:**
+> *"Porque darles peso hoy sería inventármelo, y esa es exactamente la clase de decisión que
+> este proyecto se ha pasado treinta capítulos evitando.
+>
+> El artefacto en producción conoce **«LinkedIn Ads»**, que es publicidad pagada. Un post
+> orgánico no es publicidad pagada: se comporta distinto, llega a otra gente y no tiene por
+> qué convertir igual. Los seis canales del capítulo 27 —WhatsApp, Facebook, X, Instagram,
+> correo, enlace directo— tampoco existían cuando se entrenó.
+>
+> **Qué hace el sistema con ellos:** los trata como **canal desconocido**, es decir,
+> **neutro**. No los penaliza ni los premia. Y quiero subrayar que neutro **no es cero**: un
+> cero sería afirmar que ese canal no aporta nada, que es una afirmación sobre el mundo que
+> nadie ha medido. Desconocido es la respuesta honrada.
+>
+> **Por qué no los añadí de todas formas.** Podría haber asignado un peso a ojo, y el
+> sistema habría seguido funcionando y nadie lo habría notado. El problema es que seis meses
+> después, cuando alguien leyera que WhatsApp vale 12 puntos, no habría forma de distinguir
+> un número medido de un número inventado. Una constante escrita a ojo es indistinguible de
+> una medición para quien lee el resultado.
+>
+> **Qué haría falta para cerrarlo.** Desenlaces reales de cada canal. Y el capítulo 30 se
+> dedicó precisamente a construir el mecanismo que los recoge: cerrar un trato ahora exige
+> decir cómo acabó y por qué, el panel cuenta cuántos casos hay y el sistema **avisa cuando
+> se alcanza el mínimo**. No reentrena: avisa. Quien decide es una persona.
+>
+> Es lo que queda para la fase siguiente, y está escrito como tal en
+> `docs/Congelacion_y_Trabajo_Futuro.md`, §4.1."*
+
+---
+
+### Pregunta 19: Usted genera datos sintéticos para entrenar el modelo. ¿Por qué no generó también desenlaces sintéticos y reentrenó?
+**Respuesta Modelo:**
+> *"Ésta es la pregunta que más me alegra que me hagan, porque la respuesta es la línea que
+> separa un proyecto de ingeniería de una demostración bonita.
+>
+> **Sí generé datos sintéticos, y digo exactamente para qué sirven.** El conjunto de
+> entrenamiento son 3000 filas con semilla 42, y su etiqueta `converted` se calcula con una
+> fórmula conocida a partir de las propias variables más ruido gaussiano. Por eso el
+> ROC-AUC de 0.9469 **no mide el negocio**: mide que el modelo es capaz de reaprender la
+> regla del generador. Verifica que el pipeline está íntegro, y para eso es legítimo.
+>
+> **Reentrenar con desenlaces sintéticos sería otra cosa completamente distinta.** El
+> entrenamiento sintético responde «¿funciona la maquinaria?». Un reentrenamiento con
+> desenlaces inventados respondería «¿qué prospectos convierten en PluriOne?», y la
+> respuesta saldría de una fórmula que escribí yo. Sería un modelo que aprende mis
+> suposiciones sobre el negocio y me las devuelve con cuatro decimales y aspecto de
+> evidencia. El asesor que lo usara estaría siguiendo mi opinión creyendo que sigue un dato.
+>
+> **Y ahora sí existe el camino para llenarlo de verdad.** El capítulo 30 hizo que cerrar un
+> trato exija decir cómo acabó, por qué motivo —de una lista cerrada, sin texto libre— y qué
+> día. El panel cuenta cuántos casos utilizables hay contra los mínimos: **200 ejemplos, 50
+> de cada clase**.
+>
+> **Lo que sí hice para que el camino no se pudra mientras tanto**, que creo que es la parte
+> defendible: el pipeline recorre el bucle entero en **cada ejecución del CI**, sobre una
+> base desechable, con desenlaces sembrados —`ensayo_del_bucle.py`—. Comprueba que el
+> extractor funciona, que la etiqueta se lee del desenlace y no del estado, que el motivo
+> viaja como contexto y **no** como variable del modelo, y que ningún prospecto aún en el
+> embudo se cuenta como perdido. Todo eso está probado. Lo único que falta son las filas, y
+> las filas no se inventan.
+>
+> Añado una cosa más, porque demuestra que la línea se ha respetado hasta el final: los
+> cierres anteriores al capítulo 30 **no tienen motivo**, y la migración no se lo inventó.
+> El manifiesto del dataset los cuenta aparte. Es la merma que cuesta no inventar, y está
+> medida."*
+
+---
+
+### Pregunta 20: ¿Se ha probado el sistema con usuarios reales?
+**Respuesta Modelo:**
+> *"No. Y es la entrada que más tiempo lleva abierta en este proyecto, así que prefiero
+> decirla yo.
+>
+> **Lo que sí está hecho:** el guion por papel con las tareas de los cuatro roles escritas
+> **sin decir dónde pulsar** —si la tarea dice dónde pulsar, la prueba ya no mide nada—, las
+> cuatro hojas de observación, el preparador que deja la base sembrada y un ensayo
+> automático que recorre los nueve pasos y los cronometra. Está todo en
+> `docs/Prueba_Con_Personas.md`.
+>
+> **Lo que ninguna prueba automática puede decir**, y por lo que la sesión sigue pendiente:
+> si marketing, al pedirle el texto de WhatsApp, contesta que los dos enlaces son el mismo
+> —si lo dice, el informe por red es inexplicable por muy exactos que sean sus números—; o
+> si el asesor, al entrar, **lee** su bandeja o se va a «Prospectos» por costumbre.
+>
+> **Ocho atascos salieron de ensayos propios y siete están corregidos**, así que el guion no
+> está sin probar; está probado sin nadie delante, que es distinto y hay que decirlo así.
+>
+> Y hay un error del que aprendí algo: el capítulo 28 dio por cerradas dos notas de
+> usabilidad y solo una lo estaba. Al líder le di ver los prospectos calientes que se
+> enfrían, que es **otra pregunta distinta** de cuántos esperan a que los repartan. Lo dejé
+> escrito en el reporte, porque el error no fue de código: fue dar por resuelto un síntoma
+> parecido al anotado, que es la forma más fácil de cerrar una observación de usabilidad sin
+> haberla mirado."*
+
+---
+
+### Pregunta 21: ¿Por qué un sistema que maneja datos personales no tiene segundo factor de autenticación?
+**Respuesta Modelo:**
+> *"Porque era opcional en el alcance y decidí **no hacerlo a medias**, que en autenticación
+> es peor que no hacerlo.
+>
+> Un TOTP para la cuenta de administración exige: alta con código de verificación, códigos
+> de recuperación, un paso más en el inicio de sesión del cliente y —la parte que nadie
+> recuerda— una respuesta para quien pierde el teléfono **siendo el único administrador**,
+> que es justamente la cuenta que no puede quedarse fuera. Añadir la verificación sin todo
+> eso produce una cuenta de administración que se bloquea sola, y un sistema al que nadie
+> puede entrar no es un sistema más seguro.
+>
+> **Lo que sí se hizo en su lugar**, y creo que cubre más superficie real: contraseñas con
+> `bcrypt` contrastadas contra una lista de filtradas; revocación **inmediata** por
+> `token_version`, de modo que cerrar sesión cierra todos los dispositivos a la vez y un
+> cambio de rol expulsa la sesión abierta; rotación verificable del token de refresco con
+> detección de reutilización y revocación por familia; y autorización sobre el dato, que
+> limita lo que un token robado alcanza.
+>
+> Un segundo factor protege del robo de contraseña. La revocación inmediata protege del robo
+> de sesión, que es el caso que este sistema tenía abierto y ya no tiene."*
+
+---
+
+### Pregunta 22: El sistema dice al asesor qué hacer hoy, pero no le avisa por ningún sitio. ¿No es eso inútil?
+**Respuesta Modelo:**
+> *"Es una limitación real, y la razón de que quede fuera no es solo que falte una cuenta de
+> correo.
+>
+> Son tres cosas. Una, sí: hace falta una cuenta y una dirección verificada. Dos: hace falta
+> una política de qué ocurre cuando un aviso rebota, porque un canal de salida que falla en
+> silencio es peor que no tenerlo. Y tres, la que de verdad pesa: **un aviso que sale del
+> sistema saca de la aplicación el nombre de una persona que aceptó un aviso de privacidad
+> para otra cosa**. Eso no es un problema de infraestructura, es una decisión de quien
+> responde del tratamiento de datos, y no me corresponde tomarla.
+>
+> **Lo que hay mientras tanto** no es nada: son seis reglas que producen tareas con su
+> motivo escrito y su plazo, una bandeja «Hoy» que las ordena, y una campana de avisos para
+> el líder. Todo dentro del panel, que es donde el asesor ya entra cada mañana.
+>
+> Y añado la limitación de verdad, que no es el canal: **nadie ha vivido una semana con la
+> bandeja**. Si las seis reglas producen la cantidad adecuada de trabajo —ni tan poco que
+> sobre, ni tanto que se ignore— solo se sabe usándola varios días seguidos. Por eso los
+> plazos se dejaron configurables y no fijos en el código."*
+
+---
+
+### Pregunta 23: Si el modelo no está validado con datos reales y nada está en producción, ¿qué ha demostrado exactamente esta estadía?
+**Respuesta Modelo:**
+> *"Que el camino completo existe, funciona de punta a punta y **se niega a inventar** en
+> cada punto donde habría sido más cómodo hacerlo. Lo diría con tres pruebas concretas.
+>
+> **Primera: el camino es completo y verificable.** De un post en una red social a un dato
+> de entrenamiento, pasando por la página de captación, la puntuación, la atribución por
+> red, la bandeja del asesor y el cierre con su motivo. No es un diagrama: se recorre entero
+> en menos de dos segundos de servidor y el ensayo lo comprueba paso por paso.
+>
+> **Segunda: está defendido contra sí mismo.** 1326 pruebas de backend con 93 % de
+> cobertura, 350 de cliente, diez trabajos de integración continua. Y algo que considero más
+> valioso que la cobertura: **cuatro guardas que comprueban propiedades, no casos**. Un
+> campo de texto libre nuevo en el formulario de cierre no rompería ninguna prueba
+> existente, porque nadie lo enviaría; la guarda falla en cuanto ese campo existe. Y las
+> guardas no se dan por buenas porque pasen: se validan **reintroduciendo defectos a
+> propósito** y comprobando que los cazan. La del motor de reglas se midió con 31 defectos
+> inyectados; la del desenlace, con 18, detectados los 18, y con la huella de cada archivo
+> verificada al restaurarlo.
+>
+> **Tercera, y es la que defiendo de verdad: el sistema sabe lo que no sabe.** Un canal que
+> no conoce lo trata como desconocido, no como cero. Unos ingresos que faltan viajan como
+> ausentes, no como 100 000. Un prospecto todavía en el embudo se excluye del entrenamiento
+> en lugar de contarse como perdido. Un modelo cuyo intervalo de confianza no alcanza el
+> umbral no se publica, aunque su estimación puntual lo supere. Y un cierre sin motivo no se
+> puede registrar.
+>
+> Un sistema que hubiera rellenado todos esos huecos habría dado una demostración más
+> vistosa y habría empezado a mentir el primer día que alguien se fiara de él. Lo que he
+> demostrado es que sé dónde está esa línea y que la respeté incluso cuando cruzarla no lo
+> habría notado nadie."*
+
+---
+
+### Pregunta 24: ¿Qué pasa con este sistema cuando usted se vaya?
+**Respuesta Modelo:**
+> *"Está pensado para eso, y lo puedo enseñar en cuatro puntos.
+>
+> **El proyecto está congelado, con criterio escrito.** Desde el 24 de septiembre solo entran
+> correcciones de fallos, y `docs/Congelacion_y_Trabajo_Futuro.md` define qué cuenta como
+> fallo y qué cuenta como funcionalidad, con tres casos frontera ya resueltos de antemano
+> para que nadie tenga que discutirlos.
+>
+> **El trabajo futuro está en un solo documento y agrupado por de qué depende**, que es lo
+> único que decide si algo se puede hacer: cuentas externas, datos reales, decisiones que no
+> son técnicas, o deuda de ingeniería que se puede atacar hoy. Y lleva una sección de **lo
+> que no se va a hacer, con el motivo**, para que nadie vuelva a plantear cada año las
+> mismas discusiones ya zanjadas.
+>
+> **Todo lo que se decidió está explicado, no solo hecho.** Veintinueve reportes, y cada uno
+> dice por qué se tomó cada decisión y qué se descartó. La memoria técnica los compila con
+> índice y anclas, y hay una prueba que falla si un reporte existe y no entró en la memoria:
+> los capítulos 22 a 24 se pegaron a mano una vez, salieron sin ancla y la siguiente
+> regeneración los habría borrado sin avisar.
+>
+> **Y el sistema se defiende solo mientras nadie lo mire.** Las guardas del CI no comprueban
+> que las funciones sigan dando el resultado correcto: comprueban que el sistema no ha
+> perdido una defensa. Si alguien dentro de un año añade un campo de texto libre al cierre,
+> o hace que cerrar un prospecto recalcule su puntuación, el pipeline se pone en rojo y el
+> mensaje dice exactamente qué se perdió y por qué importaba. Eso es lo que queda cuando yo
+> ya no estoy para explicarlo."*
+
+---
+
+## 4. Tres cosas que no hay que hacer en la defensa
+
+1. **No prometer un reentrenamiento trimestral.** Entre puntuar un prospecto y conocer su
+   desenlace pasan semanas o meses; el calendario no lo permite, y decirlo es peor que la
+   limitación misma.
+2. **No presentar el ROC-AUC de 0.9469 como logro comercial.** Es la trampa más fácil de
+   esta defensa: la cifra es cierta y la conclusión que sugiere, no. Decir siempre qué mide
+   **antes** de decir cuánto vale.
+3. **No dar por probado con usuarios lo que está probado con pruebas.** «Tiene pruebas» y
+   «se ha probado con alguien» son cosas distintas, y el proyecto lleva cinco capítulos
+   distinguiéndolas por escrito. Confundirlas en voz alta delante del sínodo desharía ese
+   trabajo en una frase.

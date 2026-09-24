@@ -133,26 +133,62 @@ def build_table_of_contents() -> str:
 
 
 def build_executive_summary() -> str:
+    """
+    El resumen ejecutivo: la historia, lo construido y las cifras finales.
+
+    Se reescribió entero en el capítulo 31, cuando el proyecto se congeló. Hasta entonces
+    enumeraba los capítulos 1 a 15 y se había quedado ahí: las cifras del modelo eran las
+    del vector 1 —retirado en el capítulo 24— y las de la suite, las de la fase 8. Un
+    resumen que envejece calladamente es peor que no tenerlo, porque el sínodo lo lee
+    primero y los capítulos, después.
+
+    Lleva las cifras a mano y no calculadas al compilar a propósito: la memoria tiene que
+    salir igual dentro de un año, con el repositorio congelado, sin depender de que haya
+    un entorno capaz de correr la suite.
+    """
     return """# RESUMEN EJECUTIVO INSTITUCIONAL
 
-La presente **Memoria Técnica** documenta el ciclo de vida completo de concepción, desarrollo, validación y despliegue del **Sistema Inteligente de Lead Scoring** desarrollado para **PluriOne S.A. de C.V. (Develop Talent & Technology)**.
+La presente **Memoria Técnica** documenta el ciclo de vida completo de concepción, desarrollo, validación y congelación del **Sistema Inteligente de Lead Scoring** desarrollado para **PluriOne S.A. de C.V. (Develop Talent & Technology)**.
 
-### El Desafío Empresarial:
-PluriOne experimentaba una alta dispersión del tiempo productivo de sus ejecutivos comerciales, quienes atendían solicitudes de prospección bajo un esquema secuencial no calificado (FIFO), con tiempos de respuesta promedio de 36 horas y una tasa de conversión MQL a SQL del 12%.
+### El desafío empresarial
 
-### La Solución de Ingeniería Implementada:
-Diseñé e implementé una plataforma integral basada en **Clean Architecture (Puertos y Adaptadores)** que opera bajo una premisa estricta de **Desarrollo Local a Costo Cero ($0 USD)** con capacidad de integración transparente hacia servicios en la nube de **Microsoft Azure**:
-1. **Pipeline de Machine Learning Supervisado:** Clasificador Gradient Boosting con calibración isotónica de probabilidades ($ROC\text{-}AUC = 0.9524$ sobre datos sintéticos). La cifra verifica la integridad del pipeline, no el rendimiento comercial: el Capítulo 12 la compara contra el heurístico sin modelo (0.9110) y contra una regla trivial (0.9136) para mostrar el aporte real, que es de +0.041.
-2. **Algoritmo Híbrido con Decaimiento Temporal Continuo:** Ecuación ponderada $S_{\\text{final}} = 0.60 \\times S_{\\text{ML}} + 0.40 \\times S_{\\text{Heurístico}} \\times \\gamma(\\Delta t)$, donde $\\gamma(\\Delta t) = (0.5)^{\\Delta t / 14}$ modela la pérdida exponencial de interés del prospecto en el tiempo.
-3. **Core Backend RESTful en FastAPI:** 13 endpoints para ingesta multicanal de webhooks CRM con firma HMAC, deduplicación de contactos, bitácoras inmutables, auto-asignación comercial de leads `HOT` y recálculo masivo en segundo plano.
-4. **Explicabilidad con IA (XAI):** Módulo de generación de resúmenes ejecutivos, fortalezas clave y tácticas comerciales accionables para cada prospecto.
-5. **Frontend React.js tipo Power BI:** Tablero analítico en tiempo real, matriz de prospectos interactiva, ficha 360 y simulador interactivo de scoring.
-6. **Aseguramiento de Calidad y DevOps:** Suite de 1326 pruebas automatizadas en Pytest (100% aprobadas, 93% de cobertura) y 350 en el cliente con Vitest, contenerización multi-etapa con usuario sin privilegios, e integración continua de diez trabajos en GitHub Actions con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones, catorce controles de regresión sobre configuración peligrosa y umbrales de precisión y de aporte del modelo.
-7. **Auditoría y Endurecimiento de Seguridad:** Autenticación por tokens JWT firmados con `bcrypt`, secretos fuera del árbol del proyecto, limitación de tasa por IP, cabeceras de seguridad en la pasarela y verificación de integridad del artefacto de Machine Learning (Capítulo 11).
-8. **Gobierno de Datos y Validez del Modelo:** Migraciones versionadas con Alembic, columnas temporales con zona horaria explícita, y diseño del bucle de realimentación que convierte los desenlaces comerciales reales en dataset de reentrenamiento sin fuga de información (Capítulo 12).
-9. **Observabilidad del Modelo en Producción:** Aislamiento de los datos del prospecto respecto del prompt del modelo generativo, registro de auditoría que identifica el motor que produjo cada puntuación, monitoreo de deriva de variables mediante el índice PSI y registro versionado de artefactos entrenados (Capítulo 13).
-10. **Trazabilidad de la Sesión y de la Operación:** Rotación verificable de tokens de refresco con detección de reutilización y revocación por familia, ingesta idempotente que distingue un reenvío hostil de un reintento legítimo, y bitácora de auditoría de solo lectura que registra actor, acción, entidad, dirección y resultado —incluidos los intentos denegados— consultable únicamente por el rol administrador (Capítulo 14).
-11. **Autorización sobre el Dato y Gestión de Identidades:** Identidad unificada —la tabla de asesores se fusiona dentro de la de usuarios, con migración de datos—, autorización por objeto aplicada en el repositorio y no en cada endpoint (un asesor comercial ve y edita únicamente su propia cartera, y un prospecto ajeno responde 404 indistinguible de uno inexistente), endpoints de alta, baja lógica, cambio de rol y restablecimiento de contraseña restringidos al rol administrador, y política de contraseñas con cambio autogestionado que revoca todas las sesiones (Capítulo 15).
+PluriOne atendía sus solicitudes de prospección bajo un esquema secuencial no calificado (FIFO), con un tiempo de primer contacto de **36 horas** y una conversión de MQL a SQL del **12%**. El ejecutivo comercial no tenía forma de saber a quién llamar primero, ni de dónde había salido la persona que tenía delante.
+
+### La historia que el sistema resuelve, de principio a fin
+
+El proyecto no es un tablero de métricas: es un camino completo que empieza en una publicación y termina en un dato de entrenamiento. Son los ocho pasos que recorre la demostración, cada uno construido, probado y verificable:
+
+1. **Marketing crea la publicación** y el servidor le devuelve un enlace propio de 128 bits que nadie puede elegir, adivinar ni reutilizar.
+2. **El texto sale listo para pegar**, ya recortado a lo que cabe en cada red, y **cada red lleva su propio enlace etiquetado**: el que se reparte por WhatsApp no es el mismo que el de LinkedIn, y por eso después se puede saber por dónde llegó cada persona.
+3. **La persona abre el enlace** —normalmente desde el teléfono— y deja sus datos en un formulario de unos treinta segundos, **sin un solo campo de texto libre**. Solo se le pide lo que el modelo sabe leer.
+4. **El sistema crea la ficha ya puntuada**, atribuida a su publicación y a su red, y sin asesor.
+5. **El líder la ve en el contador de prospectos sin asesor** y se la asigna desde la propia ficha.
+6. **El asesor no tiene que buscarla**: aparece en su bandeja «Hoy» con el motivo escrito, y la ficha 360 le dice de qué publicación salió, qué pidió, cuándo aceptó el aviso de privacidad y dónde está su perfil. Cierra la tarea cuando termina.
+7. **El trato se cierra diciendo por qué**: pasar a «Ganado» o «Perdido» no es una opción del selector de etapa. Pide un motivo **de una lista cerrada**, el día del cierre y, si se ganó, el tramo del acuerdo. La puntuación **no se recalcula**, porque el número que importa es el que había cuando se decidió.
+8. **Ese cierre es un dato de entrenamiento.** Queda en la instantánea del bucle de realimentación junto con la versión del vector de variables, y el panel de desenlaces dice cuánto falta para poder reentrenar: 200 casos utilizables, 50 de cada clase.
+
+El paso 8 es el que cierra el círculo: el sistema no solo decide a quién llamar, sino que **recoge la prueba de si acertó**, sin que nadie tenga que transcribir nada.
+
+### La solución de ingeniería implementada
+
+Una plataforma integral bajo **Clean Architecture (Puertos y Adaptadores)**, operando con **desarrollo local a costo cero ($0 USD)** y capacidad de integración transparente hacia **Microsoft Azure**:
+
+1. **Pipeline de Machine Learning supervisado.** Clasificador Gradient Boosting con calibración isotónica de probabilidades. El artefacto en producción da **ROC-AUC = 0.9469** con **IC 95 % [0.9275, 0.9635]** sobre datos sintéticos. La cifra verifica la integridad del pipeline, **no el rendimiento comercial**: lo que se exige para publicar es el **aporte sobre el heurístico**, hoy de **+0.0519 con IC 95 % [0.0296, 0.0761]** por bootstrap pareado.
+2. **Algoritmo híbrido con decaimiento temporal continuo.** $S_{\\text{final}} = 0.60 \\times S_{\\text{ML}} + 0.40 \\times S_{\\text{Heurístico}} \\times \\gamma(\\Delta t)$, con $\\gamma(\\Delta t) = (0.5)^{\\Delta t / 14}$.
+3. **Un modelo que no inventa lo que no sabe.** El vector de variables va versionado: los ingresos ausentes se imputan con la mediana y una columna que marca que faltaban, las llamadas conectadas y las que nadie contestó son variables distintas, y WhatsApp y LinkedIn dejaron de ser una sola. Un canal que el modelo no conoce se trata como **desconocido, es decir, neutro**, y no como un cero.
+4. **Core backend RESTful en FastAPI** con ingesta multicanal de webhooks firmados con HMAC, deduplicación idempotente que distingue un reenvío hostil de un reintento legítimo, recálculo masivo en segundo plano con un turno a la vez, y una página pública de captación que es la única ruta sin sesión que escribe en la base —con límite por IP y por publicación, campo trampa y la misma respuesta exista o no el correo—.
+5. **Explicabilidad (XAI) con aislamiento del prompt.** Los datos que escribe el prospecto nunca entran como instrucciones al modelo generativo, y la bitácora identifica qué motor produjo cada puntuación.
+6. **Frontend React.js** con tablero analítico, matriz de prospectos, ficha 360, simulador de scoring, informe por publicación y por red, bandeja «Hoy» y panel de desenlaces.
+7. **Autenticación sin excepciones y autorización sobre el dato.** JWT firmado con PyJWT y contraseñas con `bcrypt`; rotación verificable de tokens de refresco con detección de reutilización y revocación por familia; revocación inmediata por `token_version`; contraseñas contrastadas contra una lista de filtradas; y un asesor que ve y edita **únicamente su propia cartera** —un prospecto ajeno responde 404, indistinguible de uno inexistente—, aplicado en el repositorio y no endpoint por endpoint.
+8. **Gobierno del dato y derechos del titular.** Migraciones versionadas con Alembic y reversión probada, columnas temporales con zona horaria explícita, plazos de conservación para cada tabla, exportación y supresión del titular comprobadas tabla por tabla, y bitácora de auditoría de solo lectura que registra actor, acción, entidad y resultado —incluidos los intentos denegados— sin datos personales.
+9. **Bucle de realimentación sin fuga de información.** Cada puntuación guarda una **instantánea del vector tal como estaba al puntuar**, y el dataset se etiqueta sobre esa instantánea: un prospecto ganado lleva propuesta enviada y reunión agendada, y entrenar sobre su estado actual enseñaría que enviar propuestas causa cierres. Los prospectos aún en el embudo se **excluyen**, no se cuentan como perdidos.
+10. **Observabilidad del modelo.** Monitor de deriva por índice PSI con perfil de referencia atado por huella a su artefacto, registro versionado de modelos con procedencia de los datos, y verificación de la huella SHA-256 del artefacto antes de deserializarlo —si no coincide, el artefacto **no se carga** y el sistema sigue con el heurístico en lugar de ejecutar un `pickle` sustituido—.
+11. **Fiabilidad operativa.** Registro estructurado con `request_id`, métricas de Prometheus, copias de seguridad con **prueba de restauración**, imágenes de terceros fijadas por huella con renovación explícita, y un lanzador único para toda la pila.
+12. **Aseguramiento de calidad.** **1326 pruebas** de backend en Pytest con **93 % de cobertura** y **350 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **34 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa.
+
+### Lo que este trabajo se negó a hacer
+
+Es parte del resultado y no una omisión. El sistema **no reentrena el modelo** con los canales nuevos, porque todavía no existen desenlaces reales con los que hacerlo; **no asigna peso a los motivos** de pérdida; **no proyecta ingresos** a partir del tramo del acuerdo; y **no publica un modelo** cuyo intervalo de confianza no alcance el umbral, aunque su estimación puntual lo supere. El trabajo futuro que estas decisiones dejan abierto está recogido, con lo que depende cada punto, en `docs/Congelacion_y_Trabajo_Futuro.md`.
 
 ---
 
