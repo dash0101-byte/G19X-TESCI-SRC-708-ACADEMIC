@@ -67,6 +67,10 @@ TABLAS_DEL_PROSPECTO: Dict[str, str] = {
     # también es tratamiento de sus datos: entra en la exportación y se va en la supresión.
     "tareas": "tareas",
     "avisos": "avisos",
+    # Capítulo 30. Cómo acabó el trato con esta persona, por qué motivo y de qué tamaño es
+    # un dato suyo, y además el único del sistema que se convierte en etiqueta de
+    # entrenamiento: tiene que salir en la respuesta de acceso e irse en la supresión.
+    "desenlaces": "desenlace",
 }
 
 # Lo que el sistema NO puede alcanzar desde la base, dicho en la propia exportación. Una
@@ -75,9 +79,9 @@ FUERA_DE_LA_BASE = [
     "Copias de seguridad: los volcados diarios de PostgreSQL conservan los datos hasta "
     "RETENCION_DIAS días (14 por defecto) después de una supresión; no se editan.",
     "Conjuntos de entrenamiento: si el prospecto llegó a un desenlace (ganado, perdido o "
-    "descartado), su instantánea de entrada pudo exportarse a un CSV fuera de la base "
-    "(ml_pipeline/data/leads_reales*) para reentrenar el modelo. El modelo resultante no "
-    "guarda filas individuales.",
+    "descartado), su instantánea de entrada —y, desde el capítulo 30, el motivo y la fecha "
+    "de su cierre— pudo exportarse a un CSV fuera de la base (ml_pipeline/data/leads_reales*) "
+    "para reentrenar el modelo. El modelo resultante no guarda filas individuales.",
     "Sistemas de origen: los datos pudieron llegar desde un CRM, el formulario web, LinkedIn "
     "Lead Gen, Calendly o WhatsApp. Suprimirlos aquí no los suprime allí, y una nueva entrega "
     "de cualquiera de ellos volvería a crearlos.",
@@ -264,6 +268,14 @@ def exportar_prospecto(db: Session, lead: Lead, *, ahora: Optional[datetime.date
         "mensajes": (
             "Del contenido de los mensajes no se guarda nada: solo el tipo, la dirección, la fecha "
             "y el identificador que les dio el sistema de origen."
+        ),
+        # El desenlace no tiene plazo propio, y eso es una decisión, no un olvido: es un
+        # hecho sobre el prospecto —como su score—, no trabajo nuestro que se acumule, y
+        # purgarlo por antiguo destruiría los ejemplos de entrenamiento que el sistema
+        # tardó un ciclo comercial entero en reunir. Vive y muere con la ficha.
+        "desenlace": (
+            "Mientras el prospecto exista. El motivo del cierre es una clave de una lista "
+            "cerrada, nunca un texto: de la conversación que llevó al cierre no se guarda nada."
         ),
         "resto_de_datos": "Mientras el prospecto exista en el sistema o hasta que se solicite su supresión.",
     }

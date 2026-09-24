@@ -308,6 +308,8 @@ class Lead(Base):
     score_histories = relationship("ScoreHistory", back_populates="lead", cascade="all, delete-orphan", order_by="desc(ScoreHistory.calculated_at)")
     score_monthly = relationship("ScoreHistoryMonthly", back_populates="lead", cascade="all, delete-orphan", order_by="ScoreHistoryMonthly.month")
     crm_logs = relationship("CRMIntegrationLog", back_populates="lead", cascade="all, delete-orphan")
+    # Cómo acabó, si acabó (capítulo 30). `uselist=False`: un prospecto se cierra una vez.
+    desenlace = relationship("Desenlace", back_populates="lead", uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Lead(id={self.id}, email='{self.email}', score={self.current_score}, category='{self.score_category}')>"
@@ -627,6 +629,97 @@ class ScoreHistoryMonthly(Base):
 
     def __repr__(self) -> str:
         return f"<ScoreHistoryMonthly(lead_id={self.lead_id}, month={self.month}, n={self.scores_count})>"
+
+
+class Desenlace(Base):
+    """
+    Cómo acabó un prospecto, por qué, cuándo y —si se ganó— de qué tamaño (capítulo 30).
+
+    Por qué una tabla y no cuatro columnas en `leads`
+    -------------------------------------------------
+    `leads` describe a una persona y su situación **actual**: su teléfono, su empresa, su
+    score, la etapa en la que está. El desenlace es un hecho fechado que ocurrió una vez, y
+    que después no cambia porque la ficha cambie. Separarlo tiene tres consecuencias
+    prácticas: la mitad de las fichas —las que siguen en curso— no arrastran cuatro
+    columnas vacías; la exportación y la supresión del titular lo recogen por el mismo
+    camino que todo lo demás que cuelga de `leads`; y el extractor del dataset puede
+    preguntar «¿cuáles están cerrados con motivo?» con un `JOIN` en lugar de recorrer la
+    cartera entera mirando un estado.
+
+    Una fila por prospecto
+    ----------------------
+    `lead_id` es único. Un prospecto se cierra una vez; corregir un cierre —se marcó ganado
+    y era perdido— reescribe esta fila en lugar de añadir otra. La alternativa, guardar el
+    historial de cierres, sonaba más completa y habría obligado a decidir cuál de las filas
+    es «el» desenlace cada vez que el panel o el extractor preguntan, que es justo la clase
+    de ambigüedad que produce dos números distintos para la misma pregunta.
+
+    Lo que se copia y por qué no se recalcula
+    -----------------------------------------
+    `score_al_cierre` y `categoria_al_cierre` se guardan aquí en lugar de leerse de la
+    ficha. El score se mueve con cada actividad y con cada recálculo masivo: preguntado
+    seis meses después diría lo que el prospecto vale hoy —cuando ya está cerrado y ninguna
+    regla lo toca—, no lo que valía el día en que se decidió. La pregunta del panel es «¿el
+    score acertaba?», y solo se puede responder con el valor que había al cerrarse.
+
+    `version_del_vector` se copia de la instantánea de entrada, no de la constante de hoy.
+    Es lo que permite que una instantánea de la versión 1 siga diciendo que lo es cuando la
+    vigente sea la 3, y que el extractor la descarte en lugar de traducirla inventando.
+    """
+    __tablename__ = "desenlaces"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id", ondelete="CASCADE"), nullable=False)
+
+    # `ganado` o `perdido` (`app/core/desenlaces.py`). Texto y no un tipo enumerado de la
+    # base, por lo mismo que la procedencia de las actividades y las reglas de la agenda:
+    # tocar la lista no debe exigir un `ALTER TYPE`.
+    resultado = Column(String(20), nullable=False, index=True)
+    # La clave del motivo, de la lista cerrada de ese resultado. Nunca texto libre.
+    motivo = Column(String(40), nullable=False, index=True)
+
+    # El día en que se cerró, que no es el día en que alguien lo registró. Un trato que se
+    # firmó el viernes y se anotó el lunes tiene que contar en su semana: el panel agrupa
+    # por esta fecha, y `registrado_en` queda aparte para poder distinguir las dos cosas.
+    # `Date` y no `DateTime`: un cierre no tiene hora, y fingir una obligaría a elegir un
+    # huso para una fecha que la persona escribió en un calendario.
+    cerrado_el = Column(Date, nullable=False, index=True)
+
+    # Tramo del acuerdo. Solo en los ganados: un trato perdido no tiene tamaño, y pedirlo
+    # invitaría a anotar «lo que habríamos facturado», que es una previsión de ingresos
+    # inventada y queda explícitamente fuera del capítulo.
+    tramo = Column(String(30), nullable=True)
+
+    score_al_cierre = Column(Float, nullable=False)
+    categoria_al_cierre = Column(SQLEnum(ScoreCategory), nullable=False, index=True)
+
+    # La instantánea de entrada que este desenlace etiqueta, y con qué versión del vector
+    # se tomó. Nulas cuando el prospecto se cerró sin ninguna instantánea aprovechable
+    # —los anteriores al capítulo 18—: el desenlace se registra igual, y el contador del
+    # reentrenamiento lo cuenta como cerrado pero no como utilizable, que es la verdad.
+    score_history_id = Column(
+        Integer, ForeignKey("score_histories.id", ondelete="SET NULL"), nullable=True
+    )
+    version_del_vector = Column(Integer, nullable=True)
+
+    registrado_en = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    # Quién lo registró. Nulo si esa cuenta desaparece: el hecho sigue siendo cierto.
+    registrado_por_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    lead = relationship("Lead", back_populates="desenlace")
+    instantanea = relationship("ScoreHistory")
+
+    __table_args__ = (
+        Index("uq_desenlaces_lead", "lead_id", unique=True),
+        # La consulta del panel: los de un periodo, agrupados por resultado y motivo.
+        Index("idx_desenlaces_cerrado_resultado", "cerrado_el", "resultado"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Desenlace(lead_id={self.lead_id}, resultado='{self.resultado}', "
+            f"motivo='{self.motivo}', cerrado_el={self.cerrado_el})>"
+        )
 
 
 class CRMIntegrationLog(Base):

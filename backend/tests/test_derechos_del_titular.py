@@ -20,6 +20,7 @@ from app.models.entities import (
     AuditLog,
     Aviso,
     CRMIntegrationLog,
+    Desenlace,
     Lead,
     LeadActivity,
     ScoreCategory,
@@ -143,6 +144,19 @@ def titular(db_session):
                 clave="h24",
                 texto="Un prospecto HOT lleva 24 h sin contacto.",
                 datos={"horas": 24},
+            ),
+            # Capitulo 30: como acabo el trato con ella. Es un dato suyo —y el unico que el
+            # sistema convierte en etiqueta de entrenamiento—, asi que tiene que salir en la
+            # exportacion e irse con la supresion.
+            Desenlace(
+                lead_id=lead.id,
+                resultado="perdido",
+                motivo="precio",
+                cerrado_el=_ahora().date(),
+                score_al_cierre=61.0,
+                categoria_al_cierre=ScoreCategory.WARM,
+                registrado_en=_ahora(),
+                registrado_por_id=asesor.id,
             ),
         ]
     )
