@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     auth,
     campaigns,
     crm,
+    desenlaces,
     integraciones,
     interes,
     leads,
@@ -41,3 +42,7 @@ api_router.include_router(interes.router, prefix="/interes", tags=["Página de i
 # Lo que hay que hacer hoy (capítulo 28). Solo lee y cierra: quien decide qué hay que hacer
 # es el motor de reglas, en la pasada diaria, sin nadie delante.
 api_router.include_router(agenda.router, prefix="/agenda", tags=["Agenda del día"])
+# Lo que dicen los cierres (capítulo 30). Solo lee: las opciones del formulario y el panel
+# del líder. Cerrar un prospecto vive en `/leads/{id}/desenlace`, con el resto de lo que se
+# le hace a un prospecto, porque necesita el alcance de cartera.
+api_router.include_router(desenlaces.router, prefix="/desenlaces", tags=["Desenlaces"])

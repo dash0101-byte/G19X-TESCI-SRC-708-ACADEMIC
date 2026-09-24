@@ -40,6 +40,14 @@ bandeja. `cerrar_lo_cumplido` la llama `registrar_evento`, que es el único siti
 se escribe una actividad, y la pasada diaria la vuelve a llamar como barrido. La misma
 función en los dos caminos: dos criterios de «esto ya está» acabarían discrepando.
 
+Lo cerrado sale de aquí (capítulo 30)
+-------------------------------------
+Todas las reglas preguntan además si del prospecto queda algo que hacer. Un trato ganado,
+uno perdido y un prospecto descartado no reciben tareas ni avisos, y las que tuvieran
+abiertas se descartan en el momento del cierre. El filtro está en la **consulta** de cada
+regla y no solo en la bandeja: filtrar al pintar habría dejado el motor creando cada
+madrugada tareas invisibles sobre tratos cerrados, ocupando el índice único para siempre.
+
 Idempotencia
 ------------
 Ninguna regla comprueba si ya hizo su trabajo: lo intenta y deja que el índice único de la
@@ -66,6 +74,8 @@ from sqlalchemy.orm import Session
 from app.core.agenda import (
     ABIERTA,
     CUMPLIDA,
+    DESCARTADA,
+    DESENLACES_SUFICIENTES,
     HOT_SIN_CONTACTO,
     HOT_SIN_CONTACTO_LIDER,
     ORDEN_DE_LAS_REGLAS,
@@ -85,18 +95,23 @@ from app.core.audit import (
     registrar_evento as anotar_en_bitacora,
 )
 from app.core.config import settings
+from app.core.desenlaces import ETAPAS_SIN_SEGUIMIENTO, MINIMO_DE_CASOS, MINIMO_POR_CLASE
 from app.core.security import UserRole
+from app.core.vector_del_modelo import VERSION_DEL_VECTOR
 from app.models.entities import (
     ActivityType,
     Aviso,
     CallOutcome,
+    Desenlace,
     Lead,
     LeadActivity,
+    LeadStatus,
     ScoreCategory,
     Tarea,
     User,
     utc_now,
 )
+from app.services.desenlaces import progreso_del_reentrenamiento
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +258,27 @@ def _lideres(db: Session) -> List[int]:
     ]
 
 
+# Las etapas en las que el motor deja de proponer trabajo, ya como miembros del tipo
+# enumerado: la columna es un `Enum` y comparar contra cadenas sueltas funcionaría en
+# SQLite y no en PostgreSQL.
+_ETAPAS_SIN_SEGUIMIENTO = [LeadStatus(etapa) for etapa in ETAPAS_SIN_SEGUIMIENTO]
+
+
+def en_seguimiento():
+    """
+    Condición: de este prospecto todavía hay algo que hacer (capítulo 30).
+
+    Va en **todas** las reglas y no en la bandeja, que es donde se vería antes. Filtrar
+    solo al pintar habría dejado el motor creando cada madrugada tareas invisibles sobre
+    tratos cerrados: no molestan a nadie, ocupan el índice único para siempre y, el día
+    que alguien reabriera un prospecto, reaparecerían todas con la fecha equivocada.
+
+    Es la misma decisión que el capítulo 28 tomó con las asignaciones: la regla se
+    comprueba donde hay que pasar obligatoriamente, y aquí eso es la consulta.
+    """
+    return Lead.status.notin_(_ETAPAS_SIN_SEGUIMIENTO)
+
+
 def _sin_contacto(db: Session):
     """Condición: este prospecto no tiene ninguna actividad de contacto nuestra."""
     existe = (
@@ -297,6 +333,7 @@ def regla_primer_contacto(ctx: Contexto) -> ResultadoDeRegla:
         .filter(
             Lead.assigned_rep_id.isnot(None),
             Lead.created_at >= desde,
+            en_seguimiento(),
             _sin_contacto(ctx.db),
         )
         .all()
@@ -334,6 +371,7 @@ def regla_volver_a_llamar(ctx: Contexto) -> ResultadoDeRegla:
         .filter(
             LeadActivity.activity_type == ActivityType.PHONE_CALL,
             Lead.assigned_rep_id.isnot(None),
+            en_seguimiento(),
         )
         .order_by(LeadActivity.lead_id, LeadActivity.occurred_at.desc(), LeadActivity.id.desc())
         .all()
@@ -382,6 +420,7 @@ def regla_recordatorio_de_reunion(ctx: Contexto) -> ResultadoDeRegla:
         .filter(
             LeadActivity.activity_type == ActivityType.MEETING_SCHEDULED,
             Lead.assigned_rep_id.isnot(None),
+            en_seguimiento(),
         )
         .all()
     )
@@ -428,6 +467,7 @@ def hot_desatendidos(ctx: Contexto, horas: int) -> List[Lead]:
         .filter(
             Lead.score_category == ScoreCategory.HOT,
             Lead.created_at <= corte,
+            en_seguimiento(),
             _sin_contacto(ctx.db),
         )
         .all()
@@ -514,7 +554,9 @@ def regla_prospecto_dormido(ctx: Contexto) -> ResultadoDeRegla:
 
     dormidos = (
         ctx.db.query(Lead)
-        .filter(Lead.dormido_desde.is_(None), Lead.last_activity_at < corte)
+        .filter(
+            Lead.dormido_desde.is_(None), Lead.last_activity_at < corte, en_seguimiento()
+        )
         .all()
     )
     for lead in dormidos:
@@ -536,6 +578,81 @@ def regla_prospecto_dormido(ctx: Contexto) -> ResultadoDeRegla:
     return resultado
 
 
+def regla_desenlaces_suficientes(ctx: Contexto) -> ResultadoDeRegla:
+    """
+    Ya hay cierres registrados de sobra para plantear un reentrenamiento (capítulo 30).
+
+    Es la única regla que no habla de un prospecto: habla del conjunto. Avisa **una vez** y
+    no cada mañana, y eso lo consigue la clave, que son los mínimos exigidos y no la cuenta
+    del día: con la cuenta, cada cierre nuevo dispararía otro aviso a partir del doscientos.
+    Si algún día se suben los mínimos, la clave cambia y el aviso vuelve a llegar, que es lo
+    correcto: el umbral que se alcanzó es otro.
+
+    El aviso cuelga del **cierre que inclinó la balanza**: el que hizo número
+    `MINIMO_DE_CASOS` entre los utilizables, por orden de registro. Un aviso necesita un
+    prospecto del que hablar —es la forma de la tabla desde el capítulo 28— y colgarlo del
+    *último* cerrado habría sido un error sutil: el último cambia con cada cierre nuevo, el
+    índice único incluye al prospecto, y la pasada de mañana habría escrito otro aviso
+    idéntico sobre otra persona. El que hizo el número doscientos, en cambio, es siempre el
+    mismo.
+
+    Queda un caso raro y asumido: si esa persona ejerce su derecho de supresión, el aviso se
+    va con ella, el puesto lo ocupa el siguiente y la pasada vuelve a avisar. Un aviso
+    repetido cada varios meses es un precio menor que una tabla de avisos con filas que no
+    cuelgan de nadie.
+
+    No reentrena. No genera el CSV, no toca el artefacto y no escribe en el registro de
+    modelos: dice que se puede, y quien decide es una persona.
+    """
+    resultado = ResultadoDeRegla(DESENLACES_SUFICIENTES)
+    if not ctx.lideres:
+        return resultado
+
+    progreso = progreso_del_reentrenamiento(ctx.db)
+    if not progreso.alcanzado:
+        return resultado
+
+    el_que_inclino = (
+        ctx.db.query(Desenlace)
+        .filter(
+            Desenlace.score_history_id.isnot(None),
+            Desenlace.version_del_vector == VERSION_DEL_VECTOR,
+        )
+        .order_by(Desenlace.registrado_en.asc(), Desenlace.id.asc())
+        .offset(MINIMO_DE_CASOS - 1)
+        .first()
+    )
+    if el_que_inclino is None:
+        return resultado
+    lead = ctx.db.get(Lead, el_que_inclino.lead_id)
+    if lead is None:
+        return resultado
+
+    clave = f"{MINIMO_DE_CASOS}-{MINIMO_POR_CLASE}"
+    for lider_id in ctx.lideres:
+        if _aviso(
+            ctx,
+            lead=lead,
+            usuario_id=lider_id,
+            regla=DESENLACES_SUFICIENTES,
+            clave=clave,
+            texto=(
+                f"Ya hay {progreso.utilizables} desenlaces utilizables "
+                f"({progreso.ganados_utilizables} ganados y {progreso.perdidos_utilizables} "
+                f"perdidos): se puede plantear el reentrenamiento. No se ha reentrenado nada."
+            ),
+            datos={
+                "utilizables": progreso.utilizables,
+                "ganados": progreso.ganados_utilizables,
+                "perdidos": progreso.perdidos_utilizables,
+                "minimo_de_casos": progreso.minimo_de_casos,
+                "minimo_por_clase": progreso.minimo_por_clase,
+            },
+        ):
+            resultado.avisos += 1
+    return resultado
+
+
 REGLA_POR_CLAVE: Dict[str, Callable[[Contexto], ResultadoDeRegla]] = {
     PRIMER_CONTACTO: regla_primer_contacto,
     VOLVER_A_LLAMAR: regla_volver_a_llamar,
@@ -543,6 +660,7 @@ REGLA_POR_CLAVE: Dict[str, Callable[[Contexto], ResultadoDeRegla]] = {
     HOT_SIN_CONTACTO: regla_hot_sin_contacto,
     HOT_SIN_CONTACTO_LIDER: regla_hot_sin_contacto_lider,
     PROSPECTO_DORMIDO: regla_prospecto_dormido,
+    DESENLACES_SUFICIENTES: regla_desenlaces_suficientes,
 }
 
 
@@ -667,14 +785,52 @@ def _cerrar_recordatorios_pasados(db: Session, lead: Lead, ahora: datetime.datet
     return cerradas
 
 
+def descartar_por_desenlace(
+    db: Session, lead: Lead, *, ahora: Optional[datetime.datetime] = None
+) -> int:
+    """
+    Cierra como **descartadas** las tareas abiertas de un prospecto que acaba de cerrarse.
+
+    No es `hecha` —nadie la hizo— ni `cumplida` —no ocurrió lo que la tarea esperaba—. El
+    trato terminó y el trabajo dejó de tener sentido, que es una tercera cosa y merece su
+    propio estado: juntarla con «hecha» convertiría la primera métrica de cumplimiento que
+    alguien calcule en un número inflado por los tratos que se cerraron solos.
+
+    Lo llama el servicio que registra el desenlace, dentro de su transacción. La bandeja
+    filtra además por etapa, así que un prospecto cerrado por cualquier otro camino —una
+    migración, un arreglo a mano en la base— tampoco aparece; las dos defensas existen
+    porque la barata (filtrar al leer) no limpia y la que limpia no cubre lo que no pasó
+    por aquí.
+    """
+    ahora = ahora or utc_now()
+    abiertas = (
+        db.query(Tarea).filter(Tarea.lead_id == lead.id, Tarea.estado == ABIERTA).all()
+    )
+    for tarea in abiertas:
+        tarea.estado = DESCARTADA
+        tarea.cerrada_en = ahora
+        # `cerrada_por_id` nulo: no la cerró una persona, la cerró el desenlace.
+    return len(abiertas)
+
+
 def regla_cerrar_lo_cumplido(ctx: Contexto) -> ResultadoDeRegla:
-    """El barrido: repasa los prospectos con alguna tarea abierta y cierra lo que ya está."""
+    """
+    El barrido: repasa los prospectos con alguna tarea abierta y cierra lo que ya está.
+
+    Desde el capítulo 30 barre también lo que quedó abierto sobre prospectos ya cerrados:
+    los que se cerraron antes de que existiera el desenlace, y cualquiera que llegue a esa
+    etapa por un camino que no pase por el servicio de cierre.
+    """
     resultado = ResultadoDeRegla("cerrar_lo_cumplido")
     ids = [fila.lead_id for fila in ctx.db.query(Tarea.lead_id).filter(Tarea.estado == ABIERTA).distinct()]
     for lead_id in ids:
         lead = ctx.db.get(Lead, lead_id)
-        if lead is not None:
-            resultado.cerradas += cerrar_lo_cumplido(ctx.db, lead, None, ahora=ctx.ahora)
+        if lead is None:
+            continue
+        if lead.status in _ETAPAS_SIN_SEGUIMIENTO:
+            resultado.cerradas += descartar_por_desenlace(ctx.db, lead, ahora=ctx.ahora)
+            continue
+        resultado.cerradas += cerrar_lo_cumplido(ctx.db, lead, None, ahora=ctx.ahora)
     return resultado
 
 

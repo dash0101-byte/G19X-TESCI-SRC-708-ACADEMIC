@@ -19,6 +19,16 @@ Marcar hecha es otra cosa
 -------------------------
 Verla y decir «ya la hice» no son el mismo permiso. Lo segundo es una afirmación sobre el
 trabajo de una persona concreta, así que solo la cierra su dueño, aunque el líder la vea.
+
+Lo cerrado no sale aquí (capítulo 30)
+--------------------------------------
+La bandeja y la campana preguntan además si del prospecto queda algo que hacer, con la
+**misma** condición que usan las reglas (`motor_de_reglas.en_seguimiento`). Es una segunda
+defensa y no la principal: al cerrar un prospecto sus tareas abiertas se descartan en el
+acto, y este filtro cubre lo que se cerró antes de que existiera el desenlace o por algún
+camino que no pasara por él. El contador de avisos sin leer lleva el mismo filtro que la
+lista; que el número dijera tres y la campana enseñara uno es el defecto que ya costó un
+capítulo corregir en el contador de prospectos sin asesor.
 """
 import datetime
 from typing import Dict, List, Optional, Sequence
@@ -39,7 +49,12 @@ from app.schemas.agenda import (
     ProspectoDeLaAgenda,
     TareaDeLaAgenda,
 )
-from app.services.motor_de_reglas import Contexto, aware, hot_desatendidos
+from app.services.motor_de_reglas import (
+    Contexto,
+    aware,
+    en_seguimiento,
+    hot_desatendidos,
+)
 
 # Cuántos avisos devuelve la campana. No es una paginación: es el reconocimiento de que
 # nadie lee el aviso número cuarenta. Los que no caben siguen contando en `sin_leer`.
@@ -131,7 +146,7 @@ def bandeja_de_hoy(
     abiertas = (
         db.query(Tarea)
         .join(Lead, Lead.id == Tarea.lead_id)
-        .filter(Tarea.asesor_id == de_quien, Tarea.estado == ABIERTA)
+        .filter(Tarea.asesor_id == de_quien, Tarea.estado == ABIERTA, en_seguimiento())
         .order_by(Lead.current_score.desc(), Tarea.vence_el.asc(), Tarea.id.asc())
         .all()
     )
@@ -191,14 +206,18 @@ def campana(
     consulta = (
         db.query(Aviso)
         .join(Lead, Lead.id == Aviso.lead_id)
-        .filter(Aviso.usuario_id == alcance.usuario_id)
+        .filter(Aviso.usuario_id == alcance.usuario_id, en_seguimiento())
     )
     if solo_sin_leer:
         consulta = consulta.filter(Aviso.leido_en.is_(None))
 
+    # El contador se cuenta con el MISMO filtro que la lista. Que el numerito dijera tres
+    # y la campana enseñara uno es exactamente el defecto que el capítulo 29 corrigió en el
+    # contador de prospectos sin asesor, y repetirlo aquí habría sido reincidir.
     sin_leer = (
         db.query(Aviso)
-        .filter(Aviso.usuario_id == alcance.usuario_id, Aviso.leido_en.is_(None))
+        .join(Lead, Lead.id == Aviso.lead_id)
+        .filter(Aviso.usuario_id == alcance.usuario_id, Aviso.leido_en.is_(None), en_seguimiento())
         .count()
     )
     # Los que no se han leído primero, y dentro de cada grupo los más nuevos: la campana se

@@ -16,8 +16,10 @@ import pytest
 from app.core.agenda import (
     ABIERTA,
     CUMPLIDA,
+    DESCARTADA,
     ESTADOS_CERRADOS,
     ESTADOS_DE_TAREA,
+    ETIQUETAS_DE_ESTADO,
     HECHA,
     ORDEN_DE_LAS_REGLAS,
     REGLAS,
@@ -84,8 +86,14 @@ def test_cada_regla_se_describe_a_si_misma():
 
 
 def test_los_estados_cerrados_son_los_que_no_estan_abiertos():
-    assert set(ESTADOS_DE_TAREA) == {ABIERTA, HECHA, CUMPLIDA}
+    # `descartada` entro en el capitulo 30: la tarea no se hizo y no se resolvio sola, el
+    # prospecto se cerro y dejo de tener sentido. Es un tercer estado y no un alias de
+    # `hecha`, porque juntarlos inflaria la primera metrica de cumplimiento que alguien
+    # calcule con los tratos que se cerraron solos.
+    assert set(ESTADOS_DE_TAREA) == {ABIERTA, HECHA, CUMPLIDA, DESCARTADA}
     assert set(ESTADOS_CERRADOS) == set(ESTADOS_DE_TAREA) - {ABIERTA}
+    # Todos los cerrados tienen etiqueta: un estado sin ella se pintaria como un hueco.
+    assert set(ETIQUETAS_DE_ESTADO) == set(ESTADOS_DE_TAREA)
 
 
 # ==============================================================================

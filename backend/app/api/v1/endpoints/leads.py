@@ -3,12 +3,14 @@ from typing import Optional
 
 from app.core.audit import (
     ACCION_ACCESO_FUERA_DE_ALCANCE,
+    ACCION_DESENLACE_REGISTRAR,
     ACCION_LEAD_ACTIVIDAD,
     ACCION_LEAD_ACTUALIZAR,
     ACCION_LEAD_CREAR,
     ACCION_LEAD_ELIMINAR,
     ACCION_LEAD_EXPORTAR,
     ACCION_RECALCULO_MASIVO,
+    ENTIDAD_DESENLACE,
     ENTIDAD_LEAD,
     ENTIDAD_TRABAJO,
     AsientoDeAuditoria,
@@ -17,11 +19,13 @@ from app.core.audit import (
 )
 from app.core.autorizacion import AlcanceDeCartera, FueraDeAlcance, alcance_actual
 from app.core.database import get_db
+from app.core.desenlaces import ETAPAS_CERRADAS
 from app.core.proxy import ip_del_cliente
 from app.core.security import CurrentUser, UserRole, get_current_user, require_roles
 from app.models.entities import LeadStatus, ScoreCategory, ScoringJob, utc_now
 from app.repositories.lead_repository import LeadEmailAlreadyExists, LeadRepository
 from app.schemas.activity import ActividadRegistradaResponse, ActivityCreate
+from app.schemas.desenlaces import CierreDelProspecto, DesenlaceRegistrado
 from app.schemas.job import RecalculationJobRequest, RecalculationJobStatus
 from app.schemas.lead import (
     LeadCreate,
@@ -32,6 +36,7 @@ from app.schemas.lead import (
     LeadUpdate,
 )
 from app.schemas.score import ScoreResult
+from app.services import desenlaces as servicio_de_desenlaces
 from app.services import informe_de_publicaciones, registro_de_actividad
 from app.services.derechos_del_titular import (
     exportar_prospecto,
@@ -242,6 +247,9 @@ def get_lead_by_id(
     response_data = LeadDetailResponse.model_validate(lead)
     response_data.latest_explanation = latest_explanation
     response_data.llego_por = informe_de_publicaciones.llego_por(db, lead)
+    # `desenlace` NO se asigna aquí: el esquema lo toma de la relación del prospecto al
+    # validarlo, porque se llaman igual. Una asignación explícita más habría sido un sitio
+    # más del que acordarse el día que aparezca un tercer endpoint que devuelva fichas.
     return response_data
 
 
@@ -266,7 +274,23 @@ async def update_lead(
 
     Lo que sigue reservado a quien dirige la cartera es **reasignar**: cambiar el dueño de
     un prospecto es repartir trabajo, no atenderlo.
+
+    Y lo que ya no se puede hacer por aquí es **cerrar**. Pasar a «Ganado» o «Perdido»
+    exige un motivo, una fecha y —si se ganó— el tramo del acuerdo, y eso lo pide
+    `POST /leads/{id}/desenlace`. Dejar la etapa en este formulario habría dejado un camino
+    por el que se cierran prospectos sin decir nada, que es exactamente el hueco que el
+    capítulo 30 existe para tapar: cada cierre es una etiqueta de entrenamiento, y una
+    etiqueta sin motivo no se puede interpretar después.
     """
+    if lead_in.status is not None and lead_in.status.value in ETAPAS_CERRADAS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Un prospecto no se cierra editando su etapa: hace falta el motivo del "
+                "desenlace, la fecha de cierre y, si se ganó, el tramo del acuerdo. "
+                f"Use POST /api/v1/leads/{lead_id}/desenlace."
+            ),
+        )
     auditoria.anotar(entidad_id=lead_id)
     repo = LeadRepository(db, alcance)
     lead = repo.get_by_id(lead_id, include_relations=True)
@@ -317,6 +341,66 @@ async def update_lead(
     response_data.llego_por = informe_de_publicaciones.llego_por(db, fresh_lead)
     return response_data
 
+
+
+@router.post("/{lead_id}/desenlace", response_model=DesenlaceRegistrado)
+def registrar_desenlace(
+    request: Request,
+    lead_id: int,
+    cierre: CierreDelProspecto,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+    alcance: AlcanceDeCartera = Depends(alcance_actual),
+    auditoria: AsientoDeAuditoria = Depends(auditar(ACCION_DESENLACE_REGISTRAR, ENTIDAD_DESENLACE)),
+):
+    """
+    Cierra el prospecto diciendo cómo acabó y por qué (capítulo 30).
+
+    El permiso es el mismo que editar la ficha: **quien atiende un prospecto lo cierra**.
+    Reservarlo al líder habría convertido el cierre en un trámite que se pide por chat y se
+    hace el viernes de todos a la vez, y los motivos de un cierre los sabe quien estuvo en
+    la conversación, no quien firma la hoja.
+
+    Deja asiento con actor, y eso sí es distinto de lo que cierra el sistema solo: este es
+    el único punto de la aplicación que produce una etiqueta de entrenamiento, y el día que
+    una métrica del modelo sorprenda, la primera pregunta será de dónde salieron las
+    etiquetas. Se anota el motivo —una clave de una lista cerrada— y nunca el nombre ni la
+    empresa de nadie.
+
+    Es idempotente en el sentido que importa: cerrar dos veces deja un solo desenlace, el
+    último. Corregir un cierre equivocado es reescribirlo, y quién lo corrigió queda aquí.
+    """
+    auditoria.anotar(entidad_id=lead_id)
+    repo = LeadRepository(db, alcance)
+    lead = repo.get_by_id(lead_id)
+    if not lead:
+        _anotar_tanteo(request, db, repo, current_user, lead_id)
+        raise _no_encontrado(lead_id)
+
+    try:
+        registrado = servicio_de_desenlaces.registrar_cierre(
+            db, lead, cierre, usuario_id=current_user.user_id
+        )
+    except servicio_de_desenlaces.CierreInvalido as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    auditoria.anotar(
+        prospecto_id=lead_id,
+        resultado_del_cierre=registrado.resultado,
+        motivo=registrado.motivo,
+        cerrado_el=registrado.cerrado_el.isoformat(),
+        tramo=registrado.tramo,
+        # Lo que hace falta para rastrear una etiqueta hasta su ejemplo, y nada más.
+        version_del_vector=registrado.version_del_vector,
+        utilizable_para_reentrenar=registrado.utilizable_para_reentrenar,
+        tareas_descartadas=registrado.tareas_descartadas,
+    )
+    logger.info(
+        "Prospecto %s cerrado como %s por %s.", lead_id, registrado.resultado, current_user.email
+    )
+    return registrado
 
 
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)

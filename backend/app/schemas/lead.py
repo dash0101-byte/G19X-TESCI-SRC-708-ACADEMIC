@@ -7,6 +7,7 @@ from app.core.redes import es_de_publicacion
 from app.core.telefono import TelefonoInvalido, normalizar_telefono
 from app.models.entities import ActivityType, LeadStatus, QualificationStatus, ScoreCategory
 from app.schemas.activity import ActivityResponse
+from app.schemas.desenlaces import DesenlaceDeLaFicha
 from app.schemas.publicaciones import LlegoPor
 from app.schemas.score import ScoreHistoryResponse
 
@@ -135,6 +136,10 @@ class LeadDetailResponse(LeadResponse):
     # De qué publicación llegó esta persona. `None` cuando no llegó de ninguna: la ficha no
     # pinta la tarjeta en vez de enseñarla vacía, que sugeriría un dato perdido.
     llego_por: Optional[LlegoPor] = None
+    # Cómo acabó, si acabó (capítulo 30). `None` mientras siga en curso, y también en los
+    # que se cerraron antes de que el desenlace existiera: la diferencia entre «no ha
+    # cerrado» y «cerró y no sabemos por qué» la enseña la etapa, que sigue ahí.
+    desenlace: Optional[DesenlaceDeLaFicha] = None
 
 
 class LeadListResponse(BaseModel):

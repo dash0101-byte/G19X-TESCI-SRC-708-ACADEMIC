@@ -130,6 +130,18 @@ ACCION_REGLA_EJECUCION = "regla.ejecucion"
 # eso lleva actor; el sistema cerrando una tarea porque ocurrió lo que esperaba, no.
 ACCION_TAREA_HECHA = "tarea.hecha"
 
+# --- El desenlace (capítulo 30) ---
+# Cerrar un prospecto es la única decisión del sistema que produce una etiqueta de
+# entrenamiento. Quién dijo que este trato se ganó, cuándo y por qué motivo tiene que poder
+# atribuirse: el día que una métrica del modelo sorprenda, la primera pregunta será de
+# dónde salieron las etiquetas. Se anota el motivo —una clave de una lista cerrada— y
+# nunca el nombre ni la empresa de nadie.
+ACCION_DESENLACE_REGISTRAR = "desenlace.registrar"
+# El panel del líder son totales por motivo, publicación y red, sin una sola fila con
+# nombre. Se anota igual que la comparativa de publicaciones y por lo mismo: describe el
+# rendimiento comercial entero, y quién lo consultó es parte de la misma pregunta.
+ACCION_DESENLACE_PANEL = "desenlace.panel"
+
 ENTIDAD_SESION = "sesion"
 ENTIDAD_LEAD = "lead"
 ENTIDAD_ENDPOINT = "endpoint"
@@ -144,6 +156,7 @@ ENTIDAD_REGISTRO_CRM = "registro_crm"
 ENTIDAD_REGLA = "regla"
 ENTIDAD_TAREA = "tarea"
 ENTIDAD_AVISO = "aviso"
+ENTIDAD_DESENLACE = "desenlace"
 
 
 def _recortar(valor: Optional[str], limite: int) -> Optional[str]:

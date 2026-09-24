@@ -139,7 +139,15 @@ def _solicitudes_del_prospecto(db: Session, lead_id: int) -> List[LeadActivity]:
     )
 
 
-def _slug_de(actividad: LeadActivity) -> Optional[str]:
+def slug_de(actividad: LeadActivity) -> Optional[str]:
+    """
+    De qué publicación es esta solicitud.
+
+    Pública desde el capítulo 30: el panel de desenlaces atribuye cada cierre a la
+    publicación por la que llegó esa persona, y necesita **este** criterio y no una copia
+    suya. Dos formas de leer el slug —una que mira los datos y otra que solo mira el
+    identificador externo— darían dos atribuciones distintas para las fichas antiguas.
+    """
     datos = actividad.activity_data or {}
     slug = datos.get("publicacion")
     if slug:
@@ -162,7 +170,7 @@ def llego_por(db: Session, lead: Lead) -> Optional[LlegoPor]:
     if not actividades:
         return None
 
-    slugs = {slug for slug in (_slug_de(a) for a in actividades) if slug}
+    slugs = {slug for slug in (slug_de(a) for a in actividades) if slug}
     campanas: Dict[str, Campaign] = {}
     if slugs:
         campanas = {
@@ -173,7 +181,7 @@ def llego_por(db: Session, lead: Lead) -> Optional[LlegoPor]:
     solicitudes = []
     for actividad in actividades:
         datos = actividad.activity_data or {}
-        campana = campanas.get(_slug_de(actividad) or "")
+        campana = campanas.get(slug_de(actividad) or "")
         solicitudes.append(
             SolicitudDeLaFicha(
                 publicacion_id=campana.id if campana else None,

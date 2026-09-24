@@ -150,3 +150,23 @@ def ingresos_o_ausente(valor: Any) -> Optional[float]:
 def es_instantanea_vigente(instantanea: Any) -> bool:
     """¿Se tomó esta instantánea con el vector que consume el modelo actual?"""
     return isinstance(instantanea, dict) and instantanea.get(CLAVE_DE_VERSION) == VERSION_DEL_VECTOR
+
+
+def instantanea_utilizable(instantanea: Any) -> bool:
+    """
+    ¿Puede esta instantánea convertirse en una fila de entrenamiento tal cual?
+
+    Dos condiciones, y hacen falta las dos: que sea de la versión vigente **y** que traiga
+    todas las variables conductuales. Ser de la versión vigente no garantiza lo segundo —una
+    fila escrita a mano, una migración a medias, una instantánea recortada—, y el extractor
+    descarta lo incompleto porque rellenarlo con ceros le diría al modelo «no hubo
+    actividad» donde lo que hay es un hueco.
+
+    Vive aquí, junto al vector, porque la usan dos: el extractor del dataset, que decide si
+    una fila entra, y el contador del panel (capítulo 30), que promete cuántas entrarán. Con
+    dos criterios, el panel diría «ya hay doscientos ejemplos» y el extractor traería ciento
+    ochenta, sin que nada señalara de dónde salía la diferencia.
+    """
+    return es_instantanea_vigente(instantanea) and all(
+        columna in instantanea for columna in CONDUCTUALES
+    )

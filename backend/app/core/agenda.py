@@ -51,6 +51,7 @@ HOT_SIN_CONTACTO_LIDER = "hot_sin_contacto_lider"
 VOLVER_A_LLAMAR = "volver_a_llamar"
 RECORDATORIO_DE_REUNION = "recordatorio_de_reunion"
 PROSPECTO_DORMIDO = "prospecto_dormido"
+DESENLACES_SUFICIENTES = "desenlaces_suficientes"
 
 CREA_TAREA = "tarea"
 CREA_AVISO = "aviso"
@@ -106,6 +107,16 @@ REGLAS: Dict[str, Regla] = {
             para=PARA_ASESOR,
             descripcion="Nadie ha tocado este prospecto en mucho tiempo; queda marcado como dormido.",
         ),
+        Regla(
+            clave=DESENLACES_SUFICIENTES,
+            etiqueta="Ya hay desenlaces para reentrenar",
+            crea=CREA_AVISO,
+            para=PARA_LIDER,
+            descripcion=(
+                "Los cierres registrados alcanzan el mínimo que exige el reentrenamiento. "
+                "Es un aviso, no una acción: no se reentrena nada."
+            ),
+        ),
     )
 }
 
@@ -118,6 +129,9 @@ ORDEN_DE_LAS_REGLAS: Tuple[str, ...] = (
     HOT_SIN_CONTACTO,
     HOT_SIN_CONTACTO_LIDER,
     PROSPECTO_DORMIDO,
+    # La última, y no por importancia: es la única que no habla de un prospecto concreto
+    # sino del conjunto, y cuenta los cierres que las demás reglas ya no van a tocar.
+    DESENLACES_SUFICIENTES,
 )
 
 # --- Estados de una tarea --------------------------------------------------------------
@@ -128,14 +142,20 @@ HECHA = "hecha"
 # «volver a llamar» sin que nadie la marque. Se distingue de `hecha` a propósito: «lo hice»
 # y «pasó» no son lo mismo, y el informe de mañana querrá poder separarlos.
 CUMPLIDA = "cumplida"
+# Ya no hacía falta: el prospecto se cerró (capítulo 30). No es `hecha` —nadie la hizo— ni
+# `cumplida` —no ocurrió lo que la tarea esperaba—. Se distingue de las dos para que el
+# informe de mañana pueda decir cuánto trabajo se quedó por el camino porque el trato
+# terminó, que es un número distinto de «cuánto se hizo» y de «cuánto se resolvió solo».
+DESCARTADA = "descartada"
 
-ESTADOS_DE_TAREA: Tuple[str, ...] = (ABIERTA, HECHA, CUMPLIDA)
-ESTADOS_CERRADOS: Tuple[str, ...] = (HECHA, CUMPLIDA)
+ESTADOS_DE_TAREA: Tuple[str, ...] = (ABIERTA, HECHA, CUMPLIDA, DESCARTADA)
+ESTADOS_CERRADOS: Tuple[str, ...] = (HECHA, CUMPLIDA, DESCARTADA)
 
 ETIQUETAS_DE_ESTADO: Dict[str, str] = {
     ABIERTA: "Pendiente",
     HECHA: "Hecha",
     CUMPLIDA: "Se resolvió sola",
+    DESCARTADA: "Ya no hacía falta",
 }
 
 
