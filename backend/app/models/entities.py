@@ -259,7 +259,12 @@ class Lead(Base):
     industry = Column(String(100), nullable=True, index=True)
     company_size = Column(String(50), nullable=True)  # '1-10', '11-50', '51-200', '201-1000', '1000+'
     annual_revenue = Column(Float, nullable=True)
-    country = Column(String(100), default="México", nullable=False)
+    # Sin valor por defecto y admitiendo vacío desde el capítulo 32. Escribía «México» a
+    # cualquier ficha que llegara sin país —la de la página de interés, que no lo pregunta;
+    # la de una integración que no lo manda—, y eso no es un dato: es una suposición con
+    # aspecto de dato, indistinguible después de la de quien sí lo eligió. No puntúa ni en
+    # la regla ni en el modelo, así que lo único que hacía era volver falsa la ficha.
+    country = Column(String(100), nullable=True)
     city = Column(String(100), nullable=True)
     source = Column(String(100), default="Website", nullable=False)  # Form, Chat, Referral, LinkedIn
 

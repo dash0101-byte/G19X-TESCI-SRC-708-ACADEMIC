@@ -57,7 +57,11 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
     last_name: datos.last_name || '',
     email: datos.email || '',
     phone: datos.phone || '',
-    country: datos.country || 'México',
+    // Vacío y no «México» (capítulo 32). Precargarlo hacía que guardar una ficha sin país
+    // —las de la página de interés, que no lo pregunta— le escribiera uno sin que nadie
+    // lo hubiera elegido, y por el camino más difícil de detectar: el asesor entraba a
+    // corregir un teléfono y salía habiendo declarado un país.
+    country: datos.country || '',
     city: datos.city || '',
     company: datos.company || '',
     job_title: datos.job_title || '',
@@ -83,7 +87,7 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
       last_name: initialLead.last_name || '',
       email: initialLead.email || '',
       phone: initialLead.phone || '',
-      country: initialLead.country || 'México',
+      country: initialLead.country || '',
       city: initialLead.city || '',
       company: initialLead.company || '',
       job_title: initialLead.job_title || '',
@@ -128,7 +132,7 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
         last_name: editForm.last_name.trim() ? editForm.last_name : undefined,
         email: editForm.email,
         phone: editForm.phone,
-        country: editForm.country,
+        country: editForm.country || null,
         city: editForm.city,
         company: editForm.company,
         job_title: editForm.job_title,
@@ -246,7 +250,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
               {lead.job_title} • <strong style={{ color: 'var(--text-primary)' }}>{lead.company}</strong> ({lead.industry || 'General'})
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.775rem', marginTop: '2px' }}>
-              ✉️ {lead.email} | 📞 {lead.phone || 'Sin registrar'} | 📍 {lead.city || 'N/A'}, {lead.country || 'México'}
+              {/* «Sin registrar» y no «México»: la cabecera era el último sitio donde la
+                  suposición seguía leyéndose como dato, y el único que mira una persona. */}
+              ✉️ {lead.email} | 📞 {lead.phone || 'Sin registrar'} | 📍 {[lead.city, lead.country].filter(Boolean).join(', ') || 'Sin registrar'}
             </p>
           </div>
 

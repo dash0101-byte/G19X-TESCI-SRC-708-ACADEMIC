@@ -33,6 +33,7 @@ from app.core.redes import (
     texto_para,
 )
 from app.core.security import UserRole
+from app.core.telefono import validador_de_telefono
 
 # El máximo lo impone bcrypt (72 bytes); el mínimo, la política de `app.core.passwords`.
 # Aquí se declara laxo a propósito: si Pydantic rechazara antes por longitud, el usuario
@@ -116,6 +117,13 @@ class UsuarioCreate(BaseModel):
     def _sin_espacios_sobrantes(cls, valor: str) -> str:
         return valor.strip()
 
+    # El mismo E.164 que el de los prospectos, y con el mismo módulo (capítulo 32). El
+    # teléfono de un asesor se había quedado como texto libre desde el capítulo 21, que se
+    # ocupó solo del de las personas de fuera. No es un detalle cosmético: es el número que
+    # se mira para llamar a quien lleva una cuenta, y «55 1234 5678» y «+525512345678»
+    # eran dos asesores distintos para cualquier comparación.
+    _phone = field_validator("phone")(validador_de_telefono)
+
 
 class UsuarioUpdate(BaseModel):
     """
@@ -132,6 +140,8 @@ class UsuarioUpdate(BaseModel):
     is_sales_rep: Optional[bool] = None
     phone: Optional[str] = Field(None, max_length=50)
     capacity: Optional[int] = Field(None, ge=1, le=1000)
+
+    _phone = field_validator("phone")(validador_de_telefono)
 
 
 class RestablecerContrasena(BaseModel):

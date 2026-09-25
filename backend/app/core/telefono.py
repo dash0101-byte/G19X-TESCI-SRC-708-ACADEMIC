@@ -13,6 +13,11 @@ del número.
 
 El mensaje de error no repite el número. Llega en la respuesta a quien lo envió, pero
 también puede acabar en un registro del servidor, y un teléfono es un dato personal (R-11).
+
+Desde el capítulo 32 se aplica también al teléfono de los **asesores** (`users.phone`), que
+se había quedado como texto libre. Aquí vive `validador_de_telefono`, el envoltorio que
+usan los dos esquemas: mientras cada uno tuvo su copia privada, mantener una sola forma del
+número dependía de que quien tocara una se acordara de la otra.
 """
 from typing import Optional
 
@@ -63,3 +68,21 @@ def normalizar_telefono(valor: Optional[str], region: str = REGION_POR_DEFECTO) 
             "El teléfono no es un número válido: revise la lada y el número de dígitos."
         )
     return phonenumbers.format_number(numero, PhoneNumberFormat.E164)
+
+
+def validador_de_telefono(valor: Optional[str]) -> Optional[str]:
+    """
+    Valida y normaliza desde un esquema de Pydantic. Uno solo para prospectos y asesores.
+
+    Vuelve a lanzar como `ValueError` llano, con el mismo mensaje y `from None`: lo que
+    llega a quien envió el formulario es la explicación —«revise la lada y el número de
+    dígitos»— con el campo delante, y no una traza encadenada con el nombre de la clase.
+
+    No se aplica a las respuestas, solo a la entrada —alta y edición—: un teléfono anterior
+    a la Fase 15 que la migración no pudo normalizar convertiría la lectura de su ficha en
+    un error, y leer una ficha no es el momento de descubrir que su teléfono está mal.
+    """
+    try:
+        return normalizar_telefono(valor)
+    except TelefonoInvalido as exc:
+        raise ValueError(str(exc)) from None

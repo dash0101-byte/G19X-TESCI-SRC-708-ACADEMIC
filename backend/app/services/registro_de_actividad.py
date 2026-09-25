@@ -512,7 +512,9 @@ def _crear_prospecto(db: Session, v: EventoValidado) -> Lead:
         company_size=datos.get("company_size"),
         # Sin cifra declarada queda vacío, no a cero: un cero se lee como dato (capítulo 24).
         annual_revenue=datos.get("annual_revenue"),
-        country=datos.get("country", "México"),
+        # Sin país declarado queda vacío, no «México» (capítulo 32). Es el mismo criterio
+        # que la línea de arriba: lo que no llega no se rellena.
+        country=datos.get("country"),
         city=datos.get("city"),
         source=datos.get("source", v.fuente.etiqueta),
         campaign_id=v.campana_id,

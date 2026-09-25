@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 from app.core.redes import es_de_publicacion
-from app.core.telefono import TelefonoInvalido, normalizar_telefono
+from app.core.telefono import validador_de_telefono
 from app.models.entities import ActivityType, LeadStatus, QualificationStatus, ScoreCategory
 from app.schemas.activity import ActivityResponse
 from app.schemas.desenlaces import DesenlaceDeLaFicha
@@ -30,16 +30,28 @@ MAX_SOURCE = 100
 MAX_NOTES = 500
 
 
-def _telefono_e164(valor: Optional[str]) -> Optional[str]:
+def _pais_o_vacio(valor: Optional[str]) -> Optional[str]:
     """
-    Valida y normaliza al guardar. Se aplica a la entrada —alta y edición— y no a
-    `LeadBase`: la respuesta hereda de ella, y un teléfono anterior a la Fase 15 que la
-    migración no pudo normalizar convertiría la lectura de su ficha en un error.
+    Un país en blanco es ausencia de país, no la cadena vacía (capítulo 32).
+
+    El formulario del panel manda `""` cuando el campo se deja sin rellenar, y guardarlo
+    tal cual habría dejado en la base dos formas de decir lo mismo: `NULL` para las fichas
+    que nunca lo tuvieron y `''` para las que pasaron por la pantalla. Cualquier consulta
+    posterior tendría que acordarse de las dos.
     """
-    try:
-        return normalizar_telefono(valor)
-    except TelefonoInvalido as exc:
-        raise ValueError(str(exc)) from None
+    if valor is None:
+        return None
+    limpio = valor.strip()
+    return limpio or None
+
+
+# Valida y normaliza al guardar. Se aplica a la entrada —alta y edición— y no a `LeadBase`:
+# la respuesta hereda de ella, y un teléfono anterior a la Fase 15 que la migración no pudo
+# normalizar convertiría la lectura de su ficha en un error.
+#
+# Desde el capítulo 32 la definición vive en `app.core.telefono` y la comparte el esquema de
+# las cuentas: dos copias se habrían desincronizado el día que alguien tocara una.
+_telefono_e164 = validador_de_telefono
 
 
 class LeadBase(BaseModel):
@@ -54,7 +66,11 @@ class LeadBase(BaseModel):
     company_size: Optional[str] = Field(None, max_length=MAX_COMPANY_SIZE)
     # Tampoco aquí: unos ingresos que no se indicaron no son cero (capítulo 24).
     annual_revenue: Optional[float] = Field(None, ge=0.0)
-    country: str = Field("México", max_length=MAX_COUNTRY)
+    # Sin valor por defecto, por el mismo motivo que `company_size` y `annual_revenue`
+    # (capítulo 32): un país que no se indicó no es México. Escribirlo aquí hacía que el
+    # alta por API de una ficha sin país produjera una ficha CON país, y la suposición
+    # quedaba indistinguible del dato en cuanto la fila entraba en la base.
+    country: Optional[str] = Field(None, max_length=MAX_COUNTRY)
     city: Optional[str] = Field(None, max_length=MAX_CITY)
     source: str = Field("Website", max_length=MAX_SOURCE)
     assigned_rep_id: Optional[int] = None
@@ -70,6 +86,7 @@ class LeadCreate(LeadBase):
     privacy_notice_accepted: bool = False
 
     _phone = field_validator("phone")(_telefono_e164)
+    _country = field_validator("country")(_pais_o_vacio)
 
 
 class LeadUpdate(BaseModel):
@@ -91,6 +108,7 @@ class LeadUpdate(BaseModel):
     raw_metadata: Optional[Dict[str, Any]] = None
 
     _phone = field_validator("phone")(_telefono_e164)
+    _country = field_validator("country")(_pais_o_vacio)
 
 
 class LeadResponse(LeadBase):

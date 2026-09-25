@@ -171,9 +171,10 @@ def construir_evento(
     """
     El evento que se registra. Lo que la persona no indicó no viaja, y por tanto queda
     vacío en la ficha: ni ingresos, ni teléfono, ni perfil, ni tamaño «1-10» por defecto.
-    El país sí lo rellena la ficha («México» es el valor por defecto de la columna); no
-    puntúa ni en la regla ni en el modelo, y cambiarlo exige una migración que esta fase no
-    hace.
+    El país tampoco. Hasta el capítulo 32 lo rellenaba la ficha —«México» era el valor por
+    defecto de la columna—, de modo que este formulario, que no pregunta el país, producía
+    fichas con país. Ya no: la columna admite vacío y lo que nadie indicó queda vacío. No
+    puntúa ni en la regla ni en el modelo, así que lo único que se pierde es una suposición.
 
     La necesidad va en los datos de la actividad y no en la ficha: es de este envío, no de
     la persona, y la ficha 360 y el informe la leen de ahí. Fuera de `raw_metadata`, que la
