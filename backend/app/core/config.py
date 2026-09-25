@@ -251,7 +251,31 @@ class Settings(BaseSettings):
     # `/interes/<slug>`. Con `/p` el texto copiado llevaba a la pantalla de acceso, y eso no
     # se nota escribiendo la dirección a mano: solo siguiendo el enlace ya pegado en el post.
     # `tests/test_publicaciones.py` compara este valor con la ruta del frontend.
+    # Desde el capítulo 34 es, además, **la única** cosa que hay que cambiar para pasar de
+    # la dirección efímera de un túnel de prueba a un dominio propio. No hay ninguna otra
+    # copia de la dirección pública en el código: la tarjeta de vista previa, su imagen, el
+    # texto que se copia para cada red y el enlace que enseña el panel salen todos de
+    # `enlace_publico()`, que lee este valor. `tests/test_puerta_estrecha.py` lo comprueba
+    # buscando direcciones escritas a mano en todo el árbol.
     PUBLICACIONES_URL_BASE: str = "http://localhost:3000/interes"
+
+    # --- La dirección pública, comprobada (capítulo 34) ---
+    # Un túnel gratuito da una dirección DISTINTA en cada arranque. Eso convierte un enlace
+    # ya publicado en un enlace muerto sin que nada del sistema se entere: el post sigue en
+    # LinkedIn, la publicación sigue activa, y quien pulsa no llega a ninguna parte.
+    #
+    # Apagado por defecto a propósito. La comprobación sale a internet, y una suite de
+    # pruebas o un arranque en desarrollo no deben depender de que haya red ni ponerse a
+    # pedir una dirección que no existe. Se enciende en el despliegue que está detrás del
+    # túnel, que es el único donde la pregunta tiene sentido.
+    COMPROBAR_DIRECCION_PUBLICA: bool = False
+    # Cada cuánto se vuelve a preguntar. El panel consulta el estado cada vez que se abre
+    # la pantalla de publicaciones, y sin caché eso serían varias salidas a internet por
+    # minuto para responder algo que cambia una vez al día.
+    DIRECCION_PUBLICA_CACHE_SEGUNDOS: int = 120
+    # Un túnel caído no tarda en no contestar: tarda en no contestar *nada*. El tope corto
+    # es lo que distingue «no responde» de «el panel se quedó colgado».
+    DIRECCION_PUBLICA_TIMEOUT_SEGUNDOS: float = 4.0
 
     @field_validator("PUBLICACIONES_URL_BASE")
     @classmethod

@@ -31,10 +31,11 @@ from app.models.entities import LeadStatus
 from app.schemas.interes import PublicacionPublica
 from app.schemas.publicaciones import (
     ComparativaDePublicaciones,
+    EstadoDeLaDireccionPublica,
     InformeDePublicacion,
     NuevosSinAsesor,
 )
-from app.services import informe_de_publicaciones, pagina_de_interes
+from app.services import direccion_publica, informe_de_publicaciones, pagina_de_interes
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -77,6 +78,35 @@ def contar_nuevos_sin_asesor(
     lista que sortee el alcance de cartera por la puerta de atrás.
     """
     return NuevosSinAsesor(total=informe_de_publicaciones.nuevos_sin_asesor(db))
+
+
+@router.get("/direccion-publica", response_model=EstadoDeLaDireccionPublica)
+def estado_de_la_direccion_publica(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(DIRECCION)),
+):
+    """
+    ¿La dirección pública configurada sigue llevando aquí? (capítulo 34)
+
+    Existe porque el túnel de prueba gratuito da una dirección **distinta en cada arranque**,
+    y ese cambio no rompe nada de forma visible: el post sigue en LinkedIn, la publicación
+    sigue activa, el informe sigue contando sus visitas —cero— y quien pulsa el enlace no
+    llega a ninguna parte. Sin esta pregunta, la avería se descubre cuando alguien comenta
+    que el enlace no va, que puede ser semanas.
+
+    Es de **dirección** y no de cualquiera con sesión por una razón práctica: quien puede
+    hacer algo con la respuesta es quien reparte los enlaces. Un asesor que viera «la
+    dirección pública no responde» no tendría ninguna acción disponible.
+
+    No lleva asiento de auditoría. No lee datos de nadie ni cambia nada: contesta sobre la
+    configuración del propio sistema, y un asiento por cada vez que se abre la pantalla de
+    publicaciones enterraría los que sí importan.
+    """
+    estado = direccion_publica.comprobar()
+    return EstadoDeLaDireccionPublica(
+        **estado.como_dict(),
+        publicaciones_con_enlace_caducado=informe_de_publicaciones.contar_enlaces_caducados(db),
+    )
 
 
 @router.get("/{campaign_id}/informe", response_model=InformeDePublicacion)

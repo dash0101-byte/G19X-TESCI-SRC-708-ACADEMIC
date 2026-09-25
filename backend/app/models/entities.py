@@ -205,6 +205,17 @@ class Campaign(Base):
     # enlaces valen: un enlace ya repartido sigue contando aunque su red se desactive.
     redes = Column(JSON, nullable=True)
 
+    # --- Capítulo 34: bajo qué dirección se repartió el enlace de esta publicación ------
+    # Se escribe al **activarla**, que es el instante en que su enlace se vuelve repartible,
+    # y no se vuelve a tocar. Guarda el valor de `PUBLICACIONES_URL_BASE` de ese momento.
+    #
+    # Existe porque un túnel de prueba gratuito da una dirección distinta en cada arranque.
+    # Comparar esto con la dirección de ahora es lo que permite decir «el enlace que está
+    # en ese post ya no lleva aquí» en lugar de dejar que el post falle en silencio durante
+    # semanas. `NULL` en las publicaciones anteriores a este capítulo: de ellas no consta
+    # bajo qué dirección salieron, y suponerlo sería inventar el dato que se quiere medir.
+    url_base_publicada = Column(String(300), nullable=True)
+
     # Relaciones
     leads = relationship("Lead", back_populates="campaign")
     responsable = relationship("User", foreign_keys=[responsable_id])

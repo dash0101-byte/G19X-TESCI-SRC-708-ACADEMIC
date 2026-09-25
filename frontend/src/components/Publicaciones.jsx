@@ -5,6 +5,7 @@ import {
   duplicateCampaign,
   fetchCampaignList,
   fetchComparativaDePublicaciones,
+  fetchEstadoDeLaDireccionPublica,
   fetchNuevosSinAsesor,
   fetchSalesReps,
   fetchVistaPreviaDePublicacion,
@@ -104,6 +105,8 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
   const [redesDisponibles, setRedesDisponibles] = useState([]);
   // La publicación cuyos botones de compartir están abiertos, o `null`.
   const [compartiendo, setCompartiendo] = useState(null);
+  // Si la dirección pública sigue llevando aquí (capítulo 34). `null` mientras no se sabe.
+  const [direccion, setDireccion] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -114,14 +117,19 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       // El catálogo de redes viene con la lista: una sola fuente, la del servidor.
       if (datos && datos.redes_disponibles) setRedesDisponibles(datos.redes_disponibles);
       if (puedeGestionar) {
-        const [comparadas, pendientes, equipo] = await Promise.all([
+        const [comparadas, pendientes, equipo, publica] = await Promise.all([
           fetchComparativaDePublicaciones(),
           fetchNuevosSinAsesor(),
           fetchSalesReps(),
+          // Si el túnel está caído, esta es justamente la llamada que puede tardar. Va en
+          // el `Promise.all` y no antes para que su espera no retrase la lista: el tope lo
+          // pone el servidor (`DIRECCION_PUBLICA_TIMEOUT_SEGUNDOS`).
+          fetchEstadoDeLaDireccionPublica().catch(() => null),
         ]);
         setComparativa((comparadas && comparadas.items) || []);
         setSinAsesor(pendientes ? pendientes.total : null);
         setAsesores((equipo && equipo.items) || []);
+        setDireccion(publica);
       }
     } catch (err) {
       setError(err.message);
@@ -330,6 +338,42 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       {error && (
         <div role="alert" style={{ padding: '8px 12px', margin: '12px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--hot-text)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
           {error}
+        </div>
+      )}
+
+      {/* La dirección pública, cuando hay algo que decir (capítulo 34).
+          Se dibuja solo con `responde === false` o con enlaces ya caducados: mientras la
+          dirección funciona, esta franja no existe. Una advertencia permanente —«el túnel
+          puede caerse»— se convierte en parte del decorado en dos días y deja de leerse
+          justo el día que sí pasa algo. */}
+      {puedeGestionar && direccion && direccion.responde === false && (
+        <div
+          role="alert"
+          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--hot-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
+        >
+          <strong>La dirección pública no responde.</strong>{' '}
+          Quien abra un enlace de estas publicaciones no llega a ninguna parte. Si el túnel
+          se reinició, su dirección es otra: hay que ponerla en{' '}
+          <code>PUBLICACIONES_URL_BASE</code> y volver a levantar la pila.
+          <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '4px', wordBreak: 'break-all' }}>
+            {direccion.base}{direccion.detalle ? ` · ${direccion.detalle}` : ''}
+          </div>
+        </div>
+      )}
+
+      {puedeGestionar && direccion && direccion.publicaciones_con_enlace_caducado > 0 && (
+        <div
+          role="alert"
+          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--warm-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
+        >
+          <strong>
+            {direccion.publicaciones_con_enlace_caducado}{' '}
+            {direccion.publicaciones_con_enlace_caducado === 1 ? 'publicación repartió' : 'publicaciones repartieron'}{' '}
+            un enlace que ya no lleva aquí.
+          </strong>{' '}
+          La dirección pública cambió después de activarlas. El enlace que está dentro de
+          esos posts está muerto: hay que volver a copiarlo y editar el post, o publicarlo
+          de nuevo. Están marcadas abajo.
         </div>
       )}
 
@@ -604,6 +648,17 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                   <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
                     {publicacion.enlace_publico}
                   </div>
+                  {/* El enlace de arriba es el de AHORA y se puede copiar sin problema. Lo
+                      que caducó es el que ya está dentro del post, que se copió cuando la
+                      dirección era otra. Por eso el aviso va debajo del enlace y no lo
+                      sustituye: no hay nada que arreglar aquí, hay que editar el post. */}
+                  {publicacion.enlace_caducado && (
+                    <div style={{ color: 'var(--hot-text)', marginTop: '2px' }}>
+                      ⚠ El enlace que se repartió de esta publicación ya no lleva aquí: la
+                      dirección pública cambió después de activarla. El de arriba es el
+                      bueno; hay que volver a pegarlo en el post.
+                    </div>
+                  )}
                   {publicacion.url_del_post && (
                     <a href={publicacion.url_del_post} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-primary)' }}>
                       Ver el post en LinkedIn

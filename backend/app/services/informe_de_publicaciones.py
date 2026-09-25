@@ -43,7 +43,7 @@ from sqlalchemy import case, false, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.autorizacion import AlcanceDeCartera
-from app.core.publicaciones import CANAL_LINKEDIN, enlace_publico
+from app.core.publicaciones import CANAL_LINKEDIN, base_publica, enlace_publico
 from app.core.redes import CANALES_DE_PUBLICACION, ORDEN, REDES, SIN_RED, redes_de
 from app.core.redes import etiqueta_de as etiqueta_de_red
 from app.models.entities import Campaign, Lead, LeadActivity, LeadStatus, User, VisitaDePublicacion
@@ -717,6 +717,30 @@ def nuevos_sin_asesor(db: Session) -> int:
     return (
         db.query(func.count(Lead.id))
         .filter(Lead.source.in_(CANALES_DE_PUBLICACION), Lead.assigned_rep_id.is_(None))
+        .scalar()
+        or 0
+    )
+
+
+def contar_enlaces_caducados(db: Session) -> int:
+    """
+    Cuántas publicaciones llevan un enlace repartido que ya no lleva aquí (capítulo 34).
+
+    Es la misma comparación que hace `CampanaResponse.enlace_caducado`, en una sola consulta
+    y sin traerse las filas: el panel necesita la cifra antes de dibujar la lista, para
+    decidir si enseña el aviso de arriba o no.
+
+    Cuenta solo las que **tienen** dirección anotada. Las anteriores al capítulo 34 están a
+    `NULL` —no consta bajo qué dirección salieron— y contarlas como caducadas inventaría el
+    dato que la cifra existe para medir.
+    """
+    return (
+        db.query(func.count(Campaign.id))
+        .filter(
+            Campaign.channel == CANAL_LINKEDIN,
+            Campaign.url_base_publicada.isnot(None),
+            Campaign.url_base_publicada != base_publica(),
+        )
         .scalar()
         or 0
     )

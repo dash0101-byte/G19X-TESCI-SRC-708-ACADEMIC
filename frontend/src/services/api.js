@@ -567,6 +567,21 @@ export function fetchNuevosSinAsesor() {
   return apiFetch('/publicaciones/nuevos-sin-asesor', {}, 'Error al contar los nuevos sin asesor');
 }
 
+/**
+ * Si la dirección pública configurada sigue llevando al sistema (capítulo 34).
+ *
+ * `responde` puede ser `true`, `false` o `null`; el último es «no se ha comprobado», que es
+ * lo que contesta un despliegue sin túnel delante. No es lo mismo que «no responde» y la
+ * pantalla no debe tratarlos igual.
+ */
+export function fetchEstadoDeLaDireccionPublica() {
+  return apiFetch(
+    '/publicaciones/direccion-publica',
+    {},
+    'Error al comprobar la dirección pública',
+  );
+}
+
 // ============================================================================
 // La agenda del día (capítulo 28)
 // ============================================================================

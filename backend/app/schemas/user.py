@@ -17,6 +17,7 @@ from app.core.publicaciones import (
     MAX_DESCRIPCION,
     MAX_PUBLICO,
     MAX_TEXTO_DE_LINKEDIN,
+    base_publica,
     enlace_publico,
     necesidades_de,
     normalizar_necesidades,
@@ -332,6 +333,10 @@ class CampanaResponse(BaseModel):
     )
     # Lo guardado, tal cual: `None` si usa las redes de siempre.
     redes_guardadas: Optional[List[str]] = Field(None, validation_alias="redes", exclude=True)
+    # Bajo qué dirección se activó (capítulo 34). Entra para poder calcular
+    # `enlace_caducado` y **sale excluido**: al panel le sirve la conclusión, no la
+    # dirección antigua, que además sería una dirección de túnel muerta enseñada como dato.
+    url_base_publicada: Optional[str] = Field(None, exclude=True)
 
     @computed_field
     @property
@@ -349,6 +354,27 @@ class CampanaResponse(BaseModel):
     @property
     def enlace_publico(self) -> str:
         return enlace_publico(self.public_slug)
+
+    @computed_field
+    @property
+    def enlace_caducado(self) -> bool:
+        """
+        El enlace que se repartió de esta publicación ya no lleva aquí (capítulo 34).
+
+        Pasa cuando la dirección pública cambia entre que se activó la publicación y ahora,
+        que con un túnel de prueba gratuito es **en cada arranque**. El post sigue en
+        LinkedIn y el enlace que lleva dentro está muerto.
+
+        `False` cuando no consta bajo qué dirección salió —las publicaciones anteriores a
+        este capítulo—. Marcar esas como caducadas sería inventar: no se sabe si lo están.
+        Es el mismo criterio que el capítulo 32 aplicó al país supuesto, y por el mismo
+        motivo: una advertencia que aparece sin fundamento se aprende a ignorar, y entonces
+        tampoco se lee la que sí lo tiene.
+        """
+        return bool(
+            self.url_base_publicada is not None
+            and self.url_base_publicada != base_publica()
+        )
 
     @computed_field
     @property

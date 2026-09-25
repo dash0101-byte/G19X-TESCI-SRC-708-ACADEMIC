@@ -174,3 +174,28 @@ class NuevosSinAsesor(BaseModel):
     entera de que hay trabajo sin repartir hasta que alguien mira el listado.
     """
     total: int
+
+
+class EstadoDeLaDireccionPublica(BaseModel):
+    """
+    Si la dirección pública configurada sigue llevando aquí (capítulo 34).
+
+    `responde` tiene tres valores y el tercero importa: `None` es «no se ha preguntado»,
+    que es lo que devuelve un despliegue con la comprobación apagada —desarrollo, la
+    suite—. Colapsarlo en `False` encendería una alarma permanente en pantallas donde no
+    hay nada que avisar, y una alarma siempre encendida deja de leerse.
+    """
+
+    base: str = Field(description="La dirección configurada, que es la que llevan los enlaces.")
+    responde: Optional[bool] = Field(
+        None, description="True, False, o None si la comprobación está apagada."
+    )
+    comprobada_en: Optional[datetime.datetime] = None
+    detalle: Optional[str] = Field(
+        None, description="Código de respuesta o tipo de error; nunca el cuerpo."
+    )
+    # Cuántas publicaciones llevan un enlace repartido que ya no lleva aquí. Va junto al
+    # estado y no en el listado porque es la cifra que hace falta para decidir: una sola
+    # caducada puede ser una prueba vieja; catorce es que la dirección cambió y hay que
+    # volver a repartir.
+    publicaciones_con_enlace_caducado: int = 0

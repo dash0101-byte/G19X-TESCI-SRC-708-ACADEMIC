@@ -14,6 +14,7 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.publicaciones import ACTIVA, BORRADOR, CERRADA, CIERRAN_POR_FECHA, ESTADOS
 from app.core.redes import SIN_RED
 from app.models.entities import Campaign, User, VisitaDePublicacion, utc_now
@@ -32,11 +33,24 @@ def _aware(momento: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
 
 # ------------------------------------------------------------------------------ estado
 def fijar_estado(campana: Campaign, estado: str) -> None:
-    """El único sitio que cambia el estado: `is_active` va siempre con él."""
+    """
+    El único sitio que cambia el estado: `is_active` va siempre con él.
+
+    Desde el capítulo 34 también anota **bajo qué dirección pública** se repartió el enlace.
+    Activar es el instante exacto en que ese enlace se vuelve repartible —antes es un
+    borrador que nadie ha visto—, así que es el único momento en que el dato es cierto.
+
+    Se escribe una sola vez. Reactivar una publicación pausada bajo otra dirección NO lo
+    reescribe, y esa es la decisión que hace útil el dato: lo que hay que poder contestar es
+    «¿el enlace que la gente ya tiene lleva aquí?», y quien lo tiene lo copió la primera vez.
+    Sobrescribirlo al reactivar borraría justo la prueba de que el enlace repartido caducó.
+    """
     if estado not in ESTADOS:
         raise ValueError(f"Estado desconocido: {estado}")
     campana.estado = estado
     campana.is_active = estado == ACTIVA
+    if estado == ACTIVA and campana.url_base_publicada is None:
+        campana.url_base_publicada = settings.PUBLICACIONES_URL_BASE
 
 
 def vencida(campana: Campaign, ahora: Optional[datetime.datetime] = None) -> bool:

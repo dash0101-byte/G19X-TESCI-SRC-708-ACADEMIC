@@ -61,8 +61,20 @@ def nuevo_slug_publico() -> str:
     return secrets.token_urlsafe(BYTES_DEL_SLUG)
 
 
+def base_publica() -> str:
+    """
+    La dirección bajo la que vive todo lo público, leída del ajuste y de ningún otro sitio.
+
+    Existe para que nadie tenga que escribir `settings.PUBLICACIONES_URL_BASE` fuera de
+    aquí: es la pieza que el capítulo 34 necesita que tenga **un solo dueño**, porque pasar
+    de la dirección efímera de un túnel a un dominio propio tiene que ser cambiar un valor
+    y nada más. Cada copia suelta sería un sitio donde ese cambio se olvidaría.
+    """
+    return settings.PUBLICACIONES_URL_BASE
+
+
 def enlace_publico(slug: str) -> str:
-    return f"{settings.PUBLICACIONES_URL_BASE}/{slug}"
+    return f"{base_publica()}/{slug}"
 
 
 def texto_para_linkedin(descripcion: str | None, slug: str) -> str:
