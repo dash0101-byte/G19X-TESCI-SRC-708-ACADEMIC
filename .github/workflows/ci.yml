@@ -39,9 +39,9 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -64,7 +64,7 @@ jobs:
     name: Fuga de secretos (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Historial completo: una clave borrada en el último commit sigue siendo una
           # clave filtrada. Este proyecto ya tuvo una en el árbol, y de nada sirve
@@ -85,9 +85,9 @@ jobs:
     name: Vulnerabilidades (pip-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -129,7 +129,7 @@ jobs:
       - name: Auditar lo instalado para desarrollo
         run: /tmp/desarrollo/bin/pip-audit --requirement instalado-desarrollo.txt --no-deps --disable-pip --strict --progress-spinner=off
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -161,7 +161,7 @@ jobs:
 
       - name: Guardar el informe de npm audit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: npm-audit
           path: frontend/npm-audit.json
@@ -174,9 +174,9 @@ jobs:
     name: Modelo ML (gate ROC-AUC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -527,7 +527,7 @@ jobs:
 
       - name: Publicar métricas del modelo
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: metricas-modelo
           path: ml_pipeline/models/metrics.json
@@ -538,7 +538,7 @@ jobs:
       # la imagen se construye con el modelo que este pipeline acaba de validar, no con
       # un binario comprometido en el repositorio que nadie sabe cuándo se entrenó.
       - name: Publicar artefacto del modelo
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: modelo-entrenado
           path: ml_pipeline/models/
@@ -552,9 +552,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: modelo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -565,7 +565,7 @@ jobs:
       # Las pruebas se ejecutan contra el mismo artefacto que irá a la imagen, de modo
       # que ejercitan la ruta real de inferencia y no el heurístico de respaldo.
       - name: Descargar el modelo validado
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: modelo-entrenado
           path: ml_pipeline/models/
@@ -624,7 +624,7 @@ jobs:
 
       - name: Publicar informe de cobertura
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cobertura
           path: coverage.xml
@@ -637,9 +637,9 @@ jobs:
     name: Cliente (lint, pruebas, cobertura, build)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -669,7 +669,7 @@ jobs:
 
       - name: Guardar el informe de cobertura del cliente
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cobertura-cliente
           path: frontend/coverage/
@@ -708,7 +708,7 @@ jobs:
       # consume tal cual, sin recompilarlo, para que lo probado y lo desplegado sean el
       # mismo archivo.
       - name: Publicar el bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: frontend-dist
           path: frontend/dist/
@@ -722,20 +722,20 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ modelo, frontend, pruebas ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # El Dockerfile del backend copia rutas concretas en lugar de `COPY . .`, y dos de
       # ellas no están en el repositorio: se reponen aquí desde los trabajos anteriores.
       - name: Restaurar el modelo validado
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: modelo-entrenado
           path: ml_pipeline/models/
 
       - name: Restaurar el bundle del frontend
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: frontend-dist
           path: frontend/dist/
@@ -743,7 +743,7 @@ jobs:
       # Contexto en la raíz del repositorio: la imagen necesita backend/, ml_pipeline/
       # y frontend/dist/ a la vez.
       - name: Construir la imagen del backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: backend/Dockerfile
@@ -772,7 +772,7 @@ jobs:
       # las pruebas y el suelo de cobertura. Dos compilaciones que terminan bien no son
       # la misma compilacion, y la diferencia no da ningun sintoma.
       - name: Construir la imagen del frontend con el bundle ya probado
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -829,6 +829,26 @@ jobs:
             echo "--- El proceso no puede reescribir su propio código ---"
             touch /app/prueba-escritura 2>/dev/null && aviso "/app es escribible por el proceso"
 
+            # Capítulo 32. Docker copia el contenido y los PERMISOS del directorio de la
+            # imagen dentro de un volumen nombrado vacío al montarlo por primera vez. Si el
+            # directorio no existe aquí, lo crea el demonio como root:root y este proceso
+            # —uid 1001— no puede escribir en él. Le pasó al volumen `deriva` desde el
+            # capítulo 22: llevaba tres capítulos vacío y nadie lo vio, porque el monitor
+            # solo escribe cuando tiene una alerta que recordar y todavía no ha tenido
+            # ninguna. La primera habría fallado al guardar el estado y la segunda habría
+            # vuelto a avisar de lo mismo, que es justo lo que ese volumen existe para evitar.
+            echo "--- Los puntos de montaje de los volúmenes son escribibles ---"
+            for punto in /var/lib/plurione/deriva /var/lib/plurione/realimentacion; do
+              if [ ! -d "$punto" ]; then
+                aviso "$punto no existe en la imagen: el volumen nacerá como root y el proceso no podrá escribir"
+              elif ! touch "$punto/.prueba-de-escritura" 2>/dev/null; then
+                aviso "$punto no es escribible por $(id -un)"
+              else
+                rm -f "$punto/.prueba-de-escritura"
+                echo "  escribible: $punto"
+              fi
+            done
+
             [ "$fallos" -eq 0 ] || exit 1
             echo "Imagen conforme."
           '
@@ -837,7 +857,7 @@ jobs:
       # en el propio contenedor para que los marcadores del lock —uvloop solo fuera de
       # Windows, tzdata solo en Windows— se evaluen para la plataforma real y no para el
       # runner. Despues se audita esa misma lista.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -1090,7 +1110,7 @@ jobs:
 
       - name: Guardar los informes de seguridad de las imagenes
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: seguridad-imagenes
           path: informes/
@@ -1115,7 +1135,7 @@ jobs:
     # la forma de "una línea que hace que algo deje de fallar". El coste de comprobarlas
     # es de segundos; el de descubrirlas otra vez en producción, no.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # A-8: el comodín de CORS junto a `allow_credentials=True` autoriza a cualquier
       # sitio web a leer respuestas autenticadas desde el navegador de un usuario con
@@ -1209,6 +1229,13 @@ jobs:
 
       # N-8: la bitácora no tiene endpoint de borrado ni de edición. Una bitácora que la
       # aplicación puede reescribir no prueba nada.
+      #
+      # Desde el capítulo 32 la bitácora SÍ tiene plazo en la aplicación
+      # (`CONSERVACION_AUDITORIA_DIAS`), y eso no contradice a N-8 sino que lo delimita: la
+      # purga corre en el servicio de retención, con un mínimo de un año, y deja su propio
+      # asiento. Lo que sigue prohibido es lo que este paso mira: que una petición
+      # autenticada pueda borrar o editar asientos. La retención es una política con su
+      # número escrito; un `DELETE /audit` es la herramienta de quien abusa de sus permisos.
       - name: La bitácora de auditoría es de solo lectura
         run: |
           set -euo pipefail
@@ -1942,6 +1969,74 @@ jobs:
           }
           echo "Nada inventado: tipo con motivo, ficha solo desde fuentes que la generan, llamada solo si conecto."
 
+      # Capitulo 32. El pais era la ultima suposicion de la ficha, y la mas dificil de ver
+      # porque no vivia en un servicio sino en la COLUMNA: `NOT NULL` con «Mexico» por
+      # defecto. No hacia falta que nadie escribiera nada para que toda ficha saliera con
+      # pais, y una vez en la fila es indistinguible del pais de quien si lo eligio.
+      #
+      # Se miran los tres sitios que lo escribian y el cuarto que lo ensenaba. Ninguno rompe
+      # una prueba al volver: la ficha seguiria guardandose, seguiria leyendose y diria
+      # «Mexico» de gente de la que no consta.
+      - name: El pais no se supone
+        run: |
+          set -euo pipefail
+          modelo=$(grep -vE '^\s*#' backend/app/models/entities.py)
+          printf '%s\n' "$modelo" | grep -q 'country = Column(String(100), nullable=True)' || {
+            echo ""
+            echo "FALLO: la columna `country` vuelve a ser obligatoria o a tener valor por defecto."
+            echo "Con `default=\"Mexico\", nullable=False`, la ficha de quien no indico pais"
+            echo "AFIRMA un pais que nadie dijo (capitulo 32)."
+            exit 1
+          }
+          # Se mira la AUSENCIA de un literal por defecto y no la presencia de la linea
+          # correcta: `LeadUpdate` declara el mismo campo, asi que un `grep -q` de la forma
+          # buena seguia encontrandolo alli mientras `LeadBase` volvia a escribir «Mexico».
+          # Es el disparo en falso al reves, y es el que no se ve.
+          esquema=$(grep -vE '^\s*#' backend/app/schemas/lead.py)
+          if printf '%s\n' "$esquema" | grep -nE 'country: *str *= *Field\(|country:.*Field\(["'"'"']'; then
+            echo ""
+            echo "FALLO: el esquema de la API vuelve a rellenar el pais que no llega (capitulo 32)."
+            exit 1
+          fi
+          [ "$(printf '%s\n' "$esquema" | grep -c 'country: Optional\[str\] = Field(None, max_length=MAX_COUNTRY)')" -eq 2 ] || {
+            echo "FALLO: el alta o la edicion dejaron de declarar el pais como opcional (capitulo 32)."
+            exit 1
+          }
+          registro=$(grep -vE '^\s*#' backend/app/services/registro_de_actividad.py)
+          if printf '%s\n' "$registro" | grep -nE 'country=datos\.get\("country", *"'; then
+            echo "FALLO: el alta del registro de actividad vuelve a suponer el pais (capitulo 32)."
+            exit 1
+          fi
+          # Y la cabecera de la ficha, que es el unico sitio donde una persona lo lee. Un
+          # `|| 'Mexico'` en el cliente reintroduce la suposicion sin tocar el servidor.
+          if grep -nE "country[^\n]*\|\|[^\n]*'M" frontend/src/components/LeadDetailModal.jsx; then
+            echo "FALLO: el cliente vuelve a ensenar o precargar «Mexico» por defecto (capitulo 32)."
+            exit 1
+          fi
+          echo "El pais: columna que admite vacio, esquema sin defecto, registro que no supone y cliente que no lo pinta."
+
+      # Capitulo 32. El capitulo 21 normalizo el telefono de los prospectos y se olvido del
+      # de los asesores. Lo que se vigila no es que exista la validacion: es que los dos
+      # esquemas usen EL MISMO modulo. Dos copias se desincronizan el dia que alguien sube
+      # una, que es exactamente como se llego hasta aqui.
+      - name: El telefono se normaliza con un solo modulo
+        run: |
+          set -euo pipefail
+          for esquema in lead user; do
+            grep -vE '^\s*#' "backend/app/schemas/$esquema.py" \
+              | grep -q 'from app.core.telefono import validador_de_telefono' || {
+              echo ""
+              echo "FALLO: backend/app/schemas/$esquema.py ya no normaliza con app.core.telefono (capitulo 32)."
+              exit 1
+            }
+          done
+          usuarios=$(grep -vE '^\s*#' backend/app/schemas/user.py)
+          [ "$(printf '%s\n' "$usuarios" | grep -c '_phone = field_validator("phone")(validador_de_telefono)')" -eq 2 ] || {
+            echo "FALLO: el alta o la edicion de una cuenta dejo de normalizar el telefono (capitulo 32)."
+            exit 1
+          }
+          echo "Prospectos y asesores, el mismo E.164 y el mismo modulo."
+
       # Fase 15. Del mensaje se guarda el tipo, la direccion, la fecha y el identificador,
       # nunca el texto. Y cada integracion firma con su secreto y cuenta con su limite: una
       # revocada o filtrada no arrastra a las demas.
@@ -2017,6 +2112,73 @@ jobs:
           done
           echo "Sesiones, recalculos, registros CRM y bandeja con plazo, aplicado cada dia."
 
+      # Capitulo 32. Las DOS ULTIMAS filas de §20.5 sin plazo: la bitacora de auditoria, que
+      # se remitia a «decision de operacion» desde el capitulo 14 y crecia sin techo, y el
+      # conjunto de realimentacion, que no es una tabla —son archivos— y por eso no bastaba
+      # con anadir una consulta mas.
+      - name: Nada sin plazo (2) - la bitacora y el conjunto de realimentacion
+        run: |
+          set -euo pipefail
+          plazos=$(grep -vE '^\s*#' backend/app/services/caducidad_service.py)
+
+          printf '%s\n' "$plazos" | grep -q '"bitacora", "audit_log", "CONSERVACION_AUDITORIA_DIAS"' || {
+            echo ""
+            echo "FALLO: la bitacora vuelve a no tener plazo en la aplicacion (capitulo 32)."
+            exit 1
+          }
+          # La bitacora va la ULTIMA de la lista: si corriera antes, podria llevarse en la
+          # misma pasada el asiento de ERROR que otro plazo acababa de escribir, y el fallo
+          # del dia quedaria sin rastro.
+          lista=$(sed -n '/^PLAZOS: List\[Plazo\] = \[/,/^\]/p' backend/app/services/caducidad_service.py | grep -vE '^\s*#')
+          ultima=$(printf '%s\n' "$lista" | grep -oE '"[a-z_]+", "[a-z_]+", "CONSERVACION_[A-Z_]+_DIAS"' | tail -1)
+          case "$ultima" in
+            *'"audit_log"'*) echo "La bitacora se purga la ultima." ;;
+            *) echo "FALLO: la purga de la bitacora ya no va la ultima ($ultima); capitulo 32."; exit 1 ;;
+          esac
+
+          # El conjunto de realimentacion: plazo propio, por directorio y por patron. El
+          # patron es ESTRECHO a proposito: en ese mismo directorio vive leads_historical.csv,
+          # el conjunto sintetico con el que se entrena, que no lleva datos de nadie y no
+          # tiene plazo. Un `*.csv` se lo habria llevado a los treinta dias.
+          printf '%s\n' "$plazos" | grep -q 'PATRONES_DE_REALIMENTACION = ("leads_reales\*.csv", "leads_reales\*_manifiesto.json")' || {
+            echo ""
+            echo "FALLO: el patron de la purga del conjunto cambio (capitulo 32)."
+            echo "Con un patron ancho, la purga diaria borra leads_historical.csv y el"
+            echo "entrenamiento del artefacto que sirve hoy deja de poder repetirse."
+            exit 1
+          }
+          printf '%s\n' "$plazos" | grep -q 'if ruta.is_symlink() or not ruta.is_file():' || {
+            echo "FALLO: la purga vuelve a seguir enlaces simbolicos (capitulo 32)."
+            echo "Quien pudiera escribir un nombre en ese directorio haria que la pasada"
+            echo "diaria borrara cualquier archivo de la maquina."
+            exit 1
+          }
+          # Pedir unos plazos concretos no puede arrastrar los de archivos: guarda_del_motor
+          # _de_reglas.py aplica los de `tareas` y `avisos` para comprobar otra cosa.
+          printf '%s\n' "$plazos" | grep -q 'plazos_de_archivos = \[\] if plazos is not None else PLAZOS_DE_ARCHIVOS' || {
+            echo "FALLO: una pasada restringida vuelve a borrar archivos de paso (capitulo 32)."
+            exit 1
+          }
+
+          servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
+          for ajuste in CONSERVACION_AUDITORIA_DIAS CONSERVACION_REALIMENTACION_DIAS REALIMENTACION_DIR; do
+            printf '%s\n' "$servicio" | grep -q "^      $ajuste:" || {
+              echo "FALLO: $ajuste no llega al servicio que aplica el plazo (capitulo 32)."
+              exit 1
+            }
+          done
+          # Y el volumen: sin el, la purga aplicaria su corte sobre un directorio vacio cada
+          # dia —cero archivos, cierto— mientras el CSV sigue en el otro contenedor.
+          directorio=$(printf '%s\n' "$servicio" | sed -n 's/^      REALIMENTACION_DIR: //p')
+          for bloque in backend retencion-historial; do
+            sed -n "/^  $bloque:/,/^  [a-z-]*:$/p" devops/docker-compose.yml \
+              | grep -q "realimentacion:$directorio" || {
+              echo "FALLO: el servicio '$bloque' no monta el volumen de realimentacion (capitulo 32)."
+              exit 1
+            }
+          done
+          echo "Bitacora y conjunto de realimentacion con plazo; el volumen lo comparten quien extrae y quien purga."
+
       # §19.9. Negarse a evaluar con un perfil ajeno es correcto; hacerlo sin avisar deja al
       # sistema aparentando vigilancia. La negativa tiene que salir por el webhook, y la de
       # una evaluacion fallida sin el mensaje de la excepcion, que nombra la base.
@@ -2041,10 +2203,12 @@ jobs:
           }
           echo "Negativas del monitor por el mismo canal que sus alertas."
 
-      # Capitulo 22 (§20.8, §17.9). La guarda es el propio guion de renovacion en su modo sin
-      # red: imagenes sin huella, una etiqueta con dos huellas, `apk upgrade` o un paquete de
-      # `apk` sin version. Solo biblioteca estandar, para correr sin instalar nada.
-      - name: Las imagenes base van fijadas por huella y sin apk upgrade
+      # Capitulo 22 (§20.8, §17.9), ampliado en el 32. La guarda es el propio guion de
+      # renovacion en su modo sin red: imagenes sin huella, una etiqueta con dos huellas,
+      # `apk upgrade` o `apt-get upgrade`, un paquete de `apk` o de `apt-get` sin version, y
+      # una accion de GitHub por etiqueta en vez de por la huella de su commit. Solo
+      # biblioteca estandar, para correr sin instalar nada.
+      - name: Imagenes, paquetes y acciones, todo fijado
         run: python3 scripts/renovar_imagenes.py --solo-fijacion
 
       # Capitulo 23 (§14.7). El access token lleva `ver` y la resolucion de identidad la
@@ -2154,9 +2318,9 @@ jobs:
       SECRET_KEY: clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -2242,7 +2406,7 @@ jobs:
     name: Validar la pila de despliegue
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # La pila de producción debe abortar sin credenciales: los valores por defecto
       # cómodos ("postgres"/"postgres") son exactamente los que acaban desplegados.

@@ -353,7 +353,13 @@ def test_el_asesor_ve_los_suyos_y_solo_el_total_del_resto(
     assert informe["resumen"]["de_otros_asesores"] == 1
     assert informe["resumen"]["alcance_completo"] is False
     # Ni el nombre, ni la empresa, ni el score del prospecto ajeno salen del servidor.
-    plano = str(informe)
+    #
+    # Se busca en todo MENOS en la cabecera `publicacion` (capítulo 32). Ahí va el enlace
+    # público, y dentro el slug: veintidós caracteres aleatorios de `secrets`. La cadena «99»
+    # cae dentro de un slug así aproximadamente una vez de cada doscientas, de modo que esta
+    # prueba fallaba sola con esa frecuencia desde el capítulo 25, sin que nada estuviera mal.
+    # La cabecera no lleva datos de ningún prospecto, así que sacarla no debilita nada.
+    plano = str({clave: valor for clave, valor in informe.items() if clave != "publicacion"})
     assert "Ajeno" not in plano
     assert "99" not in plano
 

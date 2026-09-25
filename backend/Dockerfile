@@ -25,9 +25,20 @@ FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# Con versión exacta desde el capítulo 32. Hasta entonces esta etapa era el último sitio
+# del proyecto donde algo se resolvía «lo que haya ese día»: la imagen base iba por huella
+# y las ruedas de Python por lock con hash, pero el compilador con el que se construyen
+# esas ruedas lo elegía el índice de Debian en el momento del build.
+#
+# `build-essential` es un METAPAQUETE: fijar su versión fija el metapaquete, no cada gcc y
+# cada libc que arrastra. Es una mejora real —esta línea deja de construir cuando Debian lo
+# renueva, y la renovación pasa a ser un acto con su diff— y no es fijación total. Fijar el
+# árbol completo exigiría `apt-get install` con la lista resuelta entera, que hay que
+# regenerar en cada renovación de la base; no compensa para una etapa que no viaja a la
+# imagen final.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
+    'build-essential=12.12' \
+    'libpq-dev=17.11-0+deb13u1' \
     && rm -rf /var/lib/apt/lists/*
 
 # Entorno virtual aislado: se copia entero a la etapa final de una sola vez.
@@ -54,7 +65,9 @@ RUN pip install --require-hashes -r /tmp/requirements.lock
 FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS runtime
 
 # libpq5 es la biblioteca en tiempo de ejecución de PostgreSQL; libpq-dev (cabeceras y
-# compilador) se queda en la etapa de compilación.
+# compilador) se queda en la etapa de compilación. Desde el capítulo 32 va con su versión
+# como los demás: era el único paquete de la imagen FINAL que seguía sin ella, y el que más
+# cerca está del proceso que atiende peticiones.
 #
 # Los otros cuatro son parches de Debian 13 sobre la base fijada (capítulo 22): con la huella
 # de hoy, Trivy encontraba doce avisos ALTOS o CRÍTICOS con arreglo publicado en ellos. Van con
@@ -62,7 +75,7 @@ FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb
 # este archivo, no el día de la construcción. Cuando Debian publique otra revisión, esta
 # línea dejará de construir; se resuelve renovando la base y mirando qué sigue haciendo falta.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
+    'libpq5=17.11-0+deb13u1' \
     'gzip=1.13-1+deb13u1' \
     'libpcre2-8-0=10.46-1~deb13u2' \
     'libsqlite3-0=3.46.1-7+deb13u2' \
@@ -74,6 +87,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # quedaba escrito con permisos de root en el anfitrión.
 RUN groupadd --system --gid 1001 plurione \
     && useradd --system --uid 1001 --gid plurione --create-home --home-dir /home/plurione plurione
+
+# Los puntos de montaje de los volúmenes, creados AQUÍ y con su dueño (capítulo 32).
+#
+# Docker copia el contenido y los PERMISOS del directorio de la imagen dentro de un volumen
+# nombrado vacío la primera vez que lo monta. Si el directorio no existe en la imagen, lo
+# crea el demonio y queda como `root:root` — y estos procesos corren como `plurione`
+# (uid 1001), así que no pueden escribir en él.
+#
+# Esto no es una precaución teórica. El volumen `deriva` existe desde el capítulo 22 con un
+# comentario en `docker-compose.yml` que explica por qué el estado de las alertas va ahí y no
+# en `tmpfs`: para que un reinicio no haga que la misma deriva vuelva a avisar. Nunca
+# funcionó: el volumen llevaba desde entonces vacío y propiedad de root. No se había notado
+# porque el monitor solo escribe cuando tiene una alerta que recordar, y todavía no ha
+# tenido ninguna. La primera habría fallado al guardar el estado, y la segunda habría
+# vuelto a avisar de lo mismo, que es exactamente lo que ese volumen existía para evitar.
+RUN mkdir -p /var/lib/plurione/deriva /var/lib/plurione/realimentacion \
+    && chown -R plurione:plurione /var/lib/plurione
 
 WORKDIR /app
 

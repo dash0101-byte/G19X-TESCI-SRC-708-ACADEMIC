@@ -6,6 +6,13 @@ Capítulo 22: las imágenes base van fijadas por huella y el sistema base no se 
 construcciones del mismo Dockerfile en fechas distintas dieran imágenes distintas. La guarda
 es `scripts/renovar_imagenes.py --solo-fijacion`; aquí se comprueba el repositorio y que la
 guarda detecta cada forma de volver atrás.
+
+Capítulo 32: las dos mitades que faltaban
+-------------------------------------------
+La guarda exigía versión a los paquetes de `apk` y no a los de `apt-get`, es decir, a la
+imagen del **cliente** y no a la del **backend**. Y fijaba por huella todo lo que el CI
+DESCARGA sin mirar lo que el CI EJECUTA: `actions/checkout@v4` es una etiqueta móvil, y lo
+que hay detrás corre con el token del repositorio.
 """
 import importlib.util
 import pathlib
@@ -101,11 +108,72 @@ def test_una_imagen_sin_huella_en_el_workflow_se_detecta(linea):
     "          docker run -d --name web-ci plurione-frontend:ci",
     "      DATABASE_URL: postgresql+psycopg2://plurione:clave@localhost:5432/lead_scoring_db",
     "          curl -sS http://127.0.0.1:8099/assets/x.css",
-    "      - uses: actions/checkout@v4",
     "      # docker run --rm aquasec/trivy:0.74.0 image x",
+    "      # - uses: actions/checkout@v4",
 ])
 def test_lo_que_no_es_una_imagen_ajena_no_dispara(linea):
     assert renovar.problemas_de_workflow(linea) == []
+
+
+# ==============================================================================
+# Capítulo 32: lo que el 22 dejó a medias
+# ==============================================================================
+
+@pytest.mark.parametrize("orden", [
+    "RUN apt-get update && apt-get upgrade -y",
+    "RUN apt-get dist-upgrade -y",
+])
+def test_apt_get_upgrade_se_detecta(orden):
+    """El equivalente de `apk upgrade` en Debian, que es la base de la imagen del backend."""
+    problemas = renovar.problemas_de_dockerfile(f"FROM python:3.13-slim@{H1}\n{orden}\n")
+    assert any("apt-get upgrade" in p for p in problemas)
+
+
+def test_un_paquete_de_apt_get_sin_version_se_detecta_aunque_venga_en_otra_linea():
+    texto = (
+        f"FROM python:3.13-slim@{H1}\n"
+        "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+        "    'libpq5=17.11-0+deb13u1' \\\n"
+        "    build-essential \\\n"
+        "    && rm -rf /var/lib/apt/lists/*\n"
+    )
+    assert renovar.problemas_de_dockerfile(texto) == [
+        "`apt-get install build-essential`: paquete sin versión"
+    ]
+
+
+def test_apt_get_update_no_es_una_instalacion_sin_version():
+    """`apt-get update` no instala nada: exigirle versión sería un disparo en falso diario."""
+    texto = f"FROM python:3.13-slim@{H1}\nRUN apt-get update && rm -rf /var/lib/apt/lists/*\n"
+    assert renovar.problemas_de_dockerfile(texto) == []
+
+
+@pytest.mark.parametrize("linea", [
+    "      - uses: actions/checkout@v4",
+    "      - uses: actions/setup-python@v5.6.0",
+    "        uses: docker/build-push-action@main",
+])
+def test_una_accion_de_github_por_etiqueta_se_detecta(linea):
+    """
+    Una etiqueta es móvil: quien controle el repositorio de la acción —o quien le robe la
+    cuenta— la reapunta y el siguiente `push` ejecuta otra cosa con el token del trabajo.
+    """
+    problemas = renovar.problemas_de_workflow(linea)
+    assert problemas and "huella del commit" in problemas[0]
+
+
+@pytest.mark.parametrize("linea", [
+    "      - uses: actions/checkout@" + "a" * 40 + " # v4.4.0",
+    "        uses: docker/build-push-action@" + "b" * 40,
+])
+def test_una_accion_fijada_por_commit_no_dispara(linea):
+    assert renovar.problemas_de_workflow(linea) == []
+
+
+def test_el_repositorio_no_usa_ninguna_accion_por_etiqueta():
+    acciones = renovar.acciones_fijadas()
+    assert acciones, "el workflow usa acciones; si esto queda vacío, la guarda dejó de mirarlas"
+    assert all(renovar.HUELLA_DE_COMMIT.fullmatch(huella) for huella in acciones.values())
 
 
 def test_la_misma_etiqueta_con_dos_huellas_es_una_renovacion_a_medias(monkeypatch):

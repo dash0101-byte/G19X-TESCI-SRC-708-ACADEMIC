@@ -14,11 +14,21 @@ Tres usos:
 
 `--solo-fijacion` es la guarda: la corren la suite y el pipeline. Falla si una imagen va sin
 huella, si la misma `nombre:etiqueta` aparece con dos huellas distintas, si un Dockerfile
-vuelve a `apk upgrade` o si instala un paquete de `apk` sin versión.
+vuelve a `apk upgrade` o `apt-get upgrade`, si instala un paquete de `apk` **o de
+`apt-get`** sin versión, o si una acción de GitHub va por etiqueta en lugar de por la huella
+de su commit.
 
-`--aplicar` no decide nada por su cuenta: deja un diff para revisar. Después hay que
-construir, escanear con Trivy y mirar si los paquetes de `apk` con versión del Dockerfile del
-cliente siguen haciendo falta; una base nueva puede traerlos ya, o necesitar otros.
+Las dos últimas comprobaciones son del capítulo 32 y cierran lo que el 22 dejó a medias: la
+guarda exigía versión a Alpine y no a Debian —es decir, a la imagen del cliente y no a la
+del backend—, y fijaba por huella todo lo que el CI DESCARGA menos lo que el CI EJECUTA. Una
+acción por etiqueta es código de terceros que puede cambiar sin que cambie el repositorio,
+corriendo con el token del trabajo.
+
+`--aplicar` no decide nada por su cuenta: deja un diff para revisar. Además, **solo renueva
+huellas de imágenes**: las de las acciones se actualizan a mano, con su comentario `# vX.Y`
+al lado, porque subir de versión una acción se lee en el diff y se decide, no se arrastra.
+Después hay que construir, escanear con Trivy y mirar si los paquetes con versión de los dos
+Dockerfile siguen haciendo falta; una base nueva puede traerlos ya, o necesitar otros.
 
 Al registro se pregunta con `docker buildx imagetools inspect`, que usa las credenciales y el
 proxy del propio Docker, y se toma la huella del índice multiplataforma: la misma referencia
@@ -55,6 +65,13 @@ SIN_HUELLA_EN_WORKFLOW = re.compile(
     r"(?![A-Za-z0-9._@-])"
 )
 
+# `uses: owner/repo@ref`, con o sin subdirectorio. Las acciones locales (`./.github/...`) y
+# las de contenedor (`docker://...`) no llevan huella de commit y quedan fuera.
+USO_DE_ACCION = re.compile(
+    r"^\s*-?\s*uses:\s*(?P<accion>[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+)@(?P<ref>[^\s#]+)"
+)
+HUELLA_DE_COMMIT = re.compile(r"[0-9a-f]{40}")
+
 
 def _sin_comentarios(texto: str) -> str:
     return "\n".join(linea for linea in texto.splitlines() if not linea.lstrip().startswith("#"))
@@ -82,12 +99,37 @@ def problemas_de_dockerfile(texto: str) -> List[str]:
         if re.search(r"\bapk\b[^;&|]*\bupgrade\b", instruccion):
             problemas.append("`apk upgrade`: sube lo que haya ese día; nombre los paquetes con su versión")
         for orden in re.finditer(r"\bapk\s+add\b(?P<resto>[^;&|]*)", instruccion):
-            for token in orden.group("resto").split():
-                paquete = token.strip("'\"")
-                if not paquete or paquete.startswith("-"):
-                    continue
-                if "=" not in paquete:
-                    problemas.append(f"`apk add {paquete}`: paquete sin versión")
+            problemas += _paquetes_sin_version("apk add", orden.group("resto"))
+
+        # Capítulo 32: lo mismo para Debian. La guarda exigía versión a `apk` desde el
+        # capítulo 22 y no miraba `apt-get`, así que la imagen del backend —la que atiende
+        # peticiones— instalaba `libpq5` y el compilador con lo que hubiera ese día. Era la
+        # misma indeterminación que se quitó en Alpine, a medias, y con la mitad que falta
+        # en la imagen más importante de las dos.
+        if re.search(r"\bapt-get\b[^;&|]*\b(upgrade|dist-upgrade)\b", instruccion):
+            problemas.append(
+                "`apt-get upgrade`: sube lo que haya ese día; nombre los paquetes con su versión"
+            )
+        for orden in re.finditer(r"\bapt-get\s+install\b(?P<resto>[^;&|]*)", instruccion):
+            problemas += _paquetes_sin_version("apt-get install", orden.group("resto"))
+    return problemas
+
+
+def _paquetes_sin_version(orden: str, resto: str) -> List[str]:
+    """
+    Los paquetes de una orden de instalación que van sin `=version`.
+
+    Las opciones (`--no-install-recommends`, `-y`) se saltan por el guion inicial. `apt-get`
+    admite además nombres con arquitectura (`libpq5:amd64`), que siguen siendo un paquete
+    sin versión: lo que decide es el `=`.
+    """
+    problemas: List[str] = []
+    for token in resto.split():
+        paquete = token.strip("'\"")
+        if not paquete or paquete.startswith("-"):
+            continue
+        if "=" not in paquete:
+            problemas.append(f"`{orden} {paquete}`: paquete sin versión")
     return problemas
 
 
@@ -142,6 +184,19 @@ def problemas_de_workflow(texto: str) -> List[str]:
             if encontrada.group("ref").startswith("plurione"):
                 continue
             problemas.append(f"línea {numero}: {encontrada.group('ref')} no va fijada por huella")
+
+        # Capítulo 32. Una acción de GitHub es código de terceros que corre con el token del
+        # repositorio y ve lo que ve el trabajo. `actions/checkout@v4` es una ETIQUETA
+        # MÓVIL: quien controle ese repositorio —o quien le robe la cuenta a quien lo
+        # controle— la reapunta y el siguiente `push` ejecuta otra cosa, sin que aquí cambie
+        # una sola línea. Es el mismo argumento con el que el capítulo 22 fijó las imágenes,
+        # aplicado a lo único del CI que seguía yendo por etiqueta.
+        accion = USO_DE_ACCION.search(linea)
+        if accion and not HUELLA_DE_COMMIT.fullmatch(accion.group("ref")):
+            problemas.append(
+                f"línea {numero}: {accion.group('accion')}@{accion.group('ref')} "
+                "no va fijada por la huella del commit"
+            )
     return problemas
 
 
@@ -171,6 +226,19 @@ def problemas_de_fijacion() -> List[str]:
             detalle = "; ".join(f"{h[7:19]} en {', '.join(sorted(set(r)))}" for h, r in huellas.items())
             problemas.append(f"{imagen}:{etiqueta} aparece con {len(huellas)} huellas distintas ({detalle})")
     return problemas
+
+
+def acciones_fijadas() -> Dict[str, str]:
+    """Cada acción de GitHub usada en los workflows, con la huella del commit que la fija."""
+    acciones: Dict[str, str] = {}
+    for ruta in WORKFLOWS:
+        for linea in _leer(ruta).splitlines():
+            if linea.lstrip().startswith("#"):
+                continue
+            uso = USO_DE_ACCION.search(linea)
+            if uso and HUELLA_DE_COMMIT.fullmatch(uso.group("ref")):
+                acciones[uso.group("accion")] = uso.group("ref")
+    return acciones
 
 
 def referencias_fijadas() -> Dict[Tuple[str, str], str]:
@@ -213,7 +281,11 @@ def main(argv=None, consultar: Callable[[str, str], str] = huella_en_el_registro
     if problemas:
         return 1
     if args.solo_fijacion:
-        print(f"Imágenes fijadas por huella y sistema base sin `apk upgrade`: {len(referencias_fijadas())} referencias.")
+        print(
+            f"Imágenes fijadas por huella: {len(referencias_fijadas())} referencias. "
+            f"Acciones de GitHub fijadas por commit: {len(acciones_fijadas())}. "
+            "Paquetes de `apk` y de `apt-get`, con versión."
+        )
         return 0
 
     atrasadas: Dict[Tuple[str, str], str] = {}

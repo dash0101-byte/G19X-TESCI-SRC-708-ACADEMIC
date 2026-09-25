@@ -3,6 +3,22 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
+**Última revisión:** 24 de septiembre de 2026 (capítulo 32)
+
+> **Revisión del capítulo 32.** La congelación se mantiene tal cual: solo entran
+> correcciones de fallos, con el criterio de §1. Lo que cambia es el inventario. §6.1 —«lo
+> que puede morder»— tenía ocho puntos y ahora tiene **dos**, y los dos esperan a un
+> sistema externo, no a más trabajo de este equipo. Se cerraron además el 13 y el 22. El
+> capítulo 32 fue deuda, no funcionalidad: cada punto reparaba algo que el sistema ya
+> prometía por escrito —una política de conservación sin filas sin plazo, una ficha que no
+> supone, una guarda que exige versión— y ninguno añadió una frase nueva al README.
+>
+> Ese capítulo encontró además, al levantar la pila para comprobar el trabajo, **un defecto
+> que no estaba en ninguna lista**: el volumen `deriva` del capítulo 22 nunca fue escribible
+> por el proceso que lo usa, así que el monitor de deriva no habría podido recordar que ya
+> avisó. Corregido, con un control nuevo en el CI. Se anota aquí porque es la clase de cosa
+> que este documento no puede prever: las listas recogen lo que se sabe que falta, no lo que
+> se cree terminado y no lo está.
 
 ---
 
@@ -184,6 +200,27 @@ Automatizarlo con un servicio que abra solicitudes de cambio exige una cuenta.
 
 Hay copias, con prueba de restauración comprobada (capítulo 16). Sacarlas de la máquina
 exige almacenamiento externo.
+
+---
+
+### 3.10. Sin `event_id`, el CRM se deduplica por contenido
+
+**(R21 §21.12 · reclasificado desde §6.1 en el capítulo 32)**
+
+Estuvo en «deuda de ingeniería» hasta el capítulo 32, y estaba mal colocado: aquí no hay
+nada que escribir. La clave de deduplicación es `(source, external_event_id)`, y cuando el
+sistema de origen **no manda** identificador la única huella disponible es el contenido.
+
+Lo que eso cuesta: dos eventos reales idénticos byte a byte —incluido el instante— entran
+como uno. Lo que costaría la alternativa: aceptar los dos y dejar que el operador decida,
+es decir, cambiar un caso raro y sin daño por uno frecuente y con daño, porque cada
+reentrega del CRM duplicaría la actividad. La corrección de verdad es que el CRM mande
+`event_id`, y eso lo decide quien opera ese CRM.
+
+Lo mismo, en menor grado, vale para la entrega de WhatsApp con varios mensajes (§6.1,
+punto 6): el arreglo es escribible, pero **no comprobable** hasta que haya una cuenta al
+otro lado, porque depende de si el proveedor reentrega la tanda entera o solo lo que
+faltaba, y de esa respuesta depende si la transacción única es la corrección o el problema.
 
 ---
 
@@ -385,16 +422,54 @@ No depende de nadie. Se puede hacer hoy. Ordenada por lo que cuesta si nadie la 
 
 ### 6.1. Lo que puede morder
 
-| # | Qué | Por qué importa | Origen |
-| :---: | :--- | :--- | :---: |
-| 1 | **El CSV de realimentación no caduca** | Vive fuera de la base y fuera del control de versiones. Es la última fila de la política de conservación sin plazo, y lleva datos de personas | R20 §20.8 · R22 §22.9 |
-| 2 | **La bitácora de auditoría no tiene plazo en la aplicación** | Es una decisión de operación desde el capítulo 14 y crece sin techo | R22 §22.9 |
-| 3 | **`App.jsx` sigue sin pruebas** | La redirección al cambio obligatorio de contraseña y el que no se lancen cargas de datos en ese estado están comprobados por lectura y por la prueba del componente, no por la aplicación montada. Arrastra desde el capítulo 17 y el 19 le añadió dos comportamientos más | R19 §19.9 |
-| 4 | **La guarda no mira `apt-get`** | Los cuatro paquetes de seguridad del backend van con versión; `libpq5` y las herramientas de compilación de la primera etapa, no. La guarda solo exige versión a `apk`: la misma indeterminación que se quitó en Alpine, a medias | R22 §22.9 |
-| 5 | **Las acciones de GitHub van por etiqueta** | `actions/checkout@v4`, no por el SHA del commit. Todo lo demás del CI va por huella | R22 §22.9 |
-| 6 | **Una entrega de WhatsApp con varios mensajes no es atómica** | Se validan todos antes de escribir, pero si el tercero falla al registrarse los dos primeros quedan. Un reintento los encuentra como duplicados, así que no corrompe; deja trabajo a medias | R21 §21.12 |
-| 7 | **Sin `event_id`, el CRM se deduplica por contenido** | Dos eventos reales idénticos byte a byte entran como uno | R21 §21.12 |
-| 8 | **El país sigue supuesto** | La ficha escribe «México» cuando no llega. No puntúa en ninguna de las dos mitades del score, y quitarlo exige una migración de la columna | R25 §25.10 · H-7 |
+> **Estado tras el capítulo 32 (cerrado el 24-09-2026).** De los ocho puntos, **seis
+> cerrados**: 1, 2, 3, 4, 5 y 8. Quedan abiertos el **6** y el **7**, y los dos por el
+> mismo motivo, que está escrito debajo de la tabla. La lista se conserva entera, tachada,
+> porque un backlog del que se borran las filas resueltas deja de servir para saber qué se
+> decidió y cuándo.
+>
+> Entra además un punto nuevo, el **24**, que el propio capítulo 32 encontró al comprobar si
+> un país escrito por error se podía corregir desde el panel. No se cerró porque el arreglo
+> afecta a **todos** los campos de la ficha a la vez y eso es una decisión de diseño con su
+> propia discusión, no una corrección.
+
+| # | Qué | Por qué importa | Origen | Estado |
+| :---: | :--- | :--- | :---: | :---: |
+| 1 | ~~**El CSV de realimentación no caduca**~~ | Vive fuera de la base y fuera del control de versiones. Es la última fila de la política de conservación sin plazo, y lleva datos de personas | R20 §20.8 · R22 §22.9 | **Cerrado** (R32 §32.2) |
+| 2 | ~~**La bitácora de auditoría no tiene plazo en la aplicación**~~ | Es una decisión de operación desde el capítulo 14 y crece sin techo | R22 §22.9 | **Cerrado** (R32 §32.3) |
+| 3 | ~~**`App.jsx` sigue sin pruebas**~~ | La redirección al cambio obligatorio de contraseña y el que no se lancen cargas de datos en ese estado están comprobados por lectura y por la prueba del componente, no por la aplicación montada. Arrastra desde el capítulo 17 y el 19 le añadió dos comportamientos más | R19 §19.9 | **Cerrado** (R32 §32.5) |
+| 4 | ~~**La guarda no mira `apt-get`**~~ | Los cuatro paquetes de seguridad del backend van con versión; `libpq5` y las herramientas de compilación de la primera etapa, no. La guarda solo exige versión a `apk`: la misma indeterminación que se quitó en Alpine, a medias | R22 §22.9 | **Cerrado** (R32 §32.6) |
+| 5 | ~~**Las acciones de GitHub van por etiqueta**~~ | `actions/checkout@v4`, no por el SHA del commit. Todo lo demás del CI va por huella | R22 §22.9 | **Cerrado** (R32 §32.6) |
+| 6 | **Una entrega de WhatsApp con varios mensajes no es atómica** | Se validan todos antes de escribir, pero si el tercero falla al registrarse los dos primeros quedan. Un reintento los encuentra como duplicados, así que no corrompe; deja trabajo a medias | R21 §21.12 | **Abierto** |
+| 7 | **Sin `event_id`, el CRM se deduplica por contenido** | Dos eventos reales idénticos byte a byte entran como uno | R21 §21.12 | **Abierto** → §3.10 |
+| 24 | **Ningún campo de la ficha se puede vaciar una vez escrito** | La actualización parcial aplica `if value is not None`, así que un `null` explícito se ignora. Se puede cambiar un valor por otro; no borrarlo. Lo encontró el capítulo 32 al comprobar si un país escrito por error se podía corregir desde el panel: no se puede, ni el país ni ningún otro campo | R32 §32.9 | **Abierto** |
+| 8 | ~~**El país sigue supuesto**~~ | La ficha escribe «México» cuando no llega. No puntúa en ninguna de las dos mitades del score, y quitarlo exige una migración de la columna | R25 §25.10 · H-7 | **Cerrado** (R32 §32.4) |
+
+**Por qué 6 y 7 siguen abiertos, uno por uno.**
+
+**6 — La entrega de WhatsApp con varios mensajes.** Arreglarlo es escribible: envolver el
+registro de los mensajes de una entrega en una transacción y deshacerla entera si uno falla.
+No se hizo porque **no se puede comprobar que esté arreglado**. Nadie ha conectado nunca una
+cuenta de WhatsApp Business a este sistema (§3.2), así que la única forma de ejercitar el
+caso es una prueba que simule el fallo del tercer mensaje, y eso comprueba el código que se
+acaba de escribir, no el comportamiento con el proveedor real: no se sabe si WhatsApp
+reentrega la tanda entera o solo lo que faltaba, y de esa respuesta depende si la
+transacción única es la corrección o el problema. El daño mientras tanto está acotado y
+medido: no corrompe nada —el reintento encuentra los dos primeros como duplicados por
+`(source, external_event_id)`— y lo que deja es trabajo a medias, visible en la bandeja.
+Pertenece a §3, «depende de cuentas externas», más que a la deuda de ingeniería.
+
+**7 — La deduplicación por contenido del CRM.** Aquí no hay nada que escribir: la clave de
+deduplicación es `(source, external_event_id)`, y cuando el sistema de origen **no manda**
+identificador, la única huella disponible es el contenido. La alternativa —aceptar los dos
+eventos y dejar que el operador decida— cambia un caso raro y sin daño (dos eventos reales
+idénticos byte a byte, incluido el instante, entran como uno) por uno frecuente y con daño
+(cada reentrega del CRM duplica la actividad). La corrección de verdad es que el CRM mande
+`event_id`, y eso no se decide aquí. **Queda reclasificado a §3**, con lo demás que depende
+de que alguien del otro lado haga algo.
+
+Es decir: al cerrar el capítulo 32, **§6.1 no tiene ningún punto que este equipo pueda
+cerrar por su cuenta**. Los dos que quedan esperan a un sistema externo, no a más trabajo.
 
 ### 6.2. Huecos de la historia que se enseña
 
@@ -404,7 +479,7 @@ No depende de nadie. Se puede hacer hoy. Ordenada por lo que cuesta si nadie la 
 | 10 | **La asignación automática es solo para las fichas `HOT`** | H-6, a medias: hay dónde repartir, pero nada reparte solo. Una ficha `WARM` o `COLD` espera a que el líder la asigne | R25 §25.10 |
 | 11 | **El contador de «sin asesor» vive en «Publicaciones»** | No en el tablero, que es donde el líder mira primero. Es la nota de usabilidad que el capítulo 28 dio por cerrada sin estarlo | R25 §25.10 · R28 §28.13 |
 | 12 | **El reparto de la cartera de una baja es todo o nada** | A un solo destino. Repartir entre varias personas exige hacerlo prospecto a prospecto, y no hay aviso fuera del panel de administración | R19 §19.9 |
-| 13 | **El teléfono de los asesores no se normaliza** | `users.phone`. El capítulo 21 se ocupó del de los prospectos | R21 §21.12 |
+| 13 | ~~**El teléfono de los asesores no se normaliza**~~ | `users.phone`. El capítulo 21 se ocupó del de los prospectos. **Cerrado** en el capítulo 32: mismo E.164 y mismo módulo (`app.core.telefono`), con migración de los que ya estaban escritos de otra forma (R32 §32.4) | R21 §21.12 |
 | 14 | **El alta del panel no ofrece la casilla del aviso de privacidad** | La API la admite (`privacy_notice_accepted`); la pantalla, no | R21 §21.12 |
 | 15 | **No hay pantalla para configurar integraciones** | Se encienden y se revocan por variables de entorno | R21 §21.12 |
 | 16 | **No hay interfaz para exportar ni para explicar la supresión** | Los derechos del titular son API. Funcionan y están comprobados; no tienen pantalla | R20 §20.8 |
@@ -423,7 +498,7 @@ No depende de nadie. Se puede hacer hoy. Ordenada por lo que cuesta si nadie la 
 | 19 | `socat` y `pgAdmin` van fijados por huella, pero su etiqueta dice `latest` y no la versión | R22 §22.9 |
 | 20 | Fuera de Docker la aplicación lee `.env` y `../.env` desde donde se lance; el lanzador cubre la pila, `uvicorn` directo depende de quien lo lanza | R22 §22.9 |
 | 21 | En el entorno de desarrollo de **esta máquina** quedan `cffi`, `cryptography` y `pycparser`: un proceso ajeno tenía abierto `_cffi_backend.pyd` y no se detuvo. El código no los importa, el CI instala desde cero y la imagen no los lleva | R23 §23.7 |
-| 22 | Los ceros de ingresos que ya hay en la base no se migraron a nulos. El extractor los lee como ausentes, que es lo que importa al modelo; la ficha los muestra como cero hasta que alguien la edite | R24 §24.9 |
+| 22 | ~~Los ceros de ingresos que ya hay en la base no se migraron a nulos. El extractor los lee como ausentes, que es lo que importa al modelo; la ficha los muestra como cero hasta que alguien la edite~~ — **cerrado** en el capítulo 32: la migración `a4c8d1e70f39` los pasa a vacío y la base dice ya lo que el modelo leía (R32 §32.4) | R24 §24.9 |
 | 23 | Un aviso purgado puede volver a entrar si el sistema de origen lo reentrega pasado el plazo; y **descartar no bloquea** | R21 §21.12 · R22 §22.9 |
 
 ---
