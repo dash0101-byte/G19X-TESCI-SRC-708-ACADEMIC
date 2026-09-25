@@ -41,7 +41,12 @@ os.environ["REFRESH_COOKIE_SECURE"] = "false"
 from app.core.config import settings  # noqa: E402  (requiere el entorno de arriba)
 from app.core.database import Base, SessionLocal, engine, get_db  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
-from app.core.security import SIGNATURE_HEADER, TIMESTAMP_HEADER, hash_password  # noqa: E402
+from app.core.security import (  # noqa: E402
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+    exige_segundo_factor,
+    hash_password,
+)
 from app.main import app  # noqa: E402
 from app.models.entities import (  # noqa: E402
     Campaign,
@@ -102,14 +107,22 @@ def prepare_environment(tmp_path_factory):
     db = SessionLocal()
     try:
         for role, (email, full_name) in TEST_ACCOUNTS.items():
-            db.add(
-                User(
-                    email=email,
-                    full_name=full_name,
-                    role=role,
-                    hashed_password=hashed,
-                )
+            cuenta = User(
+                email=email,
+                full_name=full_name,
+                role=role,
+                hashed_password=hashed,
             )
+            # La cuenta de administración nace con el segundo factor ya activo, como la de
+            # un administrador de verdad que acaba de darse de alta (capítulo 35). Sin
+            # esto, toda la suite chocaría contra la exigencia en cuanto usara
+            # `admin_headers`, y la tentación sería apagar la exigencia en las pruebas: el
+            # camino que recorren dejaría de ser el que recorre un administrador real.
+            if exige_segundo_factor(role):
+                cuenta.totp_sal = "sal-fija-de-la-suite"
+                cuenta.totp_activo = True
+                cuenta.totp_codigos_de_recuperacion = []
+            db.add(cuenta)
         db.commit()
     finally:
         db.close()
@@ -248,17 +261,62 @@ def client():
 
 @pytest.fixture(scope="session")
 def login():
-    """Devuelve una función que inicia sesión y entrega el access token de un rol."""
+    """
+    Devuelve una función que inicia sesión y entrega el access token de un rol.
+
+    Desde el capítulo 35 hace los **dos pasos** cuando la cuenta tiene segundo factor, que
+    es siempre el caso de `System_Admin`: el rol lo tiene obligatorio y la suite lo da de
+    alta al preparar la base (`_dar_de_alta_el_segundo_factor`).
+
+    Podría haberse evitado apagando la exigencia en las pruebas, y sería un error: el camino
+    que recorre toda la suite dejaría de ser el que recorre un administrador de verdad, y el
+    día que el segundo paso se rompiera lo diría una sola prueba en lugar de todas.
+    """
     def _login(role: str) -> str:
         email, _ = TEST_ACCOUNTS[role]
+        # El mismo código TOTP no vale dos veces (RFC 6238 §5.2, con prueba propia en
+        # `test_segundo_factor.py`), así que dos accesos dentro de la misma ventana de
+        # treinta segundos fallan el segundo. En la vida real eso casi no ocurre y se
+        # resuelve esperando; en una suite que entra varias veces por segundo, ocurre
+        # siempre. Olvidar el contador es decir «han pasado treinta segundos» sin pasarlos.
+        with SessionLocal() as db:
+            cuenta = db.query(User).filter(User.email == email).first()
+            if cuenta is not None and cuenta.totp_ultimo_contador is not None:
+                cuenta.totp_ultimo_contador = None
+                db.commit()
         with TestClient(app) as anon:
             response = anon.post(
                 "/api/v1/auth/login", json={"email": email, "password": TEST_PASSWORD}
             )
-        assert response.status_code == 200, response.text
-        return response.json()["access_token"]
+            assert response.status_code == 200, response.text
+            cuerpo = response.json()
+            if cuerpo.get("tipo") == "segundo_factor":
+                response = anon.post(
+                    "/api/v1/auth/login/segundo-factor",
+                    json={"desafio": cuerpo["desafio"], "codigo": codigo_del_segundo_factor(email)},
+                )
+                assert response.status_code == 200, response.text
+                cuerpo = response.json()
+        return cuerpo["access_token"]
 
     return _login
+
+
+def codigo_del_segundo_factor(email: str) -> str:
+    """
+    El código que enseñaría el teléfono de esa cuenta ahora mismo.
+
+    Se deriva igual que lo hace el servidor —de `SECRET_KEY` y la sal guardada—, así que la
+    suite no necesita conocer ningún secreto: lee la sal de la base, que es pública, y
+    calcula. Es exactamente lo que hace la aplicación al comprobar.
+    """
+    from app.core import totp
+    from app.models.entities import User, utc_now
+    from app.services.segundo_factor import _secreto_de
+
+    with SessionLocal() as db:
+        usuario = db.query(User).filter(User.email == email).one()
+        return totp.codigo(_secreto_de(usuario.totp_sal), utc_now().timestamp())
 
 
 @pytest.fixture(scope="session")

@@ -4,7 +4,7 @@
 **Empresa:** PluriOne S.A. de C.V. (Develop Talent & Technology)
 **Autor:** Alumno de Estadía Profesional - Ingeniería en Sistemas Computacionales
 **Fecha de Sustentación:** Septiembre 2026
-**Estado del proyecto:** congelado el 24-09-2026 · 34 capítulos · 32 reportes
+**Estado del proyecto:** congelado el 24-09-2026 · 35 capítulos · 33 reportes
 
 > **Cómo usar esta guía.** La sección 1 es el reloj de los diez minutos y **sigue el guion
 > de la demostración**: lo que se enseña es la columna vertebral de la exposición, no un
@@ -27,7 +27,7 @@
 | **1:00 – 2:00**<br>*(1 min)* | **El problema** | • Atención FIFO sin calificar: **36 horas** de latencia de primer contacto, conversión del **12 %**.<br>• La restricción de ingeniería: local, **$0 USD**, con salida a Microsoft Azure sin reescribir la lógica. | Dos cifras y una restricción. No entrar en arquitectura todavía. |
 | **2:00 – 3:00**<br>*(1 min)* | **La arquitectura, en una diapositiva** | • Puertos y Adaptadores: la lógica no sabe si detrás hay Scikit-Learn o Azure ML.<br>• $S_{\text{final}} = 0.60 \times S_{\text{ML}} + 0.40 \times S_{\text{Heurístico}} \times \gamma(\Delta t)$, con $\gamma(\Delta t) = (0.5)^{\Delta t/14}$.<br>• Por qué 60/40 y no 100 % ML: arranque en frío y reglas de negocio deterministas. | Una sola diapositiva. Si el sínodo quiere profundizar, preguntará: están las Preguntas 1, 2 y 3. |
 | **3:00 – 7:30**<br>*(4.5 min)* | **LA DEMOSTRACIÓN**<br>*Del post a la red social hasta el dato de entrenamiento* | **1.** Marketing crea la publicación → enlace de 128 bits que da el servidor.<br>**2.** Un post, varias redes: **los dos enlaces son distintos**, y por eso después hay atribución.<br>**3.** El interesado envía sus datos desde el teléfono: **ni un campo de texto libre**.<br>**4.** La ficha nace puntuada, atribuida y sin asesor.<br>**5.** El líder la ve en el contador «sin asesor» y la reparte.<br>**6.** El asesor **no tiene que buscarla**: está en «Hoy», con el motivo escrito, y la ficha 360 responde de dónde salió, qué pidió y cuándo aceptó el aviso.<br>**7.** El líder compara publicaciones y ve **por qué red** llegó cada persona.<br>**8.** El trato **se cierra diciendo por qué**: lista cerrada, fecha y tramo. El score **no** se recalcula.<br>**9.** El panel de desenlaces: por motivo, por red, y **qué score tenían al cerrarse**. Más el contador del reentrenamiento. | **Nunca pulsar en silencio.** Cada paso tiene su frase en el guion cronometrado.<br>**El paso 0 es obligatorio:** hacer un envío de prueba antes de empezar, o la primera puntuación tarda **más de 3 s** en lugar de 286 ms mientras todos miran. |
-| **7:30 – 8:45**<br>*(1.25 min)* | **Calidad, seguridad y operación** | • **1428 pruebas** de backend (93 % de cobertura) y **369** de cliente, todas en verde.<br>• **10 trabajos** de integración continua, y **cuatro guardas de propiedades** que fallan cuando el sistema pierde una defensa aunque ninguna prueba se rompa.<br>• Autenticación real con JWT y revocación inmediata; **autorización sobre el dato**: un asesor solo ve su cartera, y un prospecto ajeno responde 404.<br>• Imágenes fijadas por huella, copias con **prueba de restauración**, derechos del titular comprobados tabla por tabla. | Si hay que recortar la exposición, se recorta **aquí**, no en la demostración: esto se puede contestar en preguntas y la demostración, no. |
+| **7:30 – 8:45**<br>*(1.25 min)* | **Calidad, seguridad y operación** | • **1485 pruebas** de backend (93 % de cobertura) y **385** de cliente, todas en verde.<br>• **10 trabajos** de integración continua, y **cuatro guardas de propiedades** que fallan cuando el sistema pierde una defensa aunque ninguna prueba se rompa.<br>• Autenticación real con JWT y revocación inmediata; **autorización sobre el dato**: un asesor solo ve su cartera, y un prospecto ajeno responde 404.<br>• Imágenes fijadas por huella, copias con **prueba de restauración**, derechos del titular comprobados tabla por tabla. | Si hay que recortar la exposición, se recorta **aquí**, no en la demostración: esto se puede contestar en preguntas y la demostración, no. |
 | **8:45 – 10:00**<br>*(1.25 min)* | **Lo que se negó a hacer, y cierre** | • **No se reentrenó el modelo** con los canales nuevos: no hay desenlaces reales, y el capítulo 30 construyó justamente el mecanismo para tenerlos.<br>• **No se inventó el peso de los motivos** ni se proyectaron ingresos.<br>• **No se publica un modelo** cuyo intervalo de confianza no alcance el umbral, aunque su estimación puntual lo supere.<br>• El trabajo futuro está en un solo documento, con **de qué depende cada punto**.<br>• Agradecimiento al sínodo. | Este bloque es el que distingue un proyecto terminado de uno abandonado. Decirlo con seguridad, no como disculpa. |
 
 **Dónde está cada cosa si el sínodo la pide:**
@@ -36,7 +36,7 @@
 | :--- | :--- |
 | «Enséñeme el detalle de la demostración» | `docs/Guion_Cronometrado_de_la_Demo.md` |
 | «¿Qué queda por hacer?» | `docs/Congelacion_y_Trabajo_Futuro.md` |
-| «¿Dónde está todo esto documentado?» | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` (32 reportes compilados) |
+| «¿Dónde está todo esto documentado?» | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` (33 reportes compilados) |
 | «¿Se ha probado con usuarios?» | `docs/Prueba_Con_Personas.md` — y la respuesta honesta es **todavía no**: Pregunta 20 |
 
 ---
@@ -574,8 +574,8 @@ tiene razón», no una improvisación.
 > red, la bandeja del asesor y el cierre con su motivo. No es un diagrama: se recorre entero
 > en menos de dos segundos de servidor y el ensayo lo comprueba paso por paso.
 >
-> **Segunda: está defendido contra sí mismo.** 1428 pruebas de backend con 93 % de
-> cobertura, 369 de cliente, diez trabajos de integración continua. Y algo que considero más
+> **Segunda: está defendido contra sí mismo.** 1485 pruebas de backend con 93 % de
+> cobertura, 385 de cliente, diez trabajos de integración continua. Y algo que considero más
 > valioso que la cobertura: **cuatro guardas que comprueban propiedades, no casos**. Un
 > campo de texto libre nuevo en el formulario de cierre no rompería ninguna prueba
 > existente, porque nadie lo enviaría; la guarda falla en cuanto ese campo existe. Y las
@@ -627,7 +627,7 @@ tiene razón», no una improvisación.
 > seguía ahí. Se cerró en el capítulo 33, el Reporte 31, y con él §6.1 vuelve a no tener
 > nada que dependa de nosotros.
 >
-> **Todo lo que se decidió está explicado, no solo hecho.** Treinta y dos reportes, y cada uno
+> **Todo lo que se decidió está explicado, no solo hecho.** Treinta y tres reportes, y cada uno
 > dice por qué se tomó cada decisión y qué se descartó. La memoria técnica los compila con
 > índice y anclas, y hay una prueba que falla si un reporte existe y no entró en la memoria:
 > los capítulos 22 a 24 se pegaron a mano una vez, salieron sin ancla y la siguiente

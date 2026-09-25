@@ -171,18 +171,31 @@ dirección verificada, una política de qué hacer cuando rebota y, sobre todo, 
 aplicación el nombre de una persona que aceptó un aviso de privacidad para otra cosa. La
 cuenta es el requisito más barato de los tres.
 
-### 3.6. No hay segundo factor
+### 3.6. ~~No hay segundo factor~~ — **cerrado en el capítulo 35**
 
-**(R23 §23.7, R19 §19.9)**
+**(R23 §23.7, R19 §19.9 · cerrado en R33)**
 
-Era opcional en el alcance y **no se hizo a medias a propósito**. Un TOTP para
-`System_Admin` exige alta con código de verificación, códigos de recuperación, un paso más
-en el login del cliente y una respuesta para quien pierde el teléfono siendo el único
-administrador —que es justo la cuenta que no puede quedarse fuera. Añadir la verificación
-sin eso produce una cuenta de administración que se bloquea sola.
+Decía esto, y era un diagnóstico exacto: «Un TOTP para `System_Admin` exige alta con código
+de verificación, códigos de recuperación, un paso más en el login del cliente y una
+respuesta para quien pierde el teléfono siendo el único administrador —que es justo la
+cuenta que no puede quedarse fuera. Añadir la verificación sin eso produce una cuenta de
+administración que se bloquea sola.»
 
-Depende de cuenta externa solo en parte: la entrega de los códigos de recuperación y
-cualquier canal de rescate sí la necesitan.
+**Las cuatro cosas están hechas** (R33 §35.3), y la cuarta mandó sobre las otras tres: hay
+tres salidas para quien se queda fuera, y la última cuenta de administración con segundo
+factor **no se lo puede quitar**, porque hacerlo dejaría el sistema sin administración
+utilizable.
+
+Resultó que **no dependía de ninguna cuenta externa**, que es lo que lo tenía clasificado
+aquí. Los códigos de recuperación se entregan en pantalla al darse de alta —no hacía falta
+un canal para mandarlos— y el rescate del último caso se resuelve con acceso al servidor,
+que es la respuesta correcta y no una carencia: cualquier canal usable desde fuera sería una
+segunda puerta a la cuenta más poderosa del sistema.
+
+Tampoco hizo falta una biblioteca de criptografía. El secreto **no se guarda**: se deriva de
+`SECRET_KEY` y de una sal por alta, así que la base no contiene nada que cifrar. El precio
+está escrito: rotar esa clave invalida todas las altas
+(`docs/Guia_del_Segundo_Factor.md` §5).
 
 ### 3.7. La lista de contraseñas filtradas no se actualiza sola ni es exhaustiva
 
@@ -535,6 +548,7 @@ cambiados, sin copiar valores.
 | 26 | El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado | R33 §33.8 |
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
+| 29 | Un administrador **no puede quitarle el segundo factor a otro** desde el panel: la salida (b) de la guía existe en el diseño pero no tiene botón, porque la gestión de cuentas no ganó esa operación. Hoy se resuelve por la vía (c), que es la misma sentencia SQL | R35 §35.9 |
 
 ---
 

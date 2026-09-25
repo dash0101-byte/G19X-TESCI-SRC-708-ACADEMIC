@@ -114,12 +114,18 @@ def test_borrar_la_cuenta_invalida_el_token(client, auth_headers, db_session):
     assert client.get(ME_URL, headers=headers).status_code == 200
 
     usuario = db_session.query(User).filter(User.email == email).one()
+    # La copia se toma de las columnas de la TABLA, no de una lista escrita a mano.
+    #
+    # Escrita a mano acertaba el día que se escribió y se quedó corta en el capítulo 35: la
+    # cuenta se restauraba sin las columnas del segundo factor, así que volvía sin él, y a
+    # partir de ahí toda petición de administración respondía 403. El fallo no aparecía aquí
+    # —esta prueba seguía en verde— sino en otras nueve de otros archivos, a media suite de
+    # distancia. Es el mismo criterio del capítulo 33 con los campos obligatorios: si la
+    # lista la dicta la tabla, no se puede quedar corta.
     datos = {
-        "email": usuario.email,
-        "full_name": usuario.full_name,
-        "role": usuario.role,
-        "hashed_password": usuario.hashed_password,
-        "is_active": usuario.is_active,
+        columna.name: getattr(usuario, columna.name)
+        for columna in User.__table__.columns
+        if columna.name != "id"
     }
     identificador = usuario.id
     db_session.delete(usuario)

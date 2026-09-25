@@ -34,9 +34,9 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1428 pruebas en el backend (93 % de cobertura) y 369 en
+> **Calidad en las dos mitades.** 1485 pruebas en el backend (93 % de cobertura) y 385 en
 > el cliente (94,5 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
-> con 39 guardas de regresión de configuración peligrosa y cuatro guardas de propiedades.
+> con 40 guardas de regresión de configuración peligrosa y cuatro guardas de propiedades.
 
 > ## 🧊 Proyecto congelado el 24-09-2026
 >
@@ -1137,7 +1137,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1428 pruebas
+### Backend — 1485 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1217,7 +1217,7 @@ exactamente lo que el extractor del dataset sabría usar; y que el panel sea de 
 devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
 es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
 
-### Cliente — 369 pruebas
+### Cliente — 385 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1226,7 +1226,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 369 pruebas
+npm test                # 385 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```
@@ -1272,7 +1272,7 @@ python scripts/demo_e2e.py
 
 ## 📚 Compilación de la Memoria Técnica Institucional
 
-Para compilar los 32 reportes técnicos en el documento formal consolidado con portada e índice:
+Para compilar los 33 reportes técnicos en el documento formal consolidado con portada e índice:
 ```bash
 python docs/compile_reports.py
 ```
@@ -1317,6 +1317,8 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **31** | [Reporte 31](docs/reportes/Reporte_31_Vaciar_un_Campo_es_un_Cambio_El_Nulo_que_se_Ignoraba_y_la_Lista_que_la_Tabla_Dicta.md) | Vaciar un campo es un cambio (capítulo 33): la actualización parcial deja de ignorar los nulos explícitos —distinguía «no lo mandó» de «lo mandó vacío» y volvía a mezclarlos—, los campos que la tabla declara `NOT NULL` responden 422 nombrándose con la lista **derivada de las columnas** y no escrita a mano, la bitácora distingue lo vaciado sin copiar valores, y el panel deja de exigir lo que la tabla admite vacío. 9 defectos reintroducidos, 9 detectados por guarda y por suite. |
 | **32** | [Reporte 32](docs/reportes/Reporte_32_Salir_a_Internet_por_una_Puerta_Estrecha_Tunel_a_Coste_Cero_y_la_Direccion_que_Caduca.md) | Salir a internet por una puerta estrecha (capítulo 34): un túnel gratuito publica **solo** la página de interés —lista blanca en un servidor aparte, 404 para todo lo demás— con HTTPS y sin abrir puertos del router; la dirección pública sigue siendo un solo ajuste, así que pasar a un dominio es cambiar un valor; y como la dirección de un túnel gratuito cambia en cada arranque, el sistema avisa cuando deja de responder y marca los enlaces ya repartidos que no llevan aquí. Comprobado desde fuera de la red: 5 rutas publicadas, 25 negadas. 10 defectos reintroducidos, 10 detectados. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos que sigue la demostración, 16 preguntas técnicas de sínodo y **8 preguntas incómodas** con su respuesta honesta: por qué no se lee LinkedIn, por qué el modelo no conoce los canales nuevos y por qué no hay desenlaces sintéticos. |
+| **33** | [Reporte 33](docs/reportes/Reporte_33_Segundo_Factor_para_Administracion_El_Secreto_que_no_se_Guarda_y_la_Cuenta_que_no_se_Bloquea_Sola.md) | Segundo factor para administración (capítulo 35): TOTP obligatorio para `System_Admin` y opcional para el resto, con QR y diez códigos de recuperación de un solo uso. El secreto **no se guarda**: se deriva de `SECRET_KEY` y una sal por alta, así que la base no contiene nada que cifrar. El alta no activa hasta comprobar un código, el desafío del login es de tipo propio y no sirve como sesión, un código no vale dos veces, y **la última administración no puede quitarse el suyo**. TOTP escrito sobre la biblioteca estándar y comprobado contra los 18 vectores oficiales del RFC 6238. 10 defectos reintroducidos, 10 detectados. |
+| **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
 | **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
 | **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |
 | **FIN** | [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md) | Qué cuenta como fallo a partir de la congelación, y todo lo que queda abierto agrupado por de qué depende. Incluye lo que **no** se va a hacer, con el motivo. |

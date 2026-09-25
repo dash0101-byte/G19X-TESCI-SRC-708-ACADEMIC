@@ -2398,6 +2398,139 @@ jobs:
             }
           done
           echo "La puerta publica solo la pagina de interes, en loopback, y la direccion tiene un solo dueno."
+
+      # Capitulo 35. El segundo factor cierra §3.6, que llevaba abierto desde el capitulo 19
+      # y que decia por que: «anadir la verificacion sin eso produce una cuenta de
+      # administracion que se bloquea sola». Las defensas que lo evitan son pequenas y se
+      # quitan sin que nada falle de forma visible, que es lo que las hace candidatas a esta
+      # lista.
+      #
+      # Lo que se vigila no es que el TOTP funcione —eso lo comprueban los vectores del RFC
+      # en la suite— sino las decisiones que lo rodean y que, al revertirse, dejan el sistema
+      # aparentemente sano: un secreto guardado, un desafio que sirve como sesion, un codigo
+      # que vale dos veces, o la ultima cuenta de administracion quitandose el factor.
+      - name: El segundo factor no se puede desarmar en silencio
+        run: |
+          set -euo pipefail
+
+          servicio=$(grep -vE '^\s*#' backend/app/services/segundo_factor.py)
+          esquemas=$(grep -vE '^\s*#' backend/app/models/entities.py)
+          seguridad=$(grep -vE '^\s*#' backend/app/core/security.py)
+          rutas=$(grep -vE '^\s*#' backend/app/api/v1/endpoints/auth.py)
+          nucleo=$(grep -vE '^\s*#' backend/app/core/totp.py)
+
+          # 1. El secreto se DERIVA, no se guarda. Es la propiedad que hace que la base no
+          # contenga nada que cifrar, y la que un cambio bienintencionado —«guardemos el
+          # secreto para poder re-cifrarlo al rotar la clave»— tiraria sin romper nada.
+          printf '%s\n' "$servicio" | grep -q 'hmac.new(' || {
+            echo ""
+            echo "FALLO: el secreto del segundo factor ya no se deriva (capitulo 35)."
+            echo "Si se guarda, la base pasa a contener un secreto, y entonces hay que"
+            echo "cifrarlo: un volcado de users bastaria para generar codigos de cualquiera."
+            exit 1
+          }
+          if printf '%s\n' "$esquemas" | grep -qE 'totp_secreto|totp_clave|totp_seed'; then
+            echo ""
+            echo "FALLO: aparecio una columna con el secreto del segundo factor (capitulo 35)."
+            echo "La tabla guarda una SAL; el secreto sale de ella y de SECRET_KEY, que vive"
+            echo "en el entorno. Guardarlo deshace esa propiedad entera."
+            exit 1
+          fi
+          printf '%s\n' "$esquemas" | grep -q 'totp_sal = Column(String(64), nullable=True)' || {
+            echo "FALLO: desaparecio la sal del segundo factor (capitulo 35)."
+            exit 1
+          }
+
+          # 2. La baja borra la sal. Con la sal y la clave se recalcula el secreto, asi que
+          # dejarla mantiene vivo el telefono de alguien que ya no usa esa cuenta.
+          printf '%s\n' "$servicio" |  grep -A 20 'def desactivar' | grep -q 'usuario.totp_sal = None' || {
+            echo ""
+            echo "FALLO: la baja del segundo factor ya no borra la sal (capitulo 35)."
+            exit 1
+          }
+
+          # 3. El desafio del login es de un TIPO PROPIO. Sin eso seria un access token de
+          # vida corta, y el segundo factor se saltaria sencillamente no pidiendolo.
+          printf '%s\n' "$seguridad" | grep -q 'TOKEN_TYPE_DESAFIO' || {
+            echo ""
+            echo "FALLO: el desafio del segundo factor dejo de tener tipo propio (capitulo 35)."
+            echo "Si sirve como Authorization, el primer paso basta para entrar."
+            exit 1
+          }
+          printf '%s\n' "$rutas" | grep -q 'decode_token(datos.desafio, TOKEN_TYPE_DESAFIO)' || {
+            echo "FALLO: el segundo paso ya no exige que el desafio sea de su tipo (capitulo 35)."
+            exit 1
+          }
+
+          # 4. Un codigo no vale dos veces. La tolerancia de reloj da a cada codigo noventa
+          # segundos de vida; sin esta memoria, uno leido por encima del hombro se reutiliza
+          # dentro de esa ventana.
+          printf '%s\n' "$nucleo" | grep -q 'contador_minimo' || {
+            echo ""
+            echo "FALLO: el TOTP ya no recuerda el ultimo periodo usado (capitulo 35)."
+            exit 1
+          }
+          printf '%s\n' "$servicio" | grep -q 'contador_minimo=(usuario.totp_ultimo_contador or -1) + 1' || {
+            echo "FALLO: la comprobacion dejo de rechazar un codigo ya usado (capitulo 35)."
+            exit 1
+          }
+          # Y la comparacion es en tiempo constante, en las dos formas.
+          [ "$(printf '%s\n' "$nucleo$servicio" | grep -c 'hmac.compare_digest')" -ge 2 ] || {
+            echo "FALLO: alguna comparacion de codigos dejo de ser en tiempo constante (capitulo 35)."
+            exit 1
+          }
+
+          # 5. La tolerancia de reloj es UNO. Subirla multiplica la vida de cada codigo:
+          # RFC 6238 §5.2 recomienda «como mucho uno», y con dos serian 150 segundos.
+          printf '%s\n' "$nucleo" | grep -qE '^DERIVA_DE_RELOJ = 1$' || {
+            echo ""
+            echo "FALLO: la tolerancia al reloj desfasado dejo de ser un periodo (capitulo 35)."
+            echo "Cada periodo de mas triplica el tiempo que sirve un codigo robado."
+            exit 1
+          }
+
+          # 6. La salvaguarda de §3.6: la ultima cuenta de administracion con segundo factor
+          # no puede quitarselo. Sin ella, darse de baja siendo el unico deja el sistema sin
+          # administracion utilizable, que es justo el motivo por el que esto no se hizo
+          # durante dieciseis capitulos.
+          printf '%s\n' "$servicio" | grep -q 'def administradores_con_segundo_factor' || {
+            echo ""
+            echo "FALLO: desaparecio la comprobacion de la ultima administracion (capitulo 35)."
+            exit 1
+          }
+          printf '%s\n' "$rutas" | grep -q 'segundo_factor.administradores_con_segundo_factor(db, excluyendo=user.id) == 0' || {
+            echo ""
+            echo "FALLO: la baja ya no comprueba si es la ultima administracion (capitulo 35)."
+            echo "Quitarselo siendo el unico deja el sistema sin administracion utilizable."
+            exit 1
+          }
+
+          # 7. La exigencia se comprueba en la resolucion de identidad, no con una lista de
+          # rutas: asi un endpoint nuevo nace cerrado para esas cuentas.
+          printf '%s\n' "$seguridad" | grep -q 'exige_segundo_factor(user.role)' || {
+            echo ""
+            echo "FALLO: la exigencia del segundo factor salio de la resolucion de identidad (capitulo 35)."
+            echo "Con una lista de rutas, el siguiente endpoint nace ABIERTO para una cuenta"
+            echo "de administracion sin segundo factor, y nadie se entera."
+            exit 1
+          }
+          # Y la excepcion se pide por su nombre, solo desde las rutas que sirven para dejar
+          # de no tenerlo. Si aparece una tercera, hay que mirarla.
+          usos=$(printf '%s\n' "$rutas" | grep -c 'get_current_user_sin_segundo_factor' || true)
+          [ "$usos" -le 4 ] || {
+            echo ""
+            echo "FALLO: demasiadas rutas admiten no tener segundo factor (capitulo 35)."
+            echo "Son el estado, el alta y la activacion. Una cuarta hay que justificarla."
+            exit 1
+          }
+
+          # 8. Los codigos de recuperacion se guardan como resumen, nunca en claro.
+          printf '%s\n' "$servicio" | grep -q 'hashlib.sha256(_normalizar(codigo).encode' || {
+            echo ""
+            echo "FALLO: los codigos de recuperacion dejaron de guardarse como resumen (capitulo 35)."
+            exit 1
+          }
+          echo "El segundo factor conserva sus defensas: secreto derivado, desafio propio, codigo de un solo uso y la ultima administracion protegida."
       # §19.9. Negarse a evaluar con un perfil ajeno es correcto; hacerlo sin avisar deja al
       # sistema aparentando vigilancia. La negativa tiene que salir por el webhook, y la de
       # una evaluacion fallida sin el mensaje de la excepcion, que nombra la base.

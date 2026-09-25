@@ -68,6 +68,7 @@ vi.mock('./components/Publicaciones', () => ({ default: () => <div data-testid="
 vi.mock('./components/PanelDeDesenlaces', () => ({ default: () => <div data-testid="desenlaces" /> }));
 vi.mock('./components/SessionModal', () => ({ default: () => <div data-testid="sesion" /> }));
 vi.mock('./components/NewLeadModal', () => ({ default: () => <div data-testid="alta" /> }));
+vi.mock('./components/AltaDelSegundoFactor', () => ({ default: () => <div data-testid="alta-del-segundo-factor" /> }));
 
 const ASESOR = {
   id: 7,
@@ -188,5 +189,71 @@ describe('con sesión utilizable', () => {
     render(<App />);
     expect(await screen.findByTestId('bandeja-de-hoy')).toBeInTheDocument();
     expect(screen.queryByTestId('administracion')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Capítulo 35: la misma redirección, para el segundo factor
+// ============================================================================
+//
+// Una cuenta de administración sin segundo factor está en el mismo sitio que una con la
+// contraseña prestada: el servidor le rechaza todo menos lo justo para dejar de estarlo.
+// Enseñarle el panel para que cada tarjeta falle con un 403 sería peor que no enseñárselo.
+
+const ADMIN_SIN_DOSFA = {
+  ...ASESOR,
+  id: 11,
+  full_name: 'Admin de Pruebas',
+  role: 'System_Admin',
+  segundo_factor_obligatorio: true,
+  totp_activo: false,
+};
+
+describe('el segundo factor obligatorio', () => {
+  it('lleva al alta en lugar de al panel', async () => {
+    conSesion(ADMIN_SIN_DOSFA);
+    render(<App />);
+
+    expect(await screen.findByTestId('alta-del-segundo-factor')).toBeInTheDocument();
+    expect(screen.queryByTestId('navbar')).not.toBeInTheDocument();
+  });
+
+  it('y en ese estado no se lanza ninguna carga de datos', async () => {
+    // El mismo motivo que con la contraseña prestada: el servidor las rechazaría todas, y
+    // la condición que lo evita es media línea que un cambio distraído borra sin que nada
+    // se rompa de forma visible.
+    conSesion(ADMIN_SIN_DOSFA);
+    render(<App />);
+    await screen.findByTestId('alta-del-segundo-factor');
+
+    for (const carga of CARGAS_DE_DATOS()) {
+      expect(carga).not.toHaveBeenCalled();
+    }
+  });
+
+  it('con el segundo factor activo entra al panel con normalidad', async () => {
+    conSesion({ ...ADMIN_SIN_DOSFA, totp_activo: true });
+    render(<App />);
+
+    expect(await screen.findByTestId('navbar')).toBeInTheDocument();
+    expect(screen.queryByTestId('alta-del-segundo-factor')).not.toBeInTheDocument();
+  });
+
+  it('a quien no lo tiene obligatorio no se le pide', async () => {
+    conSesion({ ...ASESOR, segundo_factor_obligatorio: false, totp_activo: false });
+    render(<App />);
+
+    expect(await screen.findByTestId('navbar')).toBeInTheDocument();
+  });
+
+  it('la contraseña prestada va primero', async () => {
+    // Una cuenta con las dos cosas pendientes cambia primero la credencial que conoce otra
+    // persona. Al revés, ataría un teléfono a una cuenta que todavía no es suya. Es el
+    // mismo orden que aplica el servidor.
+    conSesion({ ...ADMIN_SIN_DOSFA, must_change_password: true });
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /contraseña/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('alta-del-segundo-factor')).not.toBeInTheDocument();
   });
 });
