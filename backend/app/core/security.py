@@ -33,6 +33,10 @@ BCRYPT_MAX_PASSWORD_BYTES = 72
 
 TOKEN_TYPE_ACCESS = "access"   # noqa: S105  valor del claim `typ`, no una contraseña
 TOKEN_TYPE_REFRESH = "refresh"  # noqa: S105  valor del claim `typ`, no una contraseña
+# El desafío entre los dos pasos del login (capítulo 35). Es un tipo propio y no un access
+# token de vida corta justamente para que `decode_token` lo rechace en cualquier otro sitio:
+# acredita «esta persona superó el primer paso» y nada más.
+TOKEN_TYPE_DESAFIO = "segundo_factor"  # noqa: S105  ídem
 
 # `auto_error=False` para poder devolver un 401 propio con `WWW-Authenticate`
 # en lugar del 403 genérico de Starlette cuando falta la cabecera.
@@ -162,6 +166,27 @@ def create_access_token(user) -> str:
     )
 
 
+def create_desafio_token(user) -> str:
+    """
+    Emite el desafío que enlaza los dos pasos del login (capítulo 35).
+
+    Vive `SEGUNDO_FACTOR_DESAFIO_MINUTOS` y no más: es el tiempo de sacar el teléfono del
+    bolsillo, no el de una sesión. Lleva `ver` como los demás, así que cerrar sesión en
+    todos los dispositivos o cambiar la contraseña lo invalida igual que a un access token
+    —un desafío emitido justo antes de que la víctima reaccione deja de servir—.
+
+    Que sea un tipo propio es lo que impide el fallo obvio: sin eso, el token del paso uno
+    sería un `Authorization: Bearer` válido y el segundo factor se podría saltar
+    sencillamente no pidiéndolo.
+    """
+    return _create_token(
+        subject=str(user.id),
+        token_type=TOKEN_TYPE_DESAFIO,
+        expires_delta=datetime.timedelta(minutes=settings.SEGUNDO_FACTOR_DESAFIO_MINUTOS),
+        extra_claims={"ver": user.token_version},
+    )
+
+
 def create_refresh_token(user, *, jti: str, family_id: str) -> str:
     """
     Emite el refresh token de vida larga que viaja en cookie HttpOnly.
@@ -239,12 +264,39 @@ def decode_token(token: str, expected_type: str) -> dict:
 # llega» sin comparar cadenas, que se rompen en cuanto alguien reescribe un mensaje.
 CODIGO_CAMBIO_OBLIGATORIO = "cambio_de_contrasena_obligatorio"
 
+# El mismo mecanismo para el segundo factor (capítulo 35): un código en el detalle, para que
+# el cliente sepa a qué pantalla llevar sin leer el texto del mensaje.
+CODIGO_SEGUNDO_FACTOR_OBLIGATORIO = "segundo_factor_obligatorio"
+
+# A qué roles se les **exige** el segundo factor, en lugar de ofrecérselo.
+#
+# Solo administración, y el motivo es el alcance de lo que puede hacer esa cuenta: recálculos
+# masivos, borrado de prospectos, gestión de cuentas y lectura de la bitácora. Un asesor
+# comprometido expone su cartera; un administrador comprometido expone el sistema y, además,
+# puede borrar el rastro de haberlo hecho.
+#
+# Es una tupla, y la lee también `services/segundo_factor.py` y la guarda del CI: el día que
+# alguien quiera exigirlo a los líderes comerciales, se añade aquí y no en cuatro sitios.
+ROLES_OBLIGADOS_A_SEGUNDO_FACTOR = (UserRole.SYSTEM_ADMIN,)
+
+
+def exige_segundo_factor(rol) -> bool:
+    """¿A este rol se le exige el segundo factor?"""
+    try:
+        return UserRole(rol) in ROLES_OBLIGADOS_A_SEGUNDO_FACTOR
+    except ValueError:
+        # Un rol no reconocido ya lo rechaza la resolución de identidad con un 403 propio y
+        # un mensaje útil. Contestar «no» aquí hace que el fallo salga por ese camino en vez
+        # de por este, que diría «active el segundo factor» sobre un rol que no existe.
+        return False
+
 
 def _resolver_identidad(
     credentials: Optional[HTTPAuthorizationCredentials],
     db: Session,
     *,
     admitir_contrasena_prestada: bool,
+    admitir_sin_segundo_factor: bool = False,
 ) -> CurrentUser:
     """
     Resuelve la identidad autenticada a partir del `Authorization: Bearer <jwt>`.
@@ -321,6 +373,31 @@ def _resolver_identidad(
             },
         )
 
+    # El segundo factor obligatorio, comprobado en el mismo sitio y por el mismo motivo
+    # (capítulo 35): un endpoint nuevo nace cerrado para una cuenta de administración que no
+    # lo tenga activo, sin que nadie tenga que acordarse de añadirlo a ninguna lista.
+    #
+    # Va DESPUÉS de la contraseña prestada, y el orden es una decisión: una cuenta con las
+    # dos cosas pendientes tiene que cambiar primero la credencial que conoce otra persona.
+    # Al revés, daría de alta un segundo factor sobre una cuenta que todavía no es suya.
+    if (
+        exige_segundo_factor(user.role)
+        and not user.totp_activo
+        and not admitir_sin_segundo_factor
+    ):
+        logger.info("Petición de %s rechazada hasta que active el segundo factor.", user.email)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "codigo": CODIGO_SEGUNDO_FACTOR_OBLIGATORIO,
+                "mensaje": (
+                    "Esta cuenta de administración necesita un segundo factor. Actívelo "
+                    "antes de seguir: hasta entonces solo puede consultar su perfil, "
+                    "darlo de alta o cerrar la sesión."
+                ),
+            },
+        )
+
     return CurrentUser(
         user_id=str(user.id),
         email=user.email,
@@ -354,8 +431,34 @@ def get_current_user_con_contrasena_prestada(
     Solo para lo que esa cuenta necesita para dejar de estarlo: saber quién es
     (`/auth/me`), cambiarla (`/auth/change-password`) y salir (`/auth/logout`). Una prueba
     enumera las rutas que la usan y falla si aparece una cuarta.
+
+    Admite también la falta de segundo factor, y no por comodidad: son exactamente las tres
+    rutas que una cuenta de administración recién creada necesita para poder llegar a
+    activarlo. Si `/auth/me` exigiera el segundo factor, el cliente no podría ni saber quién
+    es para enseñarle la pantalla de alta.
     """
-    return _resolver_identidad(credentials, db, admitir_contrasena_prestada=True)
+    return _resolver_identidad(
+        credentials, db, admitir_contrasena_prestada=True, admitir_sin_segundo_factor=True
+    )
+
+
+def get_current_user_sin_segundo_factor(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    """
+    La otra excepción, también pedida por su nombre: admite no tener segundo factor.
+
+    Solo para las dos rutas que sirven para dejar de no tenerlo: pedir el alta y activarla.
+    **No** admite contraseña prestada, y esa asimetría es deliberada: quien todavía usa la
+    contraseña que le fijó otra persona tiene que cambiarla antes de atar un teléfono a la
+    cuenta, porque hasta ese momento la cuenta no es suya.
+
+    Una prueba enumera las rutas que la usan y falla si aparece una tercera.
+    """
+    return _resolver_identidad(
+        credentials, db, admitir_contrasena_prestada=False, admitir_sin_segundo_factor=True
+    )
 
 
 def require_roles(allowed_roles: List[UserRole]):

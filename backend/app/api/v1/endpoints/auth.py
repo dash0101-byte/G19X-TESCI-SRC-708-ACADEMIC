@@ -1,13 +1,21 @@
 import datetime
 import logging
+from typing import Union
 
+from app.core import codigo_qr
 from app.core.audit import (
     ACCION_CONTRASENA_PROPIA,
     ACCION_LOGIN,
     ACCION_LOGIN_FALLIDO,
     ACCION_LOGOUT,
     ACCION_REFRESH_REUTILIZADO,
+    ACCION_SEGUNDO_FACTOR_ACTIVADO,
+    ACCION_SEGUNDO_FACTOR_ALTA,
+    ACCION_SEGUNDO_FACTOR_DESACTIVADO,
+    ACCION_SEGUNDO_FACTOR_FALLIDO,
+    ACCION_SEGUNDO_FACTOR_USADO,
     ENTIDAD_SESION,
+    ENTIDAD_USUARIO,
     registrar_evento,
 )
 from app.core.config import settings
@@ -16,18 +24,33 @@ from app.core.passwords import ContrasenaDebil, exigir
 from app.core.proxy import ip_del_cliente
 from app.core.rate_limit import limiter, login_limit
 from app.core.security import (
+    TOKEN_TYPE_DESAFIO,
     TOKEN_TYPE_REFRESH,
     CurrentUser,
     create_access_token,
+    create_desafio_token,
     decode_token,
     dummy_verify,
+    exige_segundo_factor,
+    get_current_user,
     get_current_user_con_contrasena_prestada,
+    get_current_user_sin_segundo_factor,
     hash_password,
     verify_password,
 )
 from app.models.entities import User, utc_now
-from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    AltaDeSegundoFactor,
+    CodigoDelSegundoFactor,
+    DesafioDeSegundoFactor,
+    EstadoDelSegundoFactor,
+    LoginRequest,
+    SegundoFactorDelLogin,
+    TokenResponse,
+    UserResponse,
+)
 from app.schemas.user import CambiarContrasenaPropia, ResultadoDeContrasena
+from app.services import segundo_factor
 from app.services.session_service import (
     ReutilizacionDetectada,
     abrir_sesion,
@@ -35,6 +58,7 @@ from app.services.session_service import (
     rotar_sesion,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from limits import parse
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -94,7 +118,7 @@ def _respuesta_de_sesion(response: Response, user: User, refresh_token: str) -> 
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=Union[TokenResponse, DesafioDeSegundoFactor])
 @limiter.limit(login_limit)
 def login(
     request: Request,
@@ -154,6 +178,22 @@ def login(
         logger.warning("Intento de login sobre la cuenta desactivada %s.", user.email)
         _registrar_fallo("cuenta_desactivada")
         raise INVALID_CREDENTIALS
+
+    # Segundo factor (capítulo 35). La contraseña era buena; lo que falta es el segundo
+    # paso, así que **no se abre sesión todavía**: ni refresh token, ni cookie, ni
+    # `last_login_at`, que significa «entró» y aquí todavía no ha entrado.
+    #
+    # Se responde 200 y no un error. Es el camino normal de una cuenta con segundo factor, y
+    # devolver 401 obligaría al cliente a tratar el caso corriente dentro de su rama de
+    # fallos, que es donde se acaban tragando los errores de verdad. El discriminador `tipo`
+    # es lo que permite distinguir las dos respuestas sin adivinar por los campos.
+    if user.totp_activo:
+        logger.info("Primer paso correcto, falta el segundo factor: %s.", user.email)
+        return DesafioDeSegundoFactor(
+            desafio=create_desafio_token(user),
+            expira_en=settings.SEGUNDO_FACTOR_DESAFIO_MINUTOS * 60,
+            codigos_de_recuperacion_restantes=segundo_factor.codigos_restantes(user),
+        )
 
     user.last_login_at = utc_now()
     db.commit()
@@ -427,4 +467,312 @@ def cambiar_contrasena_propia(
             "vuelva a iniciar sesión con la contraseña nueva."
         ),
         sesiones_cerradas=revocadas,
+    )
+
+
+# ==============================================================================
+# Segundo factor (capítulo 35)
+# ==============================================================================
+# Cierra §3.6 de la congelación. El orden de las rutas sigue el de la vida de un segundo
+# factor: se usa al entrar, se consulta, se da de alta, se activa y se da de baja.
+
+
+def _intentos_agotados(desafio: dict) -> bool:
+    """
+    ¿Se han gastado ya los intentos de ESTE desafío?
+
+    Se cuenta por desafío y no por cuenta, y es la decisión que evita el escenario que §3.6
+    daba como motivo para no hacer nada. Contar por cuenta significa bloquearla, y bloquear
+    la cuenta de administración por intentos fallidos le regala a cualquiera una forma de
+    dejar al sistema sin administrador: basta con fallar cinco veces contra su correo.
+
+    Contando por desafío, agotar los intentos solo obliga a volver a escribir la contraseña,
+    y la cuenta nunca queda inaccesible. El contador vive lo que vive el desafío y se limpia
+    solo, así que tampoco hay nada que desbloquear a mano.
+    """
+    if not limiter.enabled:
+        return False
+    return not limiter.limiter.hit(
+        parse(f"{settings.SEGUNDO_FACTOR_INTENTOS}/{settings.SEGUNDO_FACTOR_DESAFIO_MINUTOS}minute"),
+        "segundo-factor",
+        desafio["jti"],
+    )
+
+
+@router.post(
+    "/login/segundo-factor",
+    response_model=TokenResponse,
+    responses={401: {"description": "El desafío no vale, o el código no es correcto."}},
+)
+def completar_login(
+    request: Request,
+    datos: SegundoFactorDelLogin,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """
+    Segundo paso del acceso: el código del teléfono, o uno de recuperación.
+
+    El desafío que trae el cuerpo es lo único que acredita haber superado el primer paso, y
+    es de un **tipo propio**: no sirve como `Authorization`, así que no hay forma de llegar
+    aquí —ni a ninguna otra ruta— sin haber acertado antes la contraseña.
+
+    El mensaje de error es el mismo para un desafío caducado, uno de otra cuenta y un código
+    equivocado. Distinguirlos le diría a quien está probando cuál de las dos mitades ya
+    tiene.
+    """
+    ip = ip_del_cliente(request)
+    agente = request.headers.get("user-agent")
+    invalido = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="El código no es válido o el acceso ha caducado. Vuelva a iniciar sesión.",
+    )
+
+    desafio = decode_token(datos.desafio, TOKEN_TYPE_DESAFIO)
+    if _intentos_agotados(desafio):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Vuelva a iniciar sesión para obtener un acceso nuevo.",
+        )
+
+    try:
+        user_id = int(desafio["sub"])
+    except (TypeError, ValueError, KeyError):
+        raise invalido from None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or not user.is_active or desafio.get("ver") != user.token_version:
+        raise invalido from None
+
+    try:
+        forma, restantes = segundo_factor.comprobar(user, datos.codigo)
+    except segundo_factor.SegundoFactorInvalido:
+        # La comprobación pudo haber tocado el contador; se descarta para no dejar la cuenta
+        # con un estado escrito a medias por un intento fallido.
+        db.rollback()
+        registrar_evento(
+            db,
+            accion=ACCION_SEGUNDO_FACTOR_FALLIDO,
+            entidad=ENTIDAD_SESION,
+            resultado="HTTP_401",
+            actor_id=user.id,
+            actor_email=user.email,
+            actor_role=user.role,
+            ip=ip,
+            user_agent=agente,
+        )
+        logger.warning("Segundo factor incorrecto para %s.", user.email)
+        raise invalido from None
+
+    user.last_login_at = utc_now()
+    db.commit()
+    db.refresh(user)
+
+    refresh_token = abrir_sesion(db, user, ip)
+    registrar_evento(
+        db,
+        accion=ACCION_SEGUNDO_FACTOR_USADO,
+        entidad=ENTIDAD_SESION,
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role,
+        ip=ip,
+        user_agent=agente,
+        # Nunca el código. `forma` distingue el teléfono de un código de recuperación, que
+        # es lo que hay que poder ver sin cruzar tablas: gastar uno significa que alguien
+        # perdió el teléfono, y dos en una semana significa otra cosa.
+        metadatos={"forma": forma, "codigos_de_recuperacion_restantes": restantes},
+    )
+    registrar_evento(
+        db,
+        accion=ACCION_LOGIN,
+        entidad=ENTIDAD_SESION,
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role,
+        ip=ip,
+        user_agent=agente,
+    )
+    logger.info("Login con segundo factor (%s): %s.", forma, user.email)
+    return _respuesta_de_sesion(response, user, refresh_token)
+
+
+@router.get("/segundo-factor", response_model=EstadoDelSegundoFactor)
+def estado_del_segundo_factor(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user_sin_segundo_factor),
+):
+    """Lo que el panel necesita para dibujar la pantalla de seguridad."""
+    user = db.query(User).filter(User.id == int(current_user.user_id)).first()
+    return EstadoDelSegundoFactor(
+        activo=bool(user.totp_activo),
+        obligatorio=exige_segundo_factor(user.role),
+        activado_en=user.totp_activado_en,
+        codigos_de_recuperacion_restantes=segundo_factor.codigos_restantes(user),
+    )
+
+
+@router.post("/segundo-factor/alta", response_model=AltaDeSegundoFactor)
+def alta_del_segundo_factor(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user_sin_segundo_factor),
+):
+    """
+    Genera el secreto y los códigos, y los devuelve **una sola vez**.
+
+    No activa nada: hasta que `/segundo-factor/activar` compruebe un código de verdad, la
+    cuenta sigue entrando con la contraseña. Es lo que impide que alguien se quede fuera por
+    haber escaneado mal el QR.
+
+    Volver a llamarla descarta el alta anterior y empieza otra. Es a propósito: un alta a
+    medias —un QR escaneado en un teléfono que ya no se tiene— se rehace sin pasar por un
+    administrador.
+    """
+    user = db.query(User).filter(User.id == int(current_user.user_id)).first()
+    if user.totp_activo:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Esta cuenta ya tiene segundo factor activo. Para cambiar de teléfono, "
+                "dese de baja primero."
+            ),
+        )
+
+    alta = segundo_factor.iniciar_alta(user)
+    db.commit()
+
+    registrar_evento(
+        db,
+        accion=ACCION_SEGUNDO_FACTOR_ALTA,
+        entidad=ENTIDAD_USUARIO,
+        entidad_id=str(user.id),
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role,
+        ip=ip_del_cliente(request),
+        user_agent=request.headers.get("user-agent"),
+        # Ni el secreto, ni la sal, ni los códigos. La bitácora registra que hubo un alta,
+        # que es el hecho auditable; lo demás convertiría la tabla de auditoría en el sitio
+        # donde sí está guardado el secreto que esta implementación no guarda.
+        metadatos={"codigos_emitidos": len(alta.codigos_de_recuperacion)},
+    )
+    return AltaDeSegundoFactor(
+        uri_otpauth=alta.uri_otpauth,
+        qr_svg=codigo_qr.svg(alta.uri_otpauth),
+        secreto_en_base32=alta.secreto_en_base32,
+        codigos_de_recuperacion=alta.codigos_de_recuperacion,
+    )
+
+
+@router.post("/segundo-factor/activar", response_model=EstadoDelSegundoFactor)
+def activar_el_segundo_factor(
+    request: Request,
+    datos: CodigoDelSegundoFactor,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user_sin_segundo_factor),
+):
+    """
+    Comprueba un código del teléfono y activa el segundo factor.
+
+    A partir de aquí, entrar exige los dos pasos.
+    """
+    user = db.query(User).filter(User.id == int(current_user.user_id)).first()
+    try:
+        segundo_factor.activar(user, datos.codigo)
+    except segundo_factor.AltaNoIniciada as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except segundo_factor.SegundoFactorInvalido:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Ese código no coincide. Compruebe que la hora del teléfono sea la correcta "
+                "y vuelva a intentarlo con el código que se vea ahora."
+            ),
+        ) from None
+    db.commit()
+    db.refresh(user)
+
+    registrar_evento(
+        db,
+        accion=ACCION_SEGUNDO_FACTOR_ACTIVADO,
+        entidad=ENTIDAD_USUARIO,
+        entidad_id=str(user.id),
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role,
+        ip=ip_del_cliente(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info("Segundo factor activado por %s.", user.email)
+    return EstadoDelSegundoFactor(
+        activo=True,
+        obligatorio=exige_segundo_factor(user.role),
+        activado_en=user.totp_activado_en,
+        codigos_de_recuperacion_restantes=segundo_factor.codigos_restantes(user),
+    )
+
+
+@router.post("/segundo-factor/baja", response_model=EstadoDelSegundoFactor)
+def baja_del_segundo_factor(
+    request: Request,
+    datos: CodigoDelSegundoFactor,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Quita el segundo factor de la propia cuenta, demostrando que se tiene.
+
+    Con una salvaguarda que es justo lo que §3.6 pedía resolver: **la última cuenta de
+    administración con segundo factor no se lo puede quitar**. Una cuenta de administración
+    sin segundo factor no puede operar, así que darse de baja siendo el único que lo tiene
+    activo dejaría el sistema sin administración utilizable hasta volver a darse de alta.
+    """
+    user = db.query(User).filter(User.id == int(current_user.user_id)).first()
+    try:
+        segundo_factor.comprobar(user, datos.codigo)
+    except segundo_factor.SegundoFactorInvalido:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Ese código no coincide.",
+        ) from None
+
+    ultimo = (
+        exige_segundo_factor(user.role)
+        and segundo_factor.administradores_con_segundo_factor(db, excluyendo=user.id) == 0
+    )
+    if ultimo:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Es la única cuenta de administración con segundo factor activo. Active el "
+                "de otra cuenta de administración antes de quitar el suyo, o el sistema se "
+                "queda sin administración utilizable."
+            ),
+        )
+
+    segundo_factor.desactivar(user)
+    db.commit()
+
+    registrar_evento(
+        db,
+        accion=ACCION_SEGUNDO_FACTOR_DESACTIVADO,
+        entidad=ENTIDAD_USUARIO,
+        entidad_id=str(user.id),
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role,
+        ip=ip_del_cliente(request),
+        user_agent=request.headers.get("user-agent"),
+        metadatos={"por": "el_titular"},
+    )
+    logger.info("Segundo factor desactivado por su titular: %s.", user.email)
+    return EstadoDelSegundoFactor(
+        activo=False,
+        obligatorio=exige_segundo_factor(user.role),
+        codigos_de_recuperacion_restantes=0,
     )

@@ -95,6 +95,17 @@ ACCION_USUARIO_REACTIVAR = "usuario.reactivar"
 ACCION_USUARIO_CAMBIO_DE_ROL = "usuario.cambio_de_rol"
 ACCION_USUARIO_RESET_CONTRASENA = "usuario.reset_contrasena"  # noqa: S105  nombre de acción
 ACCION_CONTRASENA_PROPIA = "usuario.cambio_de_contrasena_propia"  # noqa: S105  ídem
+
+# --- Segundo factor (capítulo 35) ---
+# Cinco acciones y no una sola con un campo «qué pasó», porque son hechos de gravedad muy
+# distinta y hay que poder filtrarlos por separado. Gastar un código de recuperación, en
+# particular, significa que alguien perdió el teléfono; y una baja hecha por un
+# administrador sobre la cuenta de otro es lo que hay que poder auditar al día siguiente.
+ACCION_SEGUNDO_FACTOR_ALTA = "usuario.segundo_factor_alta"
+ACCION_SEGUNDO_FACTOR_ACTIVADO = "usuario.segundo_factor_activado"
+ACCION_SEGUNDO_FACTOR_USADO = "usuario.segundo_factor_usado"
+ACCION_SEGUNDO_FACTOR_FALLIDO = "usuario.segundo_factor_fallido"
+ACCION_SEGUNDO_FACTOR_DESACTIVADO = "usuario.segundo_factor_desactivado"
 ACCION_CARTERA_REPARTIR = "usuario.reparto_de_cartera"
 
 ACCION_CAMPANA_CREAR = "campana.crear"

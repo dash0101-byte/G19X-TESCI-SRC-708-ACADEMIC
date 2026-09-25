@@ -112,9 +112,59 @@ export async function login(email, password) {
     await throwApiError(res, 'No fue posible iniciar sesión');
   }
   const data = await res.json();
+  // Desde el capítulo 35 el login puede contestar dos cosas: una sesión, o un desafío de
+  // segundo factor. El discriminador `tipo` es lo que las distingue, y se devuelve tal cual
+  // para que quien llama decida: aquí no se abre sesión con un desafío.
+  if (data.tipo === 'segundo_factor') {
+    return data;
+  }
   accessToken = data.access_token;
   currentUser = data.user;
   return currentUser;
+}
+
+/**
+ * Segundo paso del acceso: el código del teléfono o uno de recuperación (capítulo 35).
+ *
+ * El desafío es lo único que acredita haber superado el primero, y no vale como
+ * `Authorization`: viaja en el cuerpo porque no es una credencial de sesión.
+ */
+export async function completarLoginConSegundoFactor(desafio, codigo) {
+  const res = await fetch(`${API_BASE}/auth/login/segundo-factor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ desafio, codigo: codigo.trim() }),
+  });
+  if (!res.ok) await throwApiError(res, 'No fue posible completar el acceso');
+  const data = await res.json();
+  accessToken = data.access_token;
+  currentUser = data.user;
+  return currentUser;
+}
+
+export function fetchEstadoDelSegundoFactor() {
+  return apiFetch('/auth/segundo-factor', {}, 'Error al consultar el segundo factor');
+}
+
+export function altaDelSegundoFactor() {
+  return apiFetch('/auth/segundo-factor/alta', { method: 'POST' }, 'Error al dar de alta el segundo factor');
+}
+
+export function activarSegundoFactor(codigo) {
+  return apiFetch(
+    '/auth/segundo-factor/activar',
+    { method: 'POST', body: JSON.stringify({ codigo: codigo.trim() }) },
+    'Error al activar el segundo factor',
+  );
+}
+
+export function bajaDelSegundoFactor(codigo) {
+  return apiFetch(
+    '/auth/segundo-factor/baja',
+    { method: 'POST', body: JSON.stringify({ codigo: codigo.trim() }) },
+    'Error al quitar el segundo factor',
+  );
 }
 
 async function refreshAccessToken() {

@@ -13,6 +13,7 @@ import Publicaciones from './components/Publicaciones';
 import PanelDeDesenlaces from './components/PanelDeDesenlaces';
 import SessionModal from './components/SessionModal';
 import NewLeadModal from './components/NewLeadModal';
+import AltaDelSegundoFactor from './components/AltaDelSegundoFactor';
 import CambioDeContrasenaObligatorio from './components/CambioDeContrasenaObligatorio';
 import {
   fetchAnalyticsSummary,
@@ -25,6 +26,19 @@ import {
   logout,
   setSessionExpiredHandler,
 } from './services/api';
+
+/**
+ * ¿A esta cuenta le falta el segundo factor que tiene obligatorio? (capítulo 35)
+ *
+ * Los dos datos vienen del servidor y ninguno se deduce aquí del rol. Deducirlo en el
+ * cliente crearía una segunda definición de «quién está obligado», y el día que alguien
+ * cambiara la del servidor —`ROLES_OBLIGADOS_A_SEGUNDO_FACTOR`— esta se quedaría atrás sin
+ * que nada fallara: el panel enseñaría la aplicación a una cuenta a la que el servidor le
+ * va a rechazar todo, o al revés.
+ */
+function faltaElSegundoFactor(user) {
+  return Boolean(user.segundo_factor_obligatorio && !user.totp_activo);
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('hoy');
@@ -111,12 +125,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || user.must_change_password) return;
+    if (!user || user.must_change_password || faltaElSegundoFactor(user)) return;
     loadData();
   }, [user, loadData]);
 
   useEffect(() => {
-    if (!user || user.must_change_password) return;
+    if (!user || user.must_change_password || faltaElSegundoFactor(user)) return;
     // `loadLeads` cambia exactamente cuando cambian el cuadrante o la búsqueda, así que
     // depender de la función equivale a la lista anterior —y no se puede quedar corta.
     loadLeads();
@@ -251,6 +265,28 @@ export default function App() {
           // vuelve a la entrada diciendo por qué, para que no parezca una caducidad.
           await logout();
           setAvisoDeAcceso(mensaje);
+          setUser(null);
+        }}
+        onSalir={handleLogout}
+      />
+    );
+  }
+
+  // Y lo mismo con el segundo factor (capítulo 35). Va DESPUÉS del cambio de contraseña
+  // porque ese es el orden que aplica el servidor: una cuenta con las dos cosas pendientes
+  // tiene que cambiar primero la credencial que conoce otra persona. Al revés, ataría un
+  // teléfono a una cuenta que todavía no es suya.
+  if (faltaElSegundoFactor(user)) {
+    return (
+      <AltaDelSegundoFactor
+        user={user}
+        onActivado={async () => {
+          // Se vuelve a la entrada en lugar de seguir con la sesión actual. El segundo
+          // factor acaba de cambiar lo que hace falta para entrar, y que la primera vez que
+          // se usa sea inmediatamente después de activarlo es la única forma de comprobar
+          // en el momento que el teléfono quedó bien atado.
+          await logout();
+          setAvisoDeAcceso('Segundo factor activado. Vuelva a entrar usando el código de su aplicación.');
           setUser(null);
         }}
         onSalir={handleLogout}

@@ -149,6 +149,20 @@ class Settings(BaseSettings):
     # En producción la cookie exige HTTPS; en desarrollo se permite HTTP local.
     REFRESH_COOKIE_SECURE: bool = True
 
+    # --- Segundo factor (capítulo 35) ---
+    # Cuánto vive el desafío entre los dos pasos del login: lo que se tarda en sacar el
+    # teléfono y leer un código, no lo que dura una sesión. Cinco minutos es holgado para
+    # eso y corto para quien se haya hecho con el desafío de otro.
+    SEGUNDO_FACTOR_DESAFIO_MINUTOS: int = 5
+    # Intentos de código por desafío antes de invalidarlo. Un TOTP son seis dígitos: sin un
+    # tope, un millón de intentos lo rompen, y el límite por IP no basta porque cuenta
+    # peticiones y no intentos contra una misma cuenta.
+    SEGUNDO_FACTOR_INTENTOS: int = 5
+    # El tope por IP de la ruta del segundo paso. Va aparte del login porque son dos cosas
+    # distintas: fallar la contraseña muchas veces es un barrido de cuentas; fallar el
+    # código muchas veces es un ataque contra una cuenta concreta cuya contraseña ya cayó.
+    SEGUNDO_FACTOR_LIMITE_POR_IP: str = "20/minute"
+
     # --- Webhook CRM (HMAC-SHA256) ---
     # Secreto compartido con el CRM emisor. Sin él, el webhook queda deshabilitado (503).
     CRM_WEBHOOK_SECRET: str = ""
