@@ -119,17 +119,29 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
     setEditForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Qué hacer con un campo que la ficha NO admite vacío cuando el usuario lo deja en blanco.
+  //
+  // Antes se omitía siempre que estuviera vacío, y eso tapaba dos casos muy distintos con la
+  // misma solución. El que había que tapar es real: las fichas de la página de interés
+  // guardan el nombre entero y los apellidos en blanco, así que mandar `""` haría que la
+  // edición de cualquier otro campo de esas fichas respondiera 422 y no se pudieran tocar.
+  // El que no hay que tapar es el asesor que **borra a propósito** un apellido que estaba
+  // escrito: omitirlo hacía que la pantalla dijera «Prospecto actualizado» y el apellido
+  // siguiera ahí al reabrir la ficha, que es la mentira que el capítulo 33 vino a quitar.
+  //
+  // Se distinguen mirando lo que la ficha tenía: si había contenido y ahora no, el vacío
+  // viaja y el servidor contesta 422 nombrando el campo.
+  const obligatorio = (valor, original) =>
+    (valor || '').trim() || (original || '').trim() ? valor : undefined;
+
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     setSaveSuccessMsg('');
     try {
       const payload = {
-        first_name: editForm.first_name,
-        // Las fichas de la página de interés guardan el nombre entero y los apellidos
-        // vacíos. Mandar `""` chocaría con el mínimo de la edición y la ficha no se podría
-        // guardar; sin apellidos escritos, el campo no se toca.
-        last_name: editForm.last_name.trim() ? editForm.last_name : undefined,
+        first_name: obligatorio(editForm.first_name, datos.first_name),
+        last_name: obligatorio(editForm.last_name, datos.last_name),
         email: editForm.email,
         phone: editForm.phone,
         country: editForm.country || null,
@@ -247,7 +259,12 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
               <span className="badge badge-status">{nombreDeEtapa(lead.status)}</span>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              {lead.job_title} • <strong style={{ color: 'var(--text-primary)' }}>{lead.company}</strong> ({lead.industry || 'General'})
+              {/* Desde el capítulo 33 estos dos campos se pueden vaciar, así que la cabecera
+                  tiene que saber enseñarlos vacíos. Sin los rótulos quedaba « • (General)»,
+                  que parece la ficha rota y no una ficha sin esos datos. */}
+              {lead.job_title || 'Sin cargo'} •{' '}
+              <strong style={{ color: 'var(--text-primary)' }}>{lead.company || 'Sin empresa'}</strong>{' '}
+              ({lead.industry || 'General'})
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.775rem', marginTop: '2px' }}>
               {/* «Sin registrar» y no «México»: la cabecera era el último sitio donde la
@@ -394,23 +411,31 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                   🏢 Empresa, Cargo y Sector
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {/* Sin `required` ni asterisco desde el capítulo 33, y no es un descuido.
+                      La tabla declara las dos columnas `nullable`, así que el servidor
+                      acepta retirarlas; mientras el formulario las exigiera, el panel era
+                      MÁS estricto que la API sin decirlo, y la corrección de una empresa
+                      mal tecleada no tenía dónde hacerse. El alta sí las sigue pidiendo:
+                      preguntar por un dato al capturarlo y poder retirarlo después cuando
+                      se comprueba que era falso son dos decisiones distintas.
+
+                      Los que llevan asterisco —nombre y correo— lo llevan porque la tabla
+                      los declara `NOT NULL`, no por costumbre del formulario. */}
                   <div>
-                    <label htmlFor="lead-company" className="form-label">Empresa *</label>
+                    <label htmlFor="lead-company" className="form-label">Empresa</label>
                     <input
                       id="lead-company"
                       type="text"
-                      required
                       className="input-field"
                       value={editForm.company}
                       onChange={(e) => handleEditChange('company', e.target.value)}
                     />
                   </div>
                   <div>
-                    <label htmlFor="lead-job-title" className="form-label">Cargo / Puesto de Decisión *</label>
+                    <label htmlFor="lead-job-title" className="form-label">Cargo / Puesto de Decisión</label>
                     <input
                       id="lead-job-title"
                       type="text"
-                      required
                       className="input-field"
                       value={editForm.job_title}
                       onChange={(e) => handleEditChange('job_title', e.target.value)}

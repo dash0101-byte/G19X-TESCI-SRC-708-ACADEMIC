@@ -301,7 +301,17 @@ async def update_lead(
     # tocó, no vuelve a guardar el prospecto. Los valores no se copian —un cambio de
     # teléfono o de correo acabaría duplicado en una tabla que se consulta con otro
     # criterio de acceso que la de negocio—.
-    auditoria.anotar(campos=sorted(lead_in.model_dump(exclude_unset=True).keys()))
+    #
+    # Desde el capítulo 33 se anota aparte cuáles se **vaciaron**. Sigue sin copiarse ningún
+    # valor: `campos_vaciados` son nombres de campo, igual que `campos`. Interesa la
+    # distinción porque borrar un dato de una persona y corregirlo no son la misma acción
+    # ante quien pida cuentas, y hasta este capítulo ni siquiera se podía hacer la primera:
+    # un asiento con `campos: ["country"]` podía ser un cambio o un intento ignorado.
+    enviados = lead_in.model_dump(exclude_unset=True)
+    auditoria.anotar(
+        campos=sorted(enviados.keys()),
+        campos_vaciados=sorted(campo for campo, valor in enviados.items() if valor is None),
+    )
     etapa_anterior = lead.status
     try:
         updated_lead = repo.update(lead, lead_in)

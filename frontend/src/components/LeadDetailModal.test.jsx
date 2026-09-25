@@ -235,3 +235,96 @@ describe('editar una ficha de la página de interés', () => {
     expect(JSON.parse(JSON.stringify(cambios))).not.toHaveProperty('last_name');
   });
 });
+
+// ============================================================================
+// Capítulo 33: vaciar un campo es un cambio
+// ============================================================================
+//
+// El servidor ya distingue «no lo mandó» de «lo mandó vacío». Lo que se comprueba aquí es
+// la mitad del cliente, que tenía su propia forma de tapar el vacío: omitir el campo.
+
+describe('vaciar un campo desde la ficha', () => {
+  const rellena = { ...PROSPECTO, city: 'Monterrey', annual_revenue: 4500000 };
+
+  async function editarYGuardar(usuario, cambios) {
+    await usuario.click(screen.getByRole('button', { name: /Editar Prospecto/ }));
+    for (const [etiqueta, valor] of cambios) {
+      const campo = screen.getByLabelText(etiqueta);
+      await usuario.clear(campo);
+      if (valor) await usuario.type(campo, valor);
+    }
+    await usuario.click(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(updateLead).toHaveBeenCalledTimes(1));
+    return updateLead.mock.calls[0][1];
+  }
+
+  it('manda el vacío de los campos que la ficha admite vaciar', async () => {
+    const usuario = userEvent.setup();
+    updateLead.mockReset().mockResolvedValue({ ...rellena, city: null, company: null });
+    montar({ lead: rellena });
+
+    const cambios = await editarYGuardar(usuario, [['Ciudad', ''], ['Empresa', '']]);
+
+    // El país y el tamaño ya viajaban como `null`; la ciudad y la empresa viajan como `""`.
+    // Las dos formas son el mismo vacío para el servidor desde este capítulo, y lo que
+    // importa es que el campo VIAJE: omitirlo es lo que hacía que no se pudiera borrar.
+    expect(cambios.city).toBe('');
+    expect(cambios.company).toBe('');
+  });
+
+  it('no permite exigir en el formulario lo que la tabla admite vacío', async () => {
+    const usuario = userEvent.setup();
+    updateLead.mockReset().mockResolvedValue(rellena);
+    montar({ lead: rellena });
+    await usuario.click(screen.getByRole('button', { name: /Editar Prospecto/ }));
+
+    // Mientras «Empresa» y «Cargo» llevaran `required`, el navegador bloqueaba el envío y
+    // el panel era más estricto que la API sin decirlo.
+    expect(screen.getByLabelText('Empresa')).not.toBeRequired();
+    expect(screen.getByLabelText(/Cargo \/ Puesto de Decisión/)).not.toBeRequired();
+    // Los que la tabla sí declara obligatorios siguen marcados.
+    expect(screen.getByLabelText(/Nombre\(s\)/)).toBeRequired();
+    expect(screen.getByLabelText(/Correo Corporativo/)).toBeRequired();
+  });
+
+  it('manda el apellido vacío cuando estaba escrito y el asesor lo borra', async () => {
+    const usuario = userEvent.setup();
+    updateLead.mockReset().mockResolvedValue(rellena);
+    montar({ lead: rellena });
+
+    const cambios = await editarYGuardar(usuario, [['Apellidos', '']]);
+
+    // Viaja para que el servidor conteste 422 nombrándolo. Omitirlo —lo que se hacía— dejaba
+    // la pantalla diciendo «Prospecto actualizado» con el apellido intacto: no es que no
+    // obedeciera, es que contestaba que sí.
+    expect(cambios.last_name).toBe('');
+  });
+
+  it('vacía los ingresos por el mismo camino del capítulo 24, no con un cero', async () => {
+    const usuario = userEvent.setup();
+    updateLead.mockReset().mockResolvedValue({ ...rellena, annual_revenue: null });
+    montar({ lead: rellena });
+
+    const cambios = await editarYGuardar(usuario, [[/Ingresos/, '']]);
+
+    // Cero es una cifra: diría que la empresa factura cero y el modelo lo leería como tal.
+    expect(cambios.annual_revenue).toBeNull();
+    expect(cambios.annual_revenue).not.toBe(0);
+  });
+
+  it('tras vaciar no vuelve a enseñar el valor anterior', async () => {
+    const usuario = userEvent.setup();
+    updateLead.mockReset().mockResolvedValue({
+      ...rellena, city: null, company: null, job_title: null, country: null,
+    });
+    montar({ lead: rellena });
+
+    await editarYGuardar(usuario, [['Ciudad', ''], ['Empresa', '']]);
+
+    await waitFor(() => expect(screen.queryByText(/Empresa de Pruebas/)).not.toBeInTheDocument());
+    expect(screen.queryByText(/Monterrey/)).not.toBeInTheDocument();
+    // Y la cabecera dice que no hay dato, en vez de quedarse con los separadores sueltos.
+    expect(screen.getByText(/Sin empresa/)).toBeInTheDocument();
+    expect(screen.getByText(/Sin cargo/)).toBeInTheDocument();
+  });
+});

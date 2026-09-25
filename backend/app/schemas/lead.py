@@ -1,11 +1,17 @@
 import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator, model_validator
 
 from app.core.redes import es_de_publicacion
 from app.core.telefono import validador_de_telefono
-from app.models.entities import ActivityType, LeadStatus, QualificationStatus, ScoreCategory
+from app.models.entities import (
+    ActivityType,
+    Lead,
+    LeadStatus,
+    QualificationStatus,
+    ScoreCategory,
+)
 from app.schemas.activity import ActivityResponse
 from app.schemas.desenlaces import DesenlaceDeLaFicha
 from app.schemas.publicaciones import LlegoPor
@@ -30,19 +36,49 @@ MAX_SOURCE = 100
 MAX_NOTES = 500
 
 
-def _pais_o_vacio(valor: Optional[str]) -> Optional[str]:
+def _texto_o_vacio(valor: Optional[str]) -> Optional[str]:
     """
-    Un país en blanco es ausencia de país, no la cadena vacía (capítulo 32).
+    Un texto en blanco es ausencia de dato, no la cadena vacía.
 
     El formulario del panel manda `""` cuando el campo se deja sin rellenar, y guardarlo
     tal cual habría dejado en la base dos formas de decir lo mismo: `NULL` para las fichas
     que nunca lo tuvieron y `''` para las que pasaron por la pantalla. Cualquier consulta
     posterior tendría que acordarse de las dos.
+
+    Nació en el capítulo 32 para el país y en el 33 se aplica a los demás campos de texto de
+    la **edición**. El motivo es el mismo y se vio al arreglar el vaciado: mientras «vacío»
+    tuviera dos representaciones, «vaciar un campo» no era una operación sino dos, y la que
+    dejaba `''` no se distinguía de un dato que alguien escribió y luego borró a medias.
     """
     if valor is None:
         return None
     limpio = valor.strip()
     return limpio or None
+
+
+# Se mantiene el nombre anterior porque el capítulo 32 lo dejó escrito en el alta.
+_pais_o_vacio = _texto_o_vacio
+
+
+def _campos_que_no_admiten_vacio() -> frozenset:
+    """
+    Qué campos de la ficha no se pueden dejar vacíos, preguntándoselo a la tabla.
+
+    Se deriva de `Lead.__table__` a propósito, y es la mitad del arreglo del capítulo 33.
+    La lista «nombre, apellido, correo, etapa» es fácil de escribir a mano y es justo lo que
+    no hay que hacer: una copia escrita a mano acierta el día que se escribe y se queda atrás
+    en la primera migración que añada o quite un `NOT NULL`, sin que nada se ponga rojo. El
+    fallo que produciría es el peor de los dos posibles —un 500 desde el INSERT, o un 422 a
+    un campo que la base sí admite vacío— y llegaría meses después del cambio que lo causó.
+
+    `id` y las columnas calculadas (`current_score`, `created_at`…) entran en el conjunto y
+    no estorban: nunca están en `LeadUpdate`, así que el cruce con lo que el cliente envió
+    no las alcanza.
+    """
+    return frozenset(columna.name for columna in Lead.__table__.columns if not columna.nullable)
+
+
+CAMPOS_QUE_NO_ADMITEN_VACIO = _campos_que_no_admiten_vacio()
 
 
 # Valida y normaliza al guardar. Se aplica a la entrada —alta y edición— y no a `LeadBase`:
@@ -108,7 +144,39 @@ class LeadUpdate(BaseModel):
     raw_metadata: Optional[Dict[str, Any]] = None
 
     _phone = field_validator("phone")(_telefono_e164)
-    _country = field_validator("country")(_pais_o_vacio)
+    # Todo el texto de la edición pasa por la misma normalización desde el capítulo 33, no
+    # solo el país: es lo que hace que «lo mandó vacío» signifique una sola cosa. Sin ella,
+    # borrar el contenido de «Ciudad» en el panel guardaba `''` y borrar el de «País»
+    # guardaba `NULL`, dos vacíos distintos en la misma fila y por la misma pantalla.
+    _textos = field_validator(
+        "company", "job_title", "industry", "company_size", "country", "city", "source"
+    )(_texto_o_vacio)
+
+    @model_validator(mode="after")
+    def _vaciar_solo_lo_que_la_ficha_admite_vaciar(self) -> "LeadUpdate":
+        """
+        Un vacío explícito sobre un campo obligatorio se rechaza; nunca se ignora.
+
+        Aquí está la diferencia que el capítulo 33 vino a arreglar. `model_fields_set` dice
+        qué campos **vinieron en el cuerpo**, que no es lo mismo que qué campos valen `None`:
+        un campo ausente y un campo enviado a nulo llegaban indistinguibles al repositorio, y
+        el repositorio resolvía el empate ignorando los dos.
+
+        Separadas las dos cosas, hay que decidir qué pasa con el vacío sobre un campo que la
+        tabla declara `NOT NULL`. Se responde 422 y se nombra el campo. La alternativa
+        —ignorarlo y devolver 200— es la que estaba, y es peor de lo que parece: no es que no
+        obedezca, es que **contesta que sí**. El asesor borra el apellido, ve «Prospecto
+        actualizado», y el apellido sigue ahí la próxima vez que abra la ficha.
+        """
+        vacios = {campo for campo in self.model_fields_set if getattr(self, campo, None) is None}
+        prohibidos = sorted(vacios & CAMPOS_QUE_NO_ADMITEN_VACIO)
+        if prohibidos:
+            raise ValueError(
+                "La ficha no existe sin estos campos, así que no se pueden dejar vacíos: "
+                + ", ".join(prohibidos)
+                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
+            )
+        return self
 
 
 class LeadResponse(LeadBase):

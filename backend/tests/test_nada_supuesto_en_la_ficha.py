@@ -101,28 +101,25 @@ def test_un_pais_en_blanco_es_ausencia_de_pais_y_no_una_cadena_vacia(en_blanco):
     assert LeadUpdate(country=en_blanco).country is None
 
 
-def test_un_pais_ya_escrito_no_se_puede_vaciar_desde_la_edicion(client, lead_headers):
+def test_un_pais_ya_escrito_se_puede_vaciar_desde_la_edicion(client, lead_headers):
     """
-    El límite de este capítulo, fijado por escrito para que se vea.
+    Lo que este capítulo dejó abierto y cerró el 33, con la prueba dada la vuelta.
 
-    Las fichas que la migración no toca —las del panel, las del CRM— siguen diciendo
-    «México» porque no consta si alguien lo eligió. Un asesor que sepa que esa persona no
-    está en México **no puede dejar el campo vacío**: la actualización parcial del
-    repositorio aplica `if value is not None`, así que un `null` explícito se ignora. Y no
-    es del país: **ningún campo de la ficha se puede vaciar** una vez escrito. Se puede
-    cambiar por otro valor, no borrar.
+    Aquí había una prueba de fijación que afirmaba lo contrario: que un país escrito por
+    error **no** se podía retirar, porque la actualización parcial aplicaba
+    `if value is not None` y tiraba el nulo explícito. Estaba escrita para lo que el sistema
+    hacía, no para lo que convenía, con el encargo de ponerse roja el día que alguien lo
+    corrigiera —y es exactamente lo que hizo—.
 
-    No se corrige aquí a propósito. Cambiar esa línea altera el comportamiento de todos los
-    campos a la vez —el cliente manda `null` en varios cuando el formulario los deja en
-    blanco—, y eso es una decisión de diseño con su propia discusión, no una corrección de
-    este capítulo. Queda anotado en §6 de `docs/Congelacion_y_Trabajo_Futuro.md`.
-
-    Esta prueba comprueba lo que el sistema HACE, no lo que convendría que hiciera. Si algún
-    día se corrige, esta prueba falla y obliga a decidirlo en lugar de descubrirlo.
+    Se conserva el caso, invertido, porque es el que da sentido a la migración de datos del
+    capítulo 32: esa migración solo vacía las fichas de las que consta que nadie eligió el
+    país, y las demás quedaron a que un asesor las corrigiera a mano. Sin poder vaciarlas,
+    la corrección a mano no existía y la mitad del arreglo era teórica.
     """
-    correo = "corregible@example.com"
     creada = client.post(
-        LEADS, headers=lead_headers, json={**FICHA_MINIMA, "email": correo, "country": "México"}
+        LEADS,
+        headers=lead_headers,
+        json={**FICHA_MINIMA, "email": "corregible@example.com", "country": "México"},
     )
     assert creada.status_code == 201, creada.text
 
@@ -131,8 +128,8 @@ def test_un_pais_ya_escrito_no_se_puede_vaciar_desde_la_edicion(client, lead_hea
     )
 
     assert actualizada.status_code == 200, actualizada.text
-    assert actualizada.json()["country"] == "México"
-    # Cambiarlo por otro país sí funciona: lo que no hay es forma de dejarlo vacío.
+    assert actualizada.json()["country"] is None
+    # Y cambiarlo por otro país sigue funcionando, que es lo que ya se podía hacer.
     cambiada = client.put(
         f"{LEADS}/{creada.json()['id']}", headers=lead_headers, json={"country": "Perú"}
     )

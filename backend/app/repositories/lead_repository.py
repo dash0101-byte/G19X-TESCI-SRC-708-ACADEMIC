@@ -220,8 +220,21 @@ class LeadRepository:
                 if existing and existing.id != lead.id:
                     raise LeadEmailAlreadyExists(new_email)
 
+        # Se aplica TODO lo que vino en el cuerpo, incluido lo que vino vacío. Hasta el
+        # capítulo 33 la condición era `and value is not None`, y esa línea convertía el
+        # `exclude_unset=True` de arriba en decoración: el dump ya distinguía «no lo mandó»
+        # de «lo mandó vacío», y el bucle volvía a mezclarlos tirando los dos.
+        #
+        # La consecuencia no era que no se pudiera vaciar un campo, sino que vaciarlo
+        # respondía 200. Un dato escrito por error —un país supuesto, una empresa mal
+        # tecleada— se podía cambiar por otro, pero no retirar, y la pantalla decía que sí.
+        #
+        # Que un `None` no llegue aquí sobre una columna `NOT NULL` lo garantiza `LeadUpdate`,
+        # que lo rechaza con 422 nombrando el campo. Se comprueba allí y no aquí para que la
+        # lista de campos obligatorios tenga UN dueño: la tabla. Y si alguna vez se colara,
+        # no sería en silencio —la base lo rechaza, que es el modo de fallo que sí se ve—.
         for field, value in update_data.items():
-            if hasattr(lead, field) and value is not None:
+            if hasattr(lead, field):
                 setattr(lead, field, value)
         lead.updated_at = datetime.datetime.now(datetime.timezone.utc)
 
