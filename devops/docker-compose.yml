@@ -212,9 +212,32 @@ services:
       # Dirección pública bajo la que se sirve el enlace de cada publicación de LinkedIn.
       PUBLICACIONES_URL_BASE: ${PUBLICACIONES_URL_BASE:-http://localhost:3000/interes}
       # Página de interés: la única ruta sin sesión que escribe en la base.
-      INTERES_LIMITE_POR_IP: ${INTERES_LIMITE_POR_IP:-10/hour}
-      INTERES_LIMITE_POR_PUBLICACION: ${INTERES_LIMITE_POR_PUBLICACION:-120/hour}
-      INTERES_LIMITE_DE_LECTURAS_POR_IP: ${INTERES_LIMITE_DE_LECTURAS_POR_IP:-120/hour}
+      #
+      # Los tres primeros son MÁS ESTRICTOS que los valores por defecto del código desde el
+      # capítulo 34, y la diferencia es deliberada: los del código están pensados para una
+      # pila en red local, donde quien abre la página está en la oficina; esta pila tiene una
+      # puerta a internet, y ahí la misma cifra significa otra cosa. Bajarlos no le cuesta
+      # nada al panel —ninguna pantalla del panel pasa por estas rutas— y es lo único que
+      # separa un formulario público de un buzón de basura.
+      #
+      # Qué hacer si llega una oleada está en `docs/Guia_del_Tunel_Publico.md`: la primera
+      # medida no es tocar estos números, es apagar el túnel, que es instantáneo y no exige
+      # reconstruir nada.
+      INTERES_LIMITE_POR_IP: ${INTERES_LIMITE_POR_IP:-5/hour}
+      INTERES_LIMITE_POR_PUBLICACION: ${INTERES_LIMITE_POR_PUBLICACION:-60/hour}
+      INTERES_LIMITE_DE_LECTURAS_POR_IP: ${INTERES_LIMITE_DE_LECTURAS_POR_IP:-60/hour}
+      # Este NO se baja. Quien pide la tarjeta casi siempre es un rastreador de una red
+      # social, y son varios por cada vez que alguien comparte el enlace: apretarlo haría
+      # que la vista previa dejara de salir justo cuando el post se está difundiendo, que
+      # es lo contrario de lo que se quiere proteger.
+      INTERES_LIMITE_DE_TARJETAS_POR_IP: ${INTERES_LIMITE_DE_TARJETAS_POR_IP:-240/hour}
+      # --- La dirección pública, comprobada (capítulo 34) ---
+      # Encendida aquí y apagada por defecto en el código: esta es la pila que está detrás
+      # del túnel, y es el único sitio donde la pregunta «¿la dirección configurada sigue
+      # llevando aquí?» tiene respuesta que valga algo.
+      COMPROBAR_DIRECCION_PUBLICA: ${COMPROBAR_DIRECCION_PUBLICA:-true}
+      DIRECCION_PUBLICA_CACHE_SEGUNDOS: ${DIRECCION_PUBLICA_CACHE_SEGUNDOS:-120}
+      DIRECCION_PUBLICA_TIMEOUT_SEGUNDOS: ${DIRECCION_PUBLICA_TIMEOUT_SEGUNDOS:-4}
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-plurione}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lead_scoring_db}
       # --- Integridad del artefacto de ML (A-10) ---
       # `joblib.load` deserializa con pickle, que ejecuta codigo al cargar. Con esta
@@ -549,6 +572,16 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+      # La puerta estrecha (capítulo 34), y su dirección de publicación importa tanto como
+      # el puerto: `127.0.0.1` y no `0.0.0.0`.
+      #
+      # Es lo que hace que nadie de la red local pueda conectarse a ella. El único proceso
+      # que llega es el túnel, que corre en este mismo anfitrión, y de ahí sale la licencia
+      # de `nginx.conf` para creerse `CF-Connecting-IP` al contar el límite por IP: si este
+      # puerto se publicara en todas las interfaces, cualquiera de la oficina podría poner
+      # esa cabecera a mano y darse un contador nuevo en cada petición. Las dos líneas —esta
+      # y el `map`— son una sola decisión escrita en dos archivos.
+      - "127.0.0.1:${PUERTA_PUBLICA_PUERTO:-8080}:8080"
     depends_on:
       backend:
         condition: service_healthy

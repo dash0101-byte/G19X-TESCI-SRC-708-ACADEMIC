@@ -74,7 +74,12 @@ RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0'
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fragmento con las cabeceras de seguridad, incluido desde cada `location`.
 COPY security-headers.conf /etc/nginx/conf.d/security-headers.conf
-EXPOSE 80
+# Fragmento con las directivas de proxy de la puerta estrecha (capítulo 34), incluido desde
+# cada `location` del servidor del 8080.
+COPY puerta-publica.conf /etc/nginx/conf.d/puerta-publica.conf
+# El 80 es el panel, en la red local. El 8080 es la puerta estrecha, y es el único puerto
+# que mira el túnel; se publica solo en 127.0.0.1 (véase `devops/docker-compose.yml`).
+EXPOSE 80 8080
 CMD ["nginx", "-g", "daemon off;"]
 
 # ---------------------------------------- destino por defecto: compilar aquí dentro
