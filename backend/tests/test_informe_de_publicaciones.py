@@ -354,14 +354,34 @@ def test_el_asesor_ve_los_suyos_y_solo_el_total_del_resto(
     assert informe["resumen"]["alcance_completo"] is False
     # Ni el nombre, ni la empresa, ni el score del prospecto ajeno salen del servidor.
     #
-    # Se busca en todo MENOS en la cabecera `publicacion` (capítulo 32). Ahí va el enlace
-    # público, y dentro el slug: veintidós caracteres aleatorios de `secrets`. La cadena «99»
-    # cae dentro de un slug así aproximadamente una vez de cada doscientas, de modo que esta
-    # prueba fallaba sola con esa frecuencia desde el capítulo 25, sin que nada estuviera mal.
-    # La cabecera no lleva datos de ningún prospecto, así que sacarla no debilita nada.
-    plano = str({clave: valor for clave, valor in informe.items() if clave != "publicacion"})
-    assert "Ajeno" not in plano
-    assert "99" not in plano
+    # Se comprueba recorriendo la estructura y NO buscando «99» en el volcado a texto, que
+    # es como estaba escrito. Esa forma fallaba sola: la respuesta lleva cadenas aleatorias
+    # —el slug de veintidós caracteres— y marcas de tiempo con microsegundos, y «99» cae
+    # dentro de alguna de ellas cada pocos cientos de ejecuciones sin que nada esté mal. El
+    # capítulo 32 quitó una de esas fuentes sacando la cabecera `publicacion`; quedaban las
+    # otras, y volvió a aparecer en una pasada completa del capítulo 34.
+    #
+    # Lo que se quiere decir es «ningún número de esta respuesta es el score ajeno y ningún
+    # texto es su nombre», así que se dice eso. Además de no fallar sola, es más fuerte: un
+    # 99.0 escondido en un campo numérico anidado lo caza, y la búsqueda en texto plano
+    # también lo habría cazado pero mezclado con el ruido.
+    def _valores(nodo):
+        if isinstance(nodo, dict):
+            for clave, valor in nodo.items():
+                # La cabecera `publicacion` no lleva datos de ningún prospecto.
+                if clave != "publicacion":
+                    yield from _valores(valor)
+        elif isinstance(nodo, list):
+            for elemento in nodo:
+                yield from _valores(elemento)
+        else:
+            yield nodo
+
+    for valor in _valores(informe):
+        assert not (isinstance(valor, str) and "Ajeno" in valor), valor
+        assert not (isinstance(valor, (int, float)) and not isinstance(valor, bool) and valor == 99.0), (
+            f"el score del prospecto ajeno salió en la respuesta: {valor}"
+        )
 
 
 def test_el_lider_ve_la_publicacion_entera(client, lead_headers, publicacion, db_session):

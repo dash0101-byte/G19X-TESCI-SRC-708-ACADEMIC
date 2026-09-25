@@ -2291,6 +2291,113 @@ jobs:
           }
           echo "Vaciar un campo se aplica, se rechaza con motivo cuando la tabla no lo admite, y queda en la bitacora."
 
+
+      # Capitulo 34. La puerta estrecha: el unico puerto que sale a internet publica cinco
+      # rutas, todas de la pagina de interes, y devuelve 404 a todo lo demas.
+      #
+      # Lo que hace peligroso un cambio aqui es que NO SE VE. Publicar de mas no rompe
+      # ninguna prueba ni ninguna pantalla: el panel sigue funcionando igual de bien, y lo
+      # unico que cambia es que la cartera de prospectos pasa a ser alcanzable desde
+      # internet. Esa es exactamente la clase de regresion que este trabajo existe para
+      # detectar, y la forma de la guarda importa tanto como lo que comprueba.
+      #
+      # Se vigila la FORMA de la lista, no una lista de prohibiciones. Comprobar que
+      # `/api/v1/leads` no esta publicada seguiria pasando el dia que alguien anada
+      # `/api/v1/nomina`: una lista negra solo prohibe lo que ya se sabia nombrar.
+      - name: La puerta estrecha publica solo la pagina de interes
+        run: |
+          set -euo pipefail
+
+          # El bloque del 8080, aislado del servidor del panel (puerto 80).
+          puerta=$(sed -n '/listen 8080;/,$p' frontend/nginx.conf)
+          [ -n "$puerta" ] || {
+            echo ""
+            echo "FALLO: no hay servidor en el 8080 (capitulo 34)."
+            echo "La puerta estrecha desaparecio: o el tunel no publica nada, o esta"
+            echo "apuntando al puerto del panel, que publica el sistema entero."
+            exit 1
+          }
+
+          # 1. La red final. Sin ella la lista deja de ser blanca y un endpoint nuevo nace
+          # publicado en vez de nacer fuera.
+          printf '%s\n' "$puerta" | tr '\n' ' ' | grep -qE 'location / \{ *return 404; *\}' || {
+            echo ""
+            echo "FALLO: la puerta ya no niega por defecto (capitulo 34)."
+            echo "Con la negativa por defecto, un endpoint nuevo nace FUERA de internet."
+            echo "Sin el, nace publicado y nadie se entera hasta que alguien lo encuentra."
+            exit 1
+          }
+
+          # 2. Ninguna `location` con expresion puede publicar algo que no sea la pagina.
+          # Es la comprobacion que caza el atajo previsible: recortar `/api/` para que la
+          # pagina pueda pedir un endpoint mas, y publicar la gestion entera de paso.
+          malas=$(printf '%s\n' "$puerta" | grep -oE 'location +~ +"[^"]+"' | grep -v 'interes' || true)
+          if [ -n "$malas" ]; then
+            echo ""
+            echo "FALLO: la puerta publica rutas que no son de la pagina de interes (capitulo 34):"
+            printf '%s\n' "$malas"
+            echo "Cada ruta publicada se nombra una a una. Si la pagina necesita un endpoint"
+            echo "mas, se anade ese endpoint, nunca su prefijo."
+            exit 1
+          fi
+
+          # 3. Los `location` de prefijo: solo `/assets/` (el bundle que la pagina necesita
+          # para dibujarse) y el `/` del 404.
+          prefijos=$(printf '%s\n' "$puerta" | grep -oE 'location +/[A-Za-z0-9_./-]* *\{' \
+            | sed -E 's/location +//; s/ *\{//' | sort -u)
+          for prefijo in $prefijos; do
+            case "$prefijo" in
+              /|/assets/) ;;
+              *)
+                echo ""
+                echo "FALLO: la puerta publica el prefijo '$prefijo' (capitulo 34)."
+                echo "Un prefijo publica todo lo que cuelgue de el, hoy y en el futuro."
+                exit 1
+                ;;
+            esac
+          done
+
+          # 4. El puerto se publica SOLO en loopback. Es la otra mitad de la defensa y vive
+          # en otro archivo: `nginx.conf` se cree `CF-Connecting-IP` para contar el limite
+          # por IP, y eso solo es legitimo mientras el unico que alcance ese puerto sea el
+          # tunel de la propia maquina. Publicarlo en 0.0.0.0 convierte esa linea en un
+          # agujero, y las dos decisiones tienen que cambiar juntas o ninguna.
+          grep -qE '"127\.0\.0\.1:\$\{PUERTA_PUBLICA_PUERTO:-[0-9]+\}:8080"' devops/docker-compose.yml || {
+            echo ""
+            echo "FALLO: el puerto de la puerta ya no se publica solo en 127.0.0.1 (capitulo 34)."
+            echo "Cualquiera de la red local podria falsear CF-Connecting-IP y darse un"
+            echo "contador nuevo en cada peticion: el tope por IP dejaria de existir."
+            exit 1
+          }
+
+          # 5. La direccion publica sigue teniendo un solo dueno. Pasar de la direccion
+          # efimera de un tunel a un dominio propio tiene que ser cambiar un ajuste; cada
+          # copia suelta es un sitio donde ese cambio se olvidaria, y lo que produce es un
+          # enlace roto dentro de un post ya publicado.
+          grep -q 'def base_publica() -> str:' backend/app/core/publicaciones.py || {
+            echo ""
+            echo "FALLO: desaparecio el unico dueno de la direccion publica (capitulo 34)."
+            exit 1
+          }
+          sueltas=$(grep -rnE 'https?://[^ "'"'"']+/interes' backend/app/ --include='*.py' \
+            | grep -v 'app/core/config.py' | grep -vE '^\S+: *#' || true)
+          if [ -n "$sueltas" ]; then
+            echo ""
+            echo "FALLO: hay direcciones publicas escritas a mano en el codigo (capitulo 34):"
+            printf '%s\n' "$sueltas"
+            exit 1
+          fi
+
+          # 6. Los limites de la pagina publica siguen siendo mas estrictos que los del
+          # codigo, que estan pensados para una pila en red local.
+          for ajuste in INTERES_LIMITE_POR_IP INTERES_LIMITE_POR_PUBLICACION INTERES_LIMITE_DE_LECTURAS_POR_IP; do
+            grep -qE "^      $ajuste: \\\$\{$ajuste:-" devops/docker-compose.yml || {
+              echo ""
+              echo "FALLO: $ajuste ya no se declara en la pila que tiene puerta a internet (capitulo 34)."
+              exit 1
+            }
+          done
+          echo "La puerta publica solo la pagina de interes, en loopback, y la direccion tiene un solo dueno."
       # §19.9. Negarse a evaluar con un perfil ajeno es correcto; hacerlo sin avisar deja al
       # sistema aparentando vigilancia. La negativa tiene que salir por el webhook, y la de
       # una evaluacion fallida sin el mensaje de la excepcion, que nombra la base.

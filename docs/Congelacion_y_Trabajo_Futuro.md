@@ -141,13 +141,23 @@ Publicar desde el panel exige una API y una cuenta por red.
 
 ### 3.4. La tarjeta de vista previa no se ha visto en una red de verdad
 
-**(R27 §27.13)**
+**(R27 §27.13 · desbloqueado a medias en el capítulo 34)**
 
 El HTML se comprueba como lo lee un rastreador, y las etiquetas Open Graph y Twitter Card
 son las que LinkedIn, WhatsApp, Facebook y X documentan. Pero pegar el enlace y **mirar** la
-tarjeta exige una dirección pública, y la de la demostración es `localhost`.
+tarjeta exige una dirección pública, y la de la demostración era `localhost`.
 
-**Qué haría falta:** un dominio con certificado, aunque sea de pruebas.
+**Ya no lo es.** El capítulo 34 dejó la página alcanzable desde internet por un túnel
+gratuito, con HTTPS y sin abrir puertos (R32). Se comprobó desde fuera de la red que el HTML
+llega con `og:title`, `og:description`, `og:url`, `og:image` y `twitter:card` correctos, y
+que la imagen de 1 200 × 630 se sirve.
+
+**Lo que sigue abierto es la última mitad, y es la que no puede hacer una máquina:** pegar el
+enlace en LinkedIn y **mirar** la tarjeta que compone. Eso exige una cuenta y una persona.
+La guía lo pone como tarea del primer día (`docs/Guia_del_Tunel_Publico.md` §4).
+
+**Qué haría falta para cerrarlo del todo:** alguien con cuenta de LinkedIn, diez minutos, y
+el túnel encendido.
 
 ### 3.5. Nada sale del panel
 
@@ -523,6 +533,8 @@ cambiados, sin copiar valores.
 | 23 | Un aviso purgado puede volver a entrar si el sistema de origen lo reentrega pasado el plazo; y **descartar no bloquea** | R21 §21.12 · R22 §22.9 |
 | 25 | El **alta** no normaliza los textos en blanco: `LeadCreate` guarda `''` donde la edición guarda `NULL` desde el capítulo 33. Es el mismo arreglo en otro camino, y afecta también a las integraciones que dan de alta fichas, así que tiene su propia discusión | R33 §33.8 |
 | 26 | El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado | R33 §33.8 |
+| 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
+| 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
 
 ---
 

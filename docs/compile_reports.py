@@ -66,6 +66,11 @@ REPORT_FILES = [
     # único punto de §6.1 que el capítulo 32 abrió, y que el propio 32 encontró comprobando
     # si su arreglo del país se podía usar de verdad.
     ("Reporte_31_Vaciar_un_Campo_es_un_Cambio_El_Nulo_que_se_Ignoraba_y_la_Lista_que_la_Tabla_Dicta.md", "Capítulo 33: Vaciar un Campo es un Cambio — El Nulo que se Ignoraba y la Lista que Dicta la Tabla"),
+    # El capítulo que por fin pone la página de interés a disposición de alguien de fuera,
+    # y el primero que publica algo de este sistema en internet. Desbloquea §3.4 de la
+    # congelación, que llevaba abierto desde el capítulo 27 esperando «un dominio con
+    # certificado, aunque sea de pruebas».
+    ("Reporte_32_Salir_a_Internet_por_una_Puerta_Estrecha_Tunel_a_Coste_Cero_y_la_Direccion_que_Caduca.md", "Capítulo 34: Salir a Internet por una Puerta Estrecha — Túnel a Coste Cero y la Dirección que Caduca"),
 ]
 
 
@@ -194,7 +199,7 @@ Una plataforma integral bajo **Clean Architecture (Puertos y Adaptadores)**, ope
 10. **Bucle de realimentación sin fuga de información.** Cada puntuación guarda una **instantánea del vector tal como estaba al puntuar**, y el dataset se etiqueta sobre esa instantánea: un prospecto ganado lleva propuesta enviada y reunión agendada, y entrenar sobre su estado actual enseñaría que enviar propuestas causa cierres. Los prospectos aún en el embudo se **excluyen**, no se cuentan como perdidos.
 11. **Observabilidad del modelo.** Monitor de deriva por índice PSI con perfil de referencia atado por huella a su artefacto, registro versionado de modelos con procedencia de los datos, y verificación de la huella SHA-256 del artefacto antes de deserializarlo —si no coincide, el artefacto **no se carga** y el sistema sigue con el heurístico en lugar de ejecutar un `pickle` sustituido—.
 12. **Fiabilidad operativa.** Registro estructurado con `request_id`, métricas de Prometheus, copias de seguridad con **prueba de restauración**, imágenes de terceros fijadas por huella con renovación explícita, y un lanzador único para toda la pila.
-13. **Aseguramiento de calidad.** **1386 pruebas** de backend en Pytest con **93 % de cobertura** y **363 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **38 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa.
+13. **Aseguramiento de calidad.** **1428 pruebas** de backend en Pytest con **93 % de cobertura** y **369 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **39 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa.
 
 ### Lo que este trabajo se negó a hacer
 

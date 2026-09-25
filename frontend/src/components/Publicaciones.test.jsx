@@ -26,6 +26,7 @@ vi.mock('../services/api', () => ({
   fetchSalesReps: vi.fn(),
   fetchComparativaDePublicaciones: vi.fn(),
   fetchNuevosSinAsesor: vi.fn(),
+  fetchEstadoDeLaDireccionPublica: vi.fn(),
   fetchInformeDePublicacion: vi.fn(),
   fetchPublicacionDeInteres: vi.fn(),
   enviarInteres: vi.fn(),
@@ -39,6 +40,7 @@ import {
   fetchCampaignList,
   fetchComparativaDePublicaciones,
   fetchInformeDePublicacion,
+  fetchEstadoDeLaDireccionPublica,
   fetchNuevosSinAsesor,
   fetchPublicacionDeInteres,
   fetchSalesReps,
@@ -106,6 +108,15 @@ beforeEach(() => {
     ],
   });
   fetchNuevosSinAsesor.mockReset().mockResolvedValue({ total: 3 });
+  // Por defecto, la dirección pública responde y no hay enlaces caducados: es el estado
+  // normal, y así cada prueba que quiera el otro caso lo dice explícitamente.
+  fetchEstadoDeLaDireccionPublica.mockReset().mockResolvedValue({
+    base: 'http://localhost:3000/interes',
+    responde: true,
+    comprobada_en: '2026-09-25T10:00:00Z',
+    detalle: 'HTTP 200',
+    publicaciones_con_enlace_caducado: 0,
+  });
   fetchInformeDePublicacion.mockReset().mockResolvedValue({
     publicacion: { id: 5, titulo: PUBLICACION.name, enlace: ENLACE, activa: true, estado: 'activa' },
     resumen: { perfiles_recibidos: 1, avanzaron_de_etapa: 0, score_medio: 35.8, de_otros_asesores: 0, alcance_completo: true, visitas: 0, envios: 0, tasa_de_envio: null },
@@ -529,5 +540,95 @@ describe('del listado al informe y a la ficha', () => {
     await usuario.click(screen.getByRole('button', { name: 'Ver informe' }));
 
     expect(await screen.findByRole('heading', { name: /Informe de/ })).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Capítulo 34: la dirección pública que cambia en cada arranque
+// ============================================================================
+//
+// Un túnel de prueba gratuito da otra dirección cada vez que se levanta. Eso no rompe nada
+// de forma visible —el post sigue en LinkedIn, la publicación sigue activa— y por eso la
+// pantalla tiene que decirlo: es la única señal que habrá.
+
+describe('la dirección pública', () => {
+  it('no dibuja nada mientras la dirección responde', async () => {
+    render(<Publicaciones puedeGestionar />);
+    await screen.findAllByText(PUBLICACION.name);
+
+    // Una franja de advertencia permanente se convierte en parte del decorado en dos días
+    // y deja de leerse justo el día que sí pasa algo.
+    expect(screen.queryByText(/no responde/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ya no lleva aquí/i)).not.toBeInTheDocument();
+  });
+
+  it('avisa cuando la dirección configurada dejó de responder', async () => {
+    fetchEstadoDeLaDireccionPublica.mockResolvedValue({
+      base: 'https://energy-compare.trycloudflare.com/interes',
+      responde: false,
+      comprobada_en: '2026-09-25T10:00:00Z',
+      detalle: 'HTTP 530',
+      publicaciones_con_enlace_caducado: 0,
+    });
+    render(<Publicaciones puedeGestionar />);
+
+    const aviso = await screen.findByText(/La dirección pública no responde/i);
+    expect(aviso).toBeInTheDocument();
+    // Dice cuál es la dirección que falla y qué contestó: sin eso, el aviso obliga a ir a
+    // buscar el dato a un archivo de configuración para poder hacer algo.
+    expect(screen.getByText(/energy-compare\.trycloudflare\.com/)).toBeInTheDocument();
+    expect(screen.getByText(/HTTP 530/)).toBeInTheDocument();
+  });
+
+  it('no avisa cuando la comprobación está apagada', async () => {
+    // `responde: null` es «no se ha preguntado», que es lo que contesta un despliegue sin
+    // túnel delante. Tratarlo como una caída encendería una alarma permanente.
+    fetchEstadoDeLaDireccionPublica.mockResolvedValue({
+      base: 'http://localhost:3000/interes',
+      responde: null,
+      comprobada_en: null,
+      detalle: 'La comprobación está apagada (COMPROBAR_DIRECCION_PUBLICA).',
+      publicaciones_con_enlace_caducado: 0,
+    });
+    render(<Publicaciones puedeGestionar />);
+    await screen.findAllByText(PUBLICACION.name);
+
+    expect(screen.queryByText(/no responde/i)).not.toBeInTheDocument();
+  });
+
+  it('cuenta las publicaciones cuyo enlace repartido ya no lleva aquí', async () => {
+    fetchEstadoDeLaDireccionPublica.mockResolvedValue({
+      base: 'https://otra.trycloudflare.com/interes',
+      responde: true,
+      comprobada_en: '2026-09-25T10:00:00Z',
+      detalle: 'HTTP 200',
+      publicaciones_con_enlace_caducado: 3,
+    });
+    render(<Publicaciones puedeGestionar />);
+
+    expect(await screen.findByText(/3 publicaciones repartieron/i)).toBeInTheDocument();
+  });
+
+  it('marca la publicación concreta cuyo enlace caducó, sin tapar el enlace bueno', async () => {
+    fetchCampaignList.mockResolvedValue({
+      total: 1,
+      items: [{ ...PUBLICACION, enlace_caducado: true }],
+    });
+    render(<Publicaciones puedeGestionar />);
+
+    expect(await screen.findByText(/El enlace que se repartió de esta publicación ya no lleva aquí/i))
+      .toBeInTheDocument();
+    // El enlace de arriba es el de AHORA y se puede copiar: lo que caducó está dentro del
+    // post. Si el aviso lo sustituyera, no habría nada que pegar para arreglarlo.
+    expect(screen.getByText(ENLACE)).toBeInTheDocument();
+  });
+
+  it('un asesor no pide el estado de la dirección', async () => {
+    // No tendría ninguna acción disponible con la respuesta: quien reparte los enlaces es
+    // quien puede volver a repartirlos.
+    render(<Publicaciones />);
+    await screen.findAllByText(PUBLICACION.name);
+
+    expect(fetchEstadoDeLaDireccionPublica).not.toHaveBeenCalled();
   });
 });
