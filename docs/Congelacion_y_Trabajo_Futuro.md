@@ -433,6 +433,19 @@ No depende de nadie. Se puede hacer hoy. Ordenada por lo que cuesta si nadie la 
 > afecta a **todos** los campos de la ficha a la vez y eso es una decisión de diseño con su
 > propia discusión, no una corrección.
 
+> **Estado tras el capítulo 33 (cerrado el 24-09-2026).** El punto **24** queda cerrado: la
+> decisión que el capítulo 32 dejó por tomar se tomó, y la corrección completa está en el
+> Reporte 31 (§33.2–§33.5). Vuelve a ser cierto lo que decía el capítulo 32: **§6.1 no tiene
+> ningún punto que este equipo pueda cerrar por su cuenta**. Quedan el 6 y el 7, los dos
+> esperando a un sistema externo.
+>
+> El 24 duró un capítulo, y conviene decir cómo se encontró porque no fue por donde se
+> suelen encontrar estas cosas. No lo vio una prueba, ni el CI, ni una revisión: lo vio
+> alguien preguntándose si el arreglo que acababa de escribir se podía usar. El capítulo 32
+> quitó el país supuesto de cuatro sitios y escribió una migración que solo podía tocar
+> parte de las fichas; las demás quedaban «a que un asesor las corrigiera», y nadie había
+> comprobado que eso fuera posible. No lo era.
+
 | # | Qué | Por qué importa | Origen | Estado |
 | :---: | :--- | :--- | :---: | :---: |
 | 1 | ~~**El CSV de realimentación no caduca**~~ | Vive fuera de la base y fuera del control de versiones. Es la última fila de la política de conservación sin plazo, y lleva datos de personas | R20 §20.8 · R22 §22.9 | **Cerrado** (R32 §32.2) |
@@ -442,7 +455,7 @@ No depende de nadie. Se puede hacer hoy. Ordenada por lo que cuesta si nadie la 
 | 5 | ~~**Las acciones de GitHub van por etiqueta**~~ | `actions/checkout@v4`, no por el SHA del commit. Todo lo demás del CI va por huella | R22 §22.9 | **Cerrado** (R32 §32.6) |
 | 6 | **Una entrega de WhatsApp con varios mensajes no es atómica** | Se validan todos antes de escribir, pero si el tercero falla al registrarse los dos primeros quedan. Un reintento los encuentra como duplicados, así que no corrompe; deja trabajo a medias | R21 §21.12 | **Abierto** |
 | 7 | **Sin `event_id`, el CRM se deduplica por contenido** | Dos eventos reales idénticos byte a byte entran como uno | R21 §21.12 | **Abierto** → §3.10 |
-| 24 | **Ningún campo de la ficha se puede vaciar una vez escrito** | La actualización parcial aplica `if value is not None`, así que un `null` explícito se ignora. Se puede cambiar un valor por otro; no borrarlo. Lo encontró el capítulo 32 al comprobar si un país escrito por error se podía corregir desde el panel: no se puede, ni el país ni ningún otro campo | R32 §32.9 | **Abierto** |
+| 24 | ~~**Ningún campo de la ficha se puede vaciar una vez escrito**~~ | La actualización parcial aplicaba `if value is not None`, así que un `null` explícito se ignoraba. Se podía cambiar un valor por otro; no borrarlo. Y no respondía que no: respondía **200 con la ficha entera**, de modo que la pantalla decía «Prospecto actualizado» y el dato seguía ahí | R32 §32.9 | **Cerrado** (R33 §33.2–§33.5) |
 | 8 | ~~**El país sigue supuesto**~~ | La ficha escribe «México» cuando no llega. No puntúa en ninguna de las dos mitades del score, y quitarlo exige una migración de la columna | R25 §25.10 · H-7 | **Cerrado** (R32 §32.4) |
 
 **Por qué 6 y 7 siguen abiertos, uno por uno.**
@@ -468,8 +481,16 @@ idénticos byte a byte, incluido el instante, entran como uno) por uno frecuente
 `event_id`, y eso no se decide aquí. **Queda reclasificado a §3**, con lo demás que depende
 de que alguien del otro lado haga algo.
 
-Es decir: al cerrar el capítulo 32, **§6.1 no tiene ningún punto que este equipo pueda
-cerrar por su cuenta**. Los dos que quedan esperan a un sistema externo, no a más trabajo.
+Es decir: cerrado el punto 24 en el capítulo 33, **§6.1 no tiene ningún punto que este
+equipo pueda cerrar por su cuenta**. Los dos que quedan esperan a un sistema externo, no a
+más trabajo.
+
+**24 — Vaciar un campo.** Cerrado en el capítulo 33. La decisión que el 32 dejó pendiente
+—qué pasa cuando el vacío llega a un campo que la ficha no puede no tener— se resolvió con
+un 422 que nombra el campo, y con la lista de campos obligatorios **derivada de la tabla**
+en vez de escrita a mano, que es lo que evita que el arreglo caduque en la primera migración
+que toque un `nullable`. La bitácora distingue desde entonces los campos vaciados de los
+cambiados, sin copiar valores.
 
 ### 6.2. Huecos de la historia que se enseña
 
@@ -500,6 +521,8 @@ cerrar por su cuenta**. Los dos que quedan esperan a un sistema externo, no a m�
 | 21 | En el entorno de desarrollo de **esta máquina** quedan `cffi`, `cryptography` y `pycparser`: un proceso ajeno tenía abierto `_cffi_backend.pyd` y no se detuvo. El código no los importa, el CI instala desde cero y la imagen no los lleva | R23 §23.7 |
 | 22 | ~~Los ceros de ingresos que ya hay en la base no se migraron a nulos. El extractor los lee como ausentes, que es lo que importa al modelo; la ficha los muestra como cero hasta que alguien la edite~~ — **cerrado** en el capítulo 32: la migración `a4c8d1e70f39` los pasa a vacío y la base dice ya lo que el modelo leía (R32 §32.4) | R24 §24.9 |
 | 23 | Un aviso purgado puede volver a entrar si el sistema de origen lo reentrega pasado el plazo; y **descartar no bloquea** | R21 §21.12 · R22 §22.9 |
+| 25 | El **alta** no normaliza los textos en blanco: `LeadCreate` guarda `''` donde la edición guarda `NULL` desde el capítulo 33. Es el mismo arreglo en otro camino, y afecta también a las integraciones que dan de alta fichas, así que tiene su propia discusión | R33 §33.8 |
+| 26 | El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado | R33 §33.8 |
 
 ---
 

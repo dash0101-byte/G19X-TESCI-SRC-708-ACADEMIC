@@ -34,9 +34,9 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1364 pruebas en el backend (93 % de cobertura) y 358 en
+> **Calidad en las dos mitades.** 1386 pruebas en el backend (93 % de cobertura) y 363 en
 > el cliente (94,5 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
-> con 37 guardas de regresión de configuración peligrosa y cuatro guardas de propiedades.
+> con 38 guardas de regresión de configuración peligrosa y cuatro guardas de propiedades.
 
 > ## 🧊 Proyecto congelado el 24-09-2026
 >
@@ -52,6 +52,11 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 > **Revisión del capítulo 32.** La sección «lo que puede morder» —la deuda que no dependía
 > de nadie— pasó de ocho puntos a **dos**, y los dos esperan a un sistema externo. Ya no
 > queda ninguna fila de la política de conservación sin plazo.
+>
+> **Revisión del capítulo 33.** El único punto que el 32 dejó abierto, y que él mismo había
+> encontrado: **ningún campo de la ficha se podía vaciar** una vez escrito. Un dato puesto
+> por error se podía cambiar por otro, no retirar, y la pantalla respondía que sí lo había
+> hecho. Cerrado. §6.1 vuelve a no tener nada que este equipo pueda cerrar por su cuenta.
 
 ## ⚡ Guía de Inicio Rápido (Despliegue de la Versión Entregable)
 
@@ -1132,7 +1137,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1364 pruebas
+### Backend — 1386 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1212,7 +1217,7 @@ exactamente lo que el extractor del dataset sabría usar; y que el panel sea de 
 devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
 es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
 
-### Cliente — 358 pruebas
+### Cliente — 363 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1221,7 +1226,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 358 pruebas
+npm test                # 363 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```
@@ -1267,7 +1272,7 @@ python scripts/demo_e2e.py
 
 ## 📚 Compilación de la Memoria Técnica Institucional
 
-Para compilar los 30 reportes técnicos en el documento formal consolidado con portada e índice:
+Para compilar los 31 reportes técnicos en el documento formal consolidado con portada e índice:
 ```bash
 python docs/compile_reports.py
 ```
@@ -1309,6 +1314,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **28** | [Reporte 28](docs/reportes/Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md) | El sistema dice qué hacer hoy: seis reglas en la pasada diaria que dejan tareas y avisos sin salir del panel, bandeja «Hoy» ordenada por score, campana de avisos, los HOT que se enfrían para el líder, y guarda del CI con 31 defectos reintroducidos. |
 | **29** | [Reporte 29](docs/reportes/Reporte_29_Cerrar_el_Bucle_El_Desenlace_con_su_Motivo_Panel_y_Contador_del_Reentrenamiento.md) | Cerrar el bucle (capítulo 30): el desenlace con motivo de lista cerrada, fecha de cierre y tramo del acuerdo; una sola puerta para cerrar; lo cerrado sale de la bandeja y de las reglas; panel de desenlaces por motivo, publicación, red y score al cerrarse; contador del reentrenamiento con aviso, sin reentrenar nada; y guarda del CI con 18 defectos reintroducidos. |
 | **30** | [Reporte 30](docs/reportes/Reporte_30_La_Deuda_Que_Muerde_Plazos_Para_lo_Ultimo_sin_Plazo_El_Pais_Que_Ya_No_Se_Supone_y_Todo_Fijado.md) | La deuda que muerde (capítulo 32): plazo para las dos últimas filas sin plazo —la bitácora de auditoría y el conjunto de realimentación, que no es una tabla sino archivos—, el país que deja de suponerse en la columna, el esquema y el registro, el teléfono de los asesores en E.164 con el mismo módulo que el de los prospectos, los ceros de ingresos migrados a vacío, `App.jsx` probado con la aplicación montada, y los paquetes de `apt-get` y las acciones de GitHub fijados por versión y por huella de commit. 27 defectos reintroducidos, 27 detectados. |
+| **31** | [Reporte 31](docs/reportes/Reporte_31_Vaciar_un_Campo_es_un_Cambio_El_Nulo_que_se_Ignoraba_y_la_Lista_que_la_Tabla_Dicta.md) | Vaciar un campo es un cambio (capítulo 33): la actualización parcial deja de ignorar los nulos explícitos —distinguía «no lo mandó» de «lo mandó vacío» y volvía a mezclarlos—, los campos que la tabla declara `NOT NULL` responden 422 nombrándose con la lista **derivada de las columnas** y no escrita a mano, la bitácora distingue lo vaciado sin copiar valores, y el panel deja de exigir lo que la tabla admite vacío. 9 defectos reintroducidos, 9 detectados por guarda y por suite. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos que sigue la demostración, 16 preguntas técnicas de sínodo y **8 preguntas incómodas** con su respuesta honesta: por qué no se lee LinkedIn, por qué el modelo no conoce los canales nuevos y por qué no hay desenlaces sintéticos. |
 | **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |
 | **FIN** | [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md) | Qué cuenta como fallo a partir de la congelación, y todo lo que queda abierto agrupado por de qué depende. Incluye lo que **no** se va a hacer, con el motivo. |

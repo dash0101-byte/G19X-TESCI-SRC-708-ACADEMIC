@@ -2179,6 +2179,118 @@ jobs:
           done
           echo "Bitacora y conjunto de realimentacion con plazo; el volumen lo comparten quien extrae y quien purga."
 
+      # Capitulo 33. El punto 24 de §6.1: ningun campo de la ficha se podia vaciar. La
+      # actualizacion parcial aplicaba "if value is not None", asi que el exclude_unset de
+      # la linea de arriba —que YA distinguia «no lo mando» de «lo mando vacio»— quedaba en
+      # decoracion, porque el bucle volvia a mezclar los dos tirandolos.
+      #
+      # Lo que hace peligroso el regreso es que no rompe nada visible: vaciar un campo
+      # seguiria respondiendo 200 con la ficha entera. No es que no obedezca, es que
+      # contesta que si, y el dato borrado sigue ahi al reabrir la ficha.
+      #
+      # Cuatro formas de volver atras, una por cada mitad del arreglo.
+      - name: Vaciar un campo es un cambio
+        run: |
+          set -euo pipefail
+
+          # 1. El bucle del repositorio aplica lo que vino, incluido el vacio.
+          repo=$(grep -vE '^\s*#' backend/app/repositories/lead_repository.py)
+          if printf '%s\n' "$repo" | grep -qE 'if hasattr\(lead, field\) and value is not None'; then
+            echo ""
+            echo "FALLO: la actualizacion parcial vuelve a ignorar los campos vaciados (capitulo 33)."
+            echo "Un dato escrito por error se podra cambiar por otro, no retirar, y la"
+            echo "pantalla dira que si lo hizo (punto 24 de §6.1)."
+            exit 1
+          fi
+          printf '%s\n' "$repo" | grep -q 'update_data = lead_in.model_dump(exclude_unset=True)' || {
+            echo ""
+            echo "FALLO: la edicion dejo de distinguir lo que el cliente envio (capitulo 33)."
+            echo "Sin exclude_unset, cada edicion vaciaria todo lo que el formulario no"
+            echo "incluyera: el fallo simetrico del que se corrigio, y mas destructivo."
+            exit 1
+          }
+
+          # 2. La lista de campos obligatorios se DERIVA de la tabla. Escrita a mano acierta
+          # el dia que se escribe y calla en la primera migracion que toque un nullable.
+          esquema=$(grep -vE '^\s*#' backend/app/schemas/lead.py)
+          printf '%s\n' "$esquema" | grep -q 'Lead.__table__.columns if not columna.nullable' || {
+            echo ""
+            echo "FALLO: los campos que no admiten vacio ya no salen de la tabla (capitulo 33)."
+            echo "Una copia escrita a mano se queda atras sin que nada se ponga rojo, y el"
+            echo "fallo aparece meses despues del cambio que lo causo."
+            exit 1
+          }
+          printf '%s\n' "$esquema" | grep -q 'prohibidos = sorted(vacios & CAMPOS_QUE_NO_ADMITEN_VACIO)' || {
+            echo ""
+            echo "FALLO: el esquema ya no rechaza el vacio sobre un campo obligatorio (capitulo 33)."
+            echo "Sin ese 422, el nulo llega a la base y un 500 del INSERT sustituye a un"
+            echo "mensaje que nombraba el campo."
+            exit 1
+          }
+          printf '%s\n' "$esquema" | grep -q 'campo for campo in self.model_fields_set' || {
+            echo ""
+            echo "FALLO: el rechazo ya no mira lo que el cliente ENVIO (capitulo 33)."
+            echo "Mirando solo que valgan None, un campo ausente se confundiria con uno"
+            echo "vaciado y no se podria editar ninguna ficha."
+            exit 1
+          }
+          # Y el vacio tiene que ser UNO. El formulario manda "" en los campos de texto y
+          # null en los que pasan por un conversor; si cada forma dejara una cosa distinta,
+          # la misma pantalla produciria dos vacios en la misma fila.
+          printf '%s\n' "$esquema" | grep -q '"company", "job_title", "industry", "company_size", "country", "city", "source"' || {
+            echo ""
+            echo "FALLO: los textos en blanco de la edicion ya no se normalizan (capitulo 33)."
+            echo "Vaciar un campo volveria a significar dos cosas —cadena vacia o NULL—"
+            echo "segun por que camino se vaciara, y toda consulta tendria que saberlo."
+            exit 1
+          }
+
+          # 3. La bitacora distingue lo vaciado, y sigue anotando nombres y no valores.
+          endpoint=$(grep -vE '^\s*#' backend/app/api/v1/endpoints/leads.py)
+          printf '%s\n' "$endpoint" | grep -q 'campos_vaciados=sorted(campo for campo, valor in enviados.items() if valor is None)' || {
+            echo ""
+            echo "FALLO: la bitacora ya no distingue los campos vaciados (capitulo 33)."
+            echo "Borrar el dato de una persona y corregirlo dejarian el mismo asiento."
+            exit 1
+          }
+          printf '%s\n' "$endpoint" | grep -q 'campos=sorted(enviados.keys())' || {
+            echo ""
+            echo "FALLO: el asiento de la edicion ya no anota solo los NOMBRES (R-11)."
+            echo "La bitacora se consulta con otro criterio de acceso que la tabla de"
+            echo "negocio: un correo copiado alli sale del alcance que lo protege."
+            exit 1
+          }
+
+          # 4. El panel no exige lo que la tabla admite vacio. Mientras «Empresa» y «Cargo»
+          # llevaran required, el navegador bloqueaba el envio: el panel era mas estricto
+          # que la API sin decirlo, y la correccion de una empresa mal tecleada no tenia
+          # donde hacerse por mucho que el servidor la aceptara.
+          ficha=$(grep -vE '^\s*(//|\*|/\*)' frontend/src/components/LeadDetailModal.jsx)
+          for campo in lead-company lead-job-title; do
+            bloque=$(printf '%s\n' "$ficha" | grep -A 5 "id=\"$campo\"") || {
+              echo ""
+              echo "FALLO: $campo desaparecio del formulario de la ficha (capitulo 33)."
+              echo "La guarda no puede comprobar lo que ya no esta; si el campo se renombro,"
+              echo "hay que renombrarlo tambien aqui."
+              exit 1
+            }
+            if printf '%s\n' "$bloque" | grep -q 'required'; then
+              echo ""
+              echo "FALLO: el formulario de la ficha vuelve a exigir $campo (capitulo 33)."
+              echo "La tabla declara esa columna nullable: el panel estaria prohibiendo algo"
+              echo "que el servidor acepta, y sin decir por que."
+              exit 1
+            fi
+          done
+          printf '%s\n' "$ficha" | grep -q 'const obligatorio = (valor, original) =>' || {
+            echo ""
+            echo "FALLO: el cliente vuelve a omitir los campos obligatorios vacios (capitulo 33)."
+            echo "Omitirlos hace que borrar un apellido responda «Prospecto actualizado» y"
+            echo "el apellido siga ahi: la mentira que este capitulo vino a quitar."
+            exit 1
+          }
+          echo "Vaciar un campo se aplica, se rechaza con motivo cuando la tabla no lo admite, y queda en la bitacora."
+
       # §19.9. Negarse a evaluar con un perfil ajeno es correcto; hacerlo sin avisar deja al
       # sistema aparentando vigilancia. La negativa tiene que salir por el webhook, y la de
       # una evaluacion fallida sin el mensaje de la excepcion, que nombra la base.
