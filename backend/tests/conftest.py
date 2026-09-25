@@ -86,10 +86,17 @@ def pytest_configure(config):
 # ==============================================================================
 
 @pytest.fixture(scope="session", autouse=True)
-def prepare_environment():
+def prepare_environment(tmp_path_factory):
     """Crea el esquema en memoria, las cuentas de prueba y habilita el webhook firmado."""
     Base.metadata.create_all(bind=engine)
     settings.CRM_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET
+
+    # El plazo del conjunto de realimentación (capítulo 32) BORRA ARCHIVOS del disco, y sin
+    # esta línea el directorio por defecto sería `ml_pipeline/data` del propio árbol: correr
+    # la suite en el portátil de quien tuviera un `leads_reales.csv` extraído le borraría el
+    # suyo. Es el mismo argumento por el que la base va en memoria y no en `lead_scoring.db`.
+    # Quien quiera probar la purga de verdad apunta este ajuste a su propio `tmp_path`.
+    settings.REALIMENTACION_DIR = str(tmp_path_factory.mktemp("realimentacion-de-la-suite"))
 
     hashed = hash_password(TEST_PASSWORD)
     db = SessionLocal()

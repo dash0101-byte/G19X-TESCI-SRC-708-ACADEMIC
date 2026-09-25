@@ -69,6 +69,17 @@ CONSERVACION_MINIMA_DIAS = {
     "CONSERVACION_TAREAS_DIAS": 30,
     # Un aviso leído ya cumplió; se conserva lo justo para poder reconstruir una semana.
     "CONSERVACION_AVISOS_DIAS": 14,
+    # Capítulo 32. El conjunto de realimentación es un DERIVADO: se vuelve a extraer de la
+    # base cuando haga falta, con la misma consulta y el mismo manifiesto. Lo único que
+    # justifica conservarlo es poder repetir un entrenamiento y comparar el resultado con
+    # el anterior, y eso no se hace un año después; se hace esa semana.
+    "CONSERVACION_REALIMENTACION_DIAS": 7,
+    # Capítulo 32, y el mínimo más alto de la tabla con diferencia. La bitácora es el único
+    # sitio donde consta quién borró una ficha, quién lanzó un recálculo o quién tanteó los
+    # límites de su rol; un plazo corto aquí no ahorra espacio, borra la prueba. Un año es
+    # el ciclo de revisión más corto que tiene sentido: por debajo, la purga se llevaría los
+    # asientos antes de que nadie haya mirado el ejercicio completo.
+    "CONSERVACION_AUDITORIA_DIAS": 365,
 }
 
 # Mínimo de cada plazo del motor de reglas (capítulo 28). Mismo criterio que arriba: un `0`
@@ -325,6 +336,32 @@ class Settings(BaseSettings):
     CONSERVACION_TAREAS_DIAS: int = 180
     # Días desde que el aviso se leyó. Uno sin leer no caduca: nadie se ha enterado todavía.
     CONSERVACION_AVISOS_DIAS: int = 90
+
+    # --- Las dos últimas filas sin plazo (capítulo 32) ---
+    #
+    # Días desde que se escribió cada archivo del conjunto de realimentación. Es la última
+    # fila de la tabla de §20.5 que seguía diciendo «sin mecanismo», y la única que vive
+    # FUERA de la base: un CSV con una fila por persona cerrada, más su manifiesto. Treinta
+    # días es lo que dura una tanda de entrenamiento de principio a fin —extraer, entrenar,
+    # comparar contra el artefacto vigente, decidir—; pasado eso, el CSV ya no es material
+    # de trabajo sino una copia de datos personales que nadie mira.
+    CONSERVACION_REALIMENTACION_DIAS: int = 30
+    # Dónde vive ese conjunto. Vacío significa «donde lo deja el extractor cuando se lanza
+    # desde el árbol del repositorio» (`ml_pipeline/data`), que es su valor por defecto
+    # documentado. En la pila es un volumen, montado tanto en el backend —que es quien
+    # extrae— como en el servicio que purga: sin ese volumen compartido el plazo existiría
+    # y no alcanzaría a ningún archivo, que es la forma más cara de no tener plazo.
+    REALIMENTACION_DIR: str = ""
+    # Días desde que ocurrió el asiento. Hasta el capítulo 32 la bitácora no tenía plazo EN
+    # LA APLICACIÓN: se remitía a «una decisión de operación» (N-8) y crecía sin techo.
+    # Sigue siendo una decisión de operación —este número es técnico y provisional, no una
+    # valoración jurídica, igual que todos los de §20.5—, pero ahora tiene un mecanismo y un
+    # valor por defecto conservador en lugar de ninguno de las dos cosas.
+    #
+    # Dos años, y no menos, por lo que la bitácora es: el único registro de quién hizo qué.
+    # Borrar aquí es borrar la prueba de un abuso de permisos, no liberar espacio, así que
+    # el defecto se equivoca del lado de conservar y quien opere decidirá si acortarlo.
+    CONSERVACION_AUDITORIA_DIAS: int = 730
 
     # --- Plazos del motor de reglas (capítulo 28) ---
     # Cuánto se da para cada cosa. Son de la instalación, no del dominio: un equipo que

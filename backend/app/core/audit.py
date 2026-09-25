@@ -157,6 +157,9 @@ ENTIDAD_REGLA = "regla"
 ENTIDAD_TAREA = "tarea"
 ENTIDAD_AVISO = "aviso"
 ENTIDAD_DESENLACE = "desenlace"
+# Capítulo 32. La única entidad de esta lista que no es una tabla: el conjunto de
+# realimentación son archivos, y su plazo cuenta archivos en lugar de filas.
+ENTIDAD_REALIMENTACION = "conjunto_de_realimentacion"
 
 
 def _recortar(valor: Optional[str], limite: int) -> Optional[str]:

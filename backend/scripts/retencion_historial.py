@@ -11,6 +11,11 @@ asociar». Hasta el capítulo 22 esas tablas no tenían plazo, y la de sesiones 
 función de purga, que nada llamaba. Es la misma pasada y no un servicio nuevo a propósito: un
 proceso más que supervisar es un proceso más que puede quedarse parado sin que nadie lo vea.
 
+Desde el capítulo 32, por el mismo bucle, las dos filas de §20.5 que seguían sin plazo: la
+**bitácora de auditoría** y el **conjunto de realimentación**. La segunda no es una tabla
+—son archivos en un directorio—, así que su línea cuenta archivos en lugar de filas; todo
+lo demás —el asiento, el corte, que un fallo no detenga a los demás— es idéntico.
+
 Y desde el capítulo 28, el **motor de reglas** (`app/services/motor_de_reglas.py`): lo que
 cada asesor tiene que hacer hoy. Por el mismo argumento de arriba, y porque el motor y la
 purga miran la misma clase de cosa —qué ha pasado con cada prospecto desde la última vez—,
@@ -120,7 +125,6 @@ def una_pasada(meses: int, lote: int, simular: bool) -> int:
             fallos += 1
             print(f"[REGLAS] El motor no se pudo ejecutar ({exc.__class__.__name__}: {exc}).")
 
-        verbo = "se borrarian" if simular else "borradas"
         for resultado in aplicar_caducidad(db, simular=simular):
             if resultado.error:
                 fallos += 1
@@ -129,8 +133,12 @@ def una_pasada(meses: int, lote: int, simular: bool) -> int:
                     "Queda anotado en la bitacora; los demas plazos se aplicaron."
                 )
                 continue
+            # La unidad la dice el resultado: los plazos de la base cuentan filas y el del
+            # conjunto de realimentacion cuenta archivos (capitulo 32).
+            unidad = "archivos" if resultado.es_de_archivos else "filas"
+            verbo = "se borrarian" if simular else ("borrados" if resultado.es_de_archivos else "borradas")
             print(
-                f"[CADUCIDAD] {resultado.tabla}: {resultado.filas} filas {verbo} "
+                f"[CADUCIDAD] {resultado.tabla}: {resultado.filas} {unidad} {verbo} "
                 f"(plazo {resultado.dias} dias, corte {resultado.corte.date().isoformat()})."
             )
         return 1 if fallos else 0

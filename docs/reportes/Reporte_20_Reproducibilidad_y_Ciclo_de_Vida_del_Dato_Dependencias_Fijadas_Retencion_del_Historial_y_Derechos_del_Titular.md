@@ -441,12 +441,13 @@ provisionales: fijarlos corresponde a quien responda del tratamiento de datos en
 | Registros de integración CRM | `crm_integration_logs` | Sí: correo, nombre y empresa; sin texto de mensajes desde la Fase 15 | 90 días desde la sincronización (`CONSERVACION_REGISTROS_CRM_DIAS`, mínimo 30) | `retencion-historial`, diario; supresión, vinculados y sin vincular | **Aplicado** (capítulo 22) |
 | Bandeja «Sin asociar» | `unmatched_events` | Sí: correo, teléfono y nombre de quien aún no es prospecto | 90 días desde que llegó el aviso (`CONSERVACION_SIN_ASOCIAR_DIAS`, mínimo 30) | `retencion-historial`, diario; supresión con la ficha | **Aplicado** (capítulo 22) |
 | Entregas de webhook | `webhook_deliveries` | Respuesta con datos | Ventana antirrepetición (15 min) | Purga en cada ingesta | Aplicado |
-| Bitácora | `audit_log` | De empleados; del prospecto, hasta su supresión | Sin plazo en la aplicación | Fuera de la aplicación (capítulo 14); datos del titular retirados al suprimir | Decisión de operación |
+| Bitácora | `audit_log` | De empleados; del prospecto, hasta su supresión | 730 días desde el asiento (`CONSERVACION_AUDITORIA_DIAS`, mínimo 365) | `retencion-historial`, diario; datos del titular retirados al suprimir | **Aplicado** (capítulo 32) |
 | Sesiones | `refresh_tokens` | IP del empleado | 30 días después de caducar (`CONSERVACION_SESIONES_DIAS`, mínimo 7) | `purgar_tokens_caducados`, desde la pasada diaria de `retencion-historial` | **Aplicado** (capítulo 22) |
 | Trabajos de recálculo | `scoring_jobs` | Correo del empleado que lo pidió | 90 días desde que terminó; los vivos no caducan (`CONSERVACION_TRABAJOS_DIAS`, mínimo 7) | `retencion-historial`, diario | **Aplicado** (capítulo 22) |
 | Copias de seguridad | volumen `pgrespaldos` | Todo | `RETENCION_DIAS`, 14 por defecto | `respaldo.sh` (capítulo 16) | Aplicado; una supresión persiste en ellas hasta 14 días |
 | Registro de texto de los contenedores | `json-file` de Docker | De empleados; del prospecto, ya no | 3 × 10 MB por servicio | Rotación de Docker | Aplicado |
-| Conjunto de realimentación | `ml_pipeline/data/leads_reales*` | Sí | Fuera de la base | Excluido del control de versiones (capítulo 18) | **Sin mecanismo** |
+| Conjunto de realimentación | `ml_pipeline/data/leads_reales*` | Sí | 30 días desde que se escribió el archivo (`CONSERVACION_REALIMENTACION_DIAS`, mínimo 7) | `retencion-historial`, diario, sobre `REALIMENTACION_DIR`; excluido del control de versiones (capítulo 18) | **Aplicado** (capítulo 32) |
+| Conjunto **sintético** de entrenamiento | `ml_pipeline/data/leads_historical.csv` | No: ninguna fila corresponde a una persona | Sin plazo, a propósito | — | Es la entrada reproducible del artefacto; la purga lo excluye por patrón |
 | Artefacto del modelo | `.joblib` | No contiene filas individuales | Registro de modelos | — | — |
 
 > **Nota (capítulo 21).** Desde la Fase 15 las actividades llevan procedencia y no guardan el
@@ -461,12 +462,33 @@ provisionales: fijarlos corresponde a quien responda del tratamiento de datos en
 > plazo en días, con mínimo, y los aplica la misma pasada diaria que resume el historial, con un
 > asiento por plazo en la bitácora. Los plazos siguen siendo técnicos y provisionales.
 
+> **Nota (capítulo 32).** Ya no queda ninguna fila sin mecanismo. Las dos últimas eran las
+> que no encajaban en «una consulta más»:
+>
+> * La **bitácora** decía «sin plazo en la aplicación; decisión de operación» desde el
+>   capítulo 14. Ahora tiene `CONSERVACION_AUDITORIA_DIAS`, con el **mínimo más alto de la
+>   tabla** —un año— y dos por defecto. Sigue siendo una decisión de operación y sigue sin
+>   ser una valoración jurídica: lo que cambia es que hay un número escrito y un mecanismo
+>   que lo aplica, en lugar de una nota explicando por qué no los había. Aquí purgar borra
+>   la prueba de quién hizo qué, no libera espacio, así que el plazo se protege por tres
+>   lados: el mínimo alto, que ningún endpoint lo alcanza (N-8 sigue en pie) y que la propia
+>   purga deja su asiento diciendo cuántos se llevó y hasta qué fecha.
+> * El **conjunto de realimentación** vive fuera de la base: se purga por directorio y por
+>   patrón, y el patrón nombra exactamente lo que esta tabla nombra (`leads_reales*`). Se
+>   deja fuera `leads_historical.csv`, que está en el mismo directorio y es el conjunto
+>   sintético con el que se entrena: no lleva datos de nadie y sin él el entrenamiento del
+>   artefacto vigente no se podría repetir. Un conjunto exportado con otro nombre queda
+>   fuera del plazo; es la contrapartida de no barrer el directorio entero.
+>
+> En la pila, el directorio es un **volumen compartido** entre el backend —que extrae— y el
+> servicio que purga. Sin ese volumen el plazo existiría y no alcanzaría a ningún archivo.
+
 Leída de arriba abajo, la tabla dice tres cosas. Que el dato que más crecía —el historial—
 tiene ahora plazo y mecanismo. Que una persona puede ejercer acceso y supresión, y que la
-supresión alcanza todo lo que está en la base. Y que al cerrar esta fase **cuatro filas no
+supresión alcanza todo lo que está en la base. Y que al cerrar **esta** fase **cuatro filas no
 tenían mecanismo**: los registros CRM, las sesiones, los trabajos de recálculo y el CSV de
 realimentación. Se escribieron aquí para que no se leyeran como resueltas. Las tres primeras lo
-tienen desde el capítulo 22; el CSV de realimentación sigue sin él.
+tienen desde el capítulo 22; el CSV de realimentación y la bitácora, desde el 32.
 
 En términos de la legislación mexicana de protección de datos, esta fase da soporte técnico a
 dos de los derechos ARCO: **acceso** y **cancelación**. La **rectificación** ya existía

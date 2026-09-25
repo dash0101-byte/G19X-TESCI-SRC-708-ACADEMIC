@@ -293,6 +293,15 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # Capitulo 32. Donde el extractor del bucle deja el conjunto de realimentacion:
+      #   python devops/pila.py exec backend python /app/observabilidad/feedback_dataset.py \
+      #       --salida /var/lib/plurione/realimentacion/leads_reales.csv
+      # Es un VOLUMEN y no el /tmp en memoria de este contenedor por dos motivos, y el
+      # segundo es el que importa: uno, un CSV que desaparece al reiniciar obliga a volver
+      # a extraerlo; dos, es el unico sitio que el servicio de purga TAMBIEN ve, y un plazo
+      # de conservacion que no alcanza al archivo es un plazo escrito y no aplicado.
+      - realimentacion:/var/lib/plurione/realimentacion
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -432,6 +441,21 @@ services:
       # aviso sin leer tampoco. Minimos: 30 y 14 dias.
       CONSERVACION_TAREAS_DIAS: ${CONSERVACION_TAREAS_DIAS:-180}
       CONSERVACION_AVISOS_DIAS: ${CONSERVACION_AVISOS_DIAS:-90}
+      # Capitulo 32: las dos ultimas filas de la tabla de §20.5 que seguian sin plazo.
+      #
+      # La bitacora, con el minimo mas alto de todos (365 dias) y dos anos por defecto.
+      # Aqui borrar no libera espacio, borra la prueba de quien hizo que; el numero sigue
+      # siendo una decision de operacion y no una valoracion juridica, pero ahora hay
+      # mecanismo y valor escrito en lugar de ninguna de las dos cosas.
+      CONSERVACION_AUDITORIA_DIAS: ${CONSERVACION_AUDITORIA_DIAS:-730}
+      # El conjunto de realimentacion: archivos, no filas. Minimo 7 dias. Es un derivado
+      # —se vuelve a extraer de la base cuando haga falta—, y lo que justifica guardarlo es
+      # poder repetir un entrenamiento y comparar, que se hace esa semana o no se hace.
+      CONSERVACION_REALIMENTACION_DIAS: ${CONSERVACION_REALIMENTACION_DIAS:-30}
+      # El mismo volumen que monta el backend, que es quien extrae. Sin esta linea el plazo
+      # de arriba se aplicaria sobre un directorio que en este contenedor no existe: cero
+      # archivos cada dia, y el asiento diria la verdad sobre algo que no sirve de nada.
+      REALIMENTACION_DIR: /var/lib/plurione/realimentacion
       # Plazos del motor de reglas (capitulo 28). Cada uno con su minimo; ademas, el aviso
       # al lider tiene que superar al del asesor o el servicio no arranca.
       REGLA_PRIMER_CONTACTO_HORAS: ${REGLA_PRIMER_CONTACTO_HORAS:-24}
@@ -449,6 +473,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # El conjunto de realimentacion que extrae el backend. Este servicio no escribe nada
+      # aqui: solo borra lo que supero CONSERVACION_REALIMENTACION_DIAS (capitulo 32).
+      - realimentacion:/var/lib/plurione/realimentacion
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -683,6 +711,14 @@ volumes:
   # contenedor para que la misma deriva no vuelva a avisar cada vez que el servicio
   # arranca.
   deriva:
+    driver: local
+
+  # Conjunto de realimentacion: el CSV etiquetado con desenlaces reales y su manifiesto
+  # (capitulo 32). Lo escribe el backend con `feedback_dataset.py` y lo purga el servicio
+  # de retencion pasados CONSERVACION_REALIMENTACION_DIAS. Lleva una fila por persona
+  # cerrada, asi que no vive en el arbol del repositorio ni en el volumen de la base:
+  # se extrae, se usa para entrenar fuera, y caduca.
+  realimentacion:
     driver: local
 
   pgdata:

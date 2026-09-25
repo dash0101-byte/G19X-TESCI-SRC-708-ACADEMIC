@@ -6,8 +6,18 @@ del CRM y, desde el capítulo 21, la bandeja «Sin asociar»—, y la de sesione
 función de purga que nadie llamaba. Lo que se comprueba aquí no es solo que se borre lo
 vencido: es que no se borre lo vivo, que cada pasada quede en la bitácora, que un plazo que
 falla no detenga a los demás y que el servicio de la pila de verdad los aplique.
+
+Capítulo 32: las dos filas que el 22 dejó fuera
+------------------------------------------------
+La **bitácora**, que se remitía a «decisión de operación» y crecía sin techo, y el **conjunto
+de realimentación**, que ni siquiera es una tabla. El segundo trae una propiedad que ninguna
+de las pruebas anteriores tenía que vigilar: esta purga BORRA ARCHIVOS, así que se comprueba
+también lo que NO se lleva por delante —el conjunto sintético con el que se entrena, que
+vive en el mismo directorio— y que una pasada restringida a unos plazos concretos no toque
+el disco de paso.
 """
 import datetime
+import os
 import pathlib
 import uuid
 
@@ -24,7 +34,14 @@ from app.models.entities import (
     User,
 )
 from app.services import caducidad_service
-from app.services.caducidad_service import PLAZOS, Plazo, aplicar_caducidad
+from app.services.caducidad_service import (
+    PLAZOS,
+    PLAZOS_DE_ARCHIVOS,
+    Plazo,
+    aplicar_caducidad,
+    archivos_vencidos,
+    directorio_de_realimentacion,
+)
 from pydantic import ValidationError
 
 UTC = datetime.timezone.utc
@@ -40,6 +57,9 @@ def plazos_por_defecto(monkeypatch):
         "CONSERVACION_TRABAJOS_DIAS": 90,
         "CONSERVACION_REGISTROS_CRM_DIAS": 90,
         "CONSERVACION_SIN_ASOCIAR_DIAS": 90,
+        # Capítulo 32.
+        "CONSERVACION_AUDITORIA_DIAS": 730,
+        "CONSERVACION_REALIMENTACION_DIAS": 30,
     }.items():
         monkeypatch.setattr(settings, ajuste, dias)
 
@@ -100,8 +120,19 @@ def test_las_tablas_que_20_5_dejaba_sin_caducidad_tienen_plazo():
         "refresh_tokens", "scoring_jobs", "crm_integration_logs", "unmatched_events",
         # Capítulo 28: nacen con plazo el mismo día que nacen.
         "tareas", "avisos",
+        # Capítulo 32: la última tabla de §20.5 que decía «sin plazo en la aplicación».
+        "audit_log",
     }
-    assert {plazo.ajuste for plazo in PLAZOS} == set(CONSERVACION_MINIMA_DIAS)
+    # Ninguna de las dos listas por su cuenta cubre la tabla de mínimos, y las dos juntas
+    # sí: un plazo nuevo sin mínimo —o un mínimo escrito para un plazo que nadie aplica—
+    # falla aquí en lugar de descubrirse el día de la primera purga.
+    ajustes = {p.ajuste for p in PLAZOS} | {p.ajuste for p in PLAZOS_DE_ARCHIVOS}
+    assert ajustes == set(CONSERVACION_MINIMA_DIAS)
+
+
+def test_el_conjunto_de_realimentacion_tiene_plazo_aunque_no_sea_una_tabla():
+    assert [p.nombre for p in PLAZOS_DE_ARCHIVOS] == ["conjunto_de_realimentacion"]
+    assert PLAZOS_DE_ARCHIVOS[0].ajuste == "CONSERVACION_REALIMENTACION_DIAS"
 
 
 @pytest.mark.parametrize("ajuste", sorted(CONSERVACION_MINIMA_DIAS))
@@ -197,7 +228,12 @@ def test_cada_plazo_deja_su_asiento_tambien_sin_nada_que_borrar(db_session):
         a.event_metadata["tabla"]: a
         for a in db_session.query(AuditLog).filter(AuditLog.action == "conservacion.purga")
     }
-    assert set(asientos) == {p.tabla for p in PLAZOS}
+    # El plazo de archivos también deja su asiento, y con su propio nombre de unidad: su
+    # «tabla» es el directorio, así que se compara por separado.
+    directorio = str(directorio_de_realimentacion())
+    assert set(asientos) == {p.tabla for p in PLAZOS} | {directorio}
+    assert asientos[directorio].event_metadata["archivos_borrados"] == 0
+    assert "filas_borradas" not in asientos[directorio].event_metadata
     assert asientos["unmatched_events"].event_metadata["filas_borradas"] == 1
     assert asientos["refresh_tokens"].event_metadata["filas_borradas"] == 0
     assert all(a.actor_id is None and a.outcome == "OK" for a in asientos.values())
@@ -253,6 +289,8 @@ def test_el_guion_diario_aplica_los_plazos(db_session, capsys):
     salida = capsys.readouterr().out
     for plazo in PLAZOS:
         assert f"[CADUCIDAD] {plazo.tabla}:" in salida
+    # Y el de archivos, con su unidad: «0 archivos», no «0 filas».
+    assert f"[CADUCIDAD] {directorio_de_realimentacion()}: 0 archivos" in salida
     assert db_session.query(RefreshToken).count() == 0
     assert db_session.query(UnmatchedEvent).count() == 0
     assert db_session.query(CRMIntegrationLog).count() == 0
@@ -260,7 +298,7 @@ def test_el_guion_diario_aplica_los_plazos(db_session, capsys):
     # anotarlo rompe aquí.
     assert db_session.query(AuditLog).filter(
         AuditLog.action == "conservacion.purga"
-    ).count() == len(PLAZOS)
+    ).count() == len(PLAZOS) + len(PLAZOS_DE_ARCHIVOS)
 
 
 def test_si_el_historial_falla_los_plazos_se_aplican_y_la_pasada_sale_con_1(db_session, monkeypatch):
@@ -284,3 +322,170 @@ def test_la_pila_programa_los_plazos_en_el_servicio_diario():
     assert "/app/scripts/retencion_historial.py" in orden and "--cada" in orden
     for ajuste in CONSERVACION_MINIMA_DIAS:
         assert ajuste in servicio["environment"], f"{ajuste} no llega al servicio que aplica el plazo."
+
+
+def test_el_directorio_de_realimentacion_lo_comparten_quien_extrae_y_quien_purga():
+    """
+    El plazo del conjunto solo existe si los dos contenedores miran el mismo sitio.
+
+    Esta es la comprobación que convierte «hay un plazo» en «el plazo alcanza al archivo».
+    Sin el volumen compartido, el servicio de purga aplicaría su corte cada día sobre un
+    directorio vacío, anotaría cero archivos en la bitácora —cierto— y el CSV con una fila
+    por persona cerrada seguiría en el otro contenedor para siempre.
+    """
+    import yaml
+
+    pila = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    purga = pila["services"]["retencion-historial"]
+    extractor = pila["services"]["backend"]
+
+    directorio = purga["environment"]["REALIMENTACION_DIR"]
+    montaje = f"realimentacion:{directorio}"
+    assert montaje in purga["volumes"], "el servicio de purga no monta el volumen que va a purgar"
+    assert montaje in extractor["volumes"], "el backend no escribe donde la purga mira"
+    assert "realimentacion" in pila["volumes"]
+
+
+# ==============================================================================
+# El plazo que no es una tabla (capítulo 32)
+# ==============================================================================
+
+def _archivo(directorio: pathlib.Path, nombre: str, dias_de_antiguedad: float) -> pathlib.Path:
+    """Un archivo con su fecha de modificación puesta hacia atrás."""
+    ruta = directorio / nombre
+    ruta.write_text("resultado,converted\n1,0\n", encoding="utf-8")
+    cuando = (AHORA - datetime.timedelta(days=dias_de_antiguedad)).timestamp()
+    os.utime(ruta, (cuando, cuando))
+    return ruta
+
+
+@pytest.fixture
+def directorio_del_conjunto(tmp_path, monkeypatch):
+    destino = tmp_path / "realimentacion"
+    destino.mkdir()
+    monkeypatch.setattr(settings, "REALIMENTACION_DIR", str(destino))
+    return destino
+
+
+def test_el_conjunto_vencido_se_borra_con_su_manifiesto(db_session, directorio_del_conjunto):
+    _archivo(directorio_del_conjunto, "leads_reales.csv", 31)
+    _archivo(directorio_del_conjunto, "leads_reales_manifiesto.json", 31)
+    reciente = _archivo(directorio_del_conjunto, "leads_reales_2026_09.csv", 5)
+
+    resultados = {r.tabla: r for r in aplicar_caducidad(db_session, ahora=AHORA)}
+    resultado = resultados[str(directorio_del_conjunto)]
+
+    assert resultado.filas == 2 and resultado.unidad == "archivos"
+    assert reciente.exists()
+    assert sorted(p.name for p in directorio_del_conjunto.iterdir()) == ["leads_reales_2026_09.csv"]
+
+
+def test_el_conjunto_sintetico_de_entrenamiento_no_caduca(db_session, directorio_del_conjunto):
+    """
+    `leads_historical.csv` vive en el mismo directorio y NO lleva datos de nadie: es la
+    entrada reproducible del artefacto que hoy sirve. Un patrón `*.csv` se lo habría
+    llevado a los treinta días y habría dejado el entrenamiento sin poder repetirse.
+    """
+    sintetico = _archivo(directorio_del_conjunto, "leads_historical.csv", 400)
+    _archivo(directorio_del_conjunto, "leads_reales.csv", 400)
+
+    aplicar_caducidad(db_session, ahora=AHORA)
+
+    assert sintetico.exists()
+    assert not (directorio_del_conjunto / "leads_reales.csv").exists()
+
+
+def test_un_directorio_que_no_existe_no_es_un_fallo(db_session, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "REALIMENTACION_DIR", str(tmp_path / "todavia-no-hay-nada"))
+
+    resultados = {r.plazo: r for r in aplicar_caducidad(db_session, ahora=AHORA)}
+    resultado = resultados["conjunto_de_realimentacion"]
+
+    # La instalación que aún no ha extraído ningún conjunto es la normal durante meses. Un
+    # plazo que fallara todos los días enseñaría a no leer el registro.
+    assert resultado.error is None and resultado.filas == 0
+
+
+def test_simular_cuenta_los_archivos_sin_borrarlos(db_session, directorio_del_conjunto):
+    _archivo(directorio_del_conjunto, "leads_reales.csv", 60)
+
+    resultados = {r.plazo: r for r in aplicar_caducidad(db_session, ahora=AHORA, simular=True)}
+
+    assert resultados["conjunto_de_realimentacion"].filas == 1
+    assert (directorio_del_conjunto / "leads_reales.csv").exists()
+
+
+def test_una_pasada_restringida_a_unos_plazos_no_toca_el_disco(db_session, directorio_del_conjunto):
+    """
+    La propiedad que impide que una guarda o una prueba de otra cosa borre datos de paso.
+
+    `guarda_del_motor_de_reglas.py` aplica los plazos de `tareas` y `avisos` para comprobar
+    otra cosa. Si pedir unos plazos concretos arrastrara también los de archivos, esa guarda
+    borraría el conjunto de realimentación de quien la ejecutara.
+    """
+    vencido = _archivo(directorio_del_conjunto, "leads_reales.csv", 400)
+
+    resultados = aplicar_caducidad(
+        db_session, ahora=AHORA, plazos=[p for p in PLAZOS if p.tabla == "avisos"]
+    )
+
+    assert [r.plazo for r in resultados] == ["avisos"]
+    assert vencido.exists()
+
+
+def test_un_enlace_simbolico_no_convierte_la_purga_en_un_borrado_de_cualquier_cosa(
+    directorio_del_conjunto, tmp_path
+):
+    """
+    Un `leads_reales.csv` que apunte fuera no se sigue. Sin esto, quien pudiera escribir un
+    nombre en ese directorio podría hacer que la purga diaria borrara cualquier archivo de
+    la máquina al que llegara el proceso.
+    """
+    ajeno = tmp_path / "algo_importante.csv"
+    ajeno.write_text("no soy el conjunto", encoding="utf-8")
+    enlace = directorio_del_conjunto / "leads_reales_enlace.csv"
+    try:
+        enlace.symlink_to(ajeno)
+    except (OSError, NotImplementedError):  # pragma: no cover  (Windows sin permiso)
+        pytest.skip("este sistema no deja crear enlaces simbólicos sin privilegios")
+    cuando = (AHORA - datetime.timedelta(days=400)).timestamp()
+    os.utime(enlace, (cuando, cuando), follow_symlinks=False)
+
+    assert archivos_vencidos(directorio_del_conjunto, AHORA) == []
+
+
+def test_la_bitacora_tiene_plazo_y_deja_dicho_lo_que_se_llevo(db_session):
+    """
+    La purga que borra la prueba. Se comprueba lo que se borra, lo que no, y que el asiento
+    de la propia purga quede diciendo cuántos asientos se llevó y hasta qué fecha: lo que se
+    pierde tiene que quedar acotado por escrito (N-8).
+    """
+    for dias, accion in ((900, "lead.eliminar"), (100, "lead.eliminar")):
+        db_session.add(
+            AuditLog(
+                actor_email="alguien@plurione.test",
+                action=accion,
+                entity="lead",
+                outcome="OK",
+                occurred_at=AHORA - datetime.timedelta(days=dias),
+            )
+        )
+    db_session.commit()
+
+    aplicar_caducidad(db_session, ahora=AHORA, plazos=[p for p in PLAZOS if p.tabla == "audit_log"])
+
+    quedan = db_session.query(AuditLog).filter(AuditLog.action == "lead.eliminar").all()
+    assert len(quedan) == 1, "el asiento de hace 100 días está dentro del plazo de 730"
+    asiento = db_session.query(AuditLog).filter(AuditLog.action == "conservacion.purga").one()
+    assert asiento.event_metadata["filas_borradas"] == 1
+    assert asiento.event_metadata["dias"] == 730
+    assert asiento.event_metadata["corte"].startswith("2024-09")
+
+
+def test_la_bitacora_va_la_ultima_para_no_llevarse_los_errores_de_la_misma_pasada():
+    """
+    Un plazo que falla escribe su asiento de ERROR durante la pasada. Si la purga de la
+    bitácora corriera antes, podría llevárselo en esa misma pasada y el fallo del día
+    quedaría sin rastro.
+    """
+    assert PLAZOS[-1].tabla == "audit_log"
