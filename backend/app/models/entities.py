@@ -151,6 +151,25 @@ class User(Base):
     # otra persona no es una credencial.
     must_change_password = Column(Boolean, default=False, nullable=False)
 
+    # --- Segundo factor TOTP (capítulo 35) ---------------------------------------------
+    # Aquí NO hay ningún secreto. `totp_sal` es una sal aleatoria y el secreto se deriva de
+    # ella con `SECRET_KEY`, que vive en el entorno: quien se lleve un volcado de esta tabla
+    # se lleva sales, y con una sal sola no se genera ni un código. Es lo que hace que no
+    # haga falta cifrar nada —lo que no se guarda no hay que cifrarlo— y lo que obliga a
+    # contar el precio: rotar `SECRET_KEY` invalida todas las altas (`segundo_factor.py`).
+    totp_sal = Column(String(64), nullable=True)
+    # Separado de la sal a propósito: entre pedir el alta y confirmar el primer código, la
+    # sal existe y el factor NO está activo. Sin esa diferencia, quien se equivoque al
+    # escanear el QR se queda fuera de su cuenta sin haber comprobado nunca que funciona.
+    totp_activo = Column(Boolean, default=False, nullable=False)
+    totp_activado_en = Column(DateTime(timezone=True), nullable=True)
+    # Resúmenes SHA-256 de los códigos de recuperación que quedan sin usar. Se quita el
+    # resumen al gastarlo, que es lo que hace que sean de un solo uso.
+    totp_codigos_de_recuperacion = Column(JSON, nullable=True)
+    # El último periodo de treinta segundos aceptado. Impide que el mismo código valga dos
+    # veces dentro de su ventana de validez.
+    totp_ultimo_contador = Column(Integer, nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 

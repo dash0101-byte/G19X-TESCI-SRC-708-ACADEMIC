@@ -25,6 +25,15 @@ email-validator>=2.1.0
 pillow>=11.0.0,<13.0.0
 # Teléfonos en E.164: validar al guardar y normalizar lo existente (Fase 15).
 phonenumbers>=8.13.0
+# El código QR del alta del segundo factor (capítulo 35). Es la ÚNICA dependencia que
+# añade ese capítulo, y entra porque es la única pieza que sale peor escrita a mano: un
+# codificador de QR son los polinomios de Reed-Solomon, ocho patrones de enmascaramiento y
+# la tabla de versiones. El TOTP sí está escrito a mano (`app/core/totp.py`), porque es un
+# HMAC truncado y la norma publica vectores con los que se puede demostrar que está bien.
+#
+# Python puro y SIN dependencias propias: no arrastra nada al lock ni añade extensiones
+# compiladas, que era la objeción de fondo a traer `cryptography` solo para esto.
+segno>=1.6.0,<2.0.0
 # Limitación de tasa por IP en login, webhook CRM e inferencia de scoring.
 slowapi>=0.1.9
 # Almacén compartido del contador de tasa. Sin él, `limits` no sabe hablar con Redis
