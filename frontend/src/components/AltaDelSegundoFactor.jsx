@@ -119,7 +119,7 @@ export default function AltaDelSegundoFactor({ user, onActivado, onSalir }) {
                 autoComplete="one-time-code"
                 inputMode="numeric"
                 placeholder="000000"
-                className="input"
+                className="input-field"
                 style={{ width: '100%', marginBottom: '14px', letterSpacing: '0.12em' }}
               />
               <button

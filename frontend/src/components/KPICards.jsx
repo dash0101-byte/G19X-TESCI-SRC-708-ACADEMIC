@@ -1,5 +1,23 @@
 import React from 'react';
 
+// Las tres tarjetas de categoría FILTRAN la tabla al pulsarlas, así que son botones. Se
+// dibujaban con un `<div onClick>`, y eso las dejaba fuera del alcance del teclado: quien
+// no usa ratón veía tres tarjetas con el cursor de mano y no podía pulsar ninguna. La
+// cuarta —«Total Prospectos»— no filtra nada y sigue siendo un `<div>`, que es lo correcto:
+// convertirla en botón anunciaría al lector de pantalla un control que no hace nada.
+//
+// Un `<button>` trae su propia tipografía, su color y su alineación al centro. Esto los
+// devuelve a los del panel para que la tarjeta se vea exactamente igual que antes.
+const TARJETA_PULSABLE = {
+  padding: '16px 18px',
+  cursor: 'pointer',
+  font: 'inherit',
+  color: 'inherit',
+  textAlign: 'left',
+  width: '100%',
+  display: 'block',
+};
+
 export default function KPICards({ summary, onFilterCategory }) {
   if (!summary) return null;
 
@@ -31,12 +49,10 @@ export default function KPICards({ summary, onFilterCategory }) {
       </div>
 
       {/* HOT Leads */}
-      <div
+      <button
+        type="button"
         className="glass-panel"
-        style={{
-          padding: '16px 18px',
-          cursor: 'pointer',
-        }}
+        style={TARJETA_PULSABLE}
         onClick={() => onFilterCategory('HOT')}
         title="Filtrar prospectos HOT (Score >= 75)"
       >
@@ -52,15 +68,13 @@ export default function KPICards({ summary, onFilterCategory }) {
         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Atención comercial &lt; 15m
         </div>
-      </div>
+      </button>
 
       {/* WARM Leads */}
-      <div
+      <button
+        type="button"
         className="glass-panel"
-        style={{
-          padding: '16px 18px',
-          cursor: 'pointer',
-        }}
+        style={TARJETA_PULSABLE}
         onClick={() => onFilterCategory('WARM')}
         title="Filtrar prospectos WARM (Score 45 - 74.9)"
       >
@@ -76,15 +90,13 @@ export default function KPICards({ summary, onFilterCategory }) {
         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Nutrición y seguimiento
         </div>
-      </div>
+      </button>
 
       {/* COLD Leads */}
-      <div
+      <button
+        type="button"
         className="glass-panel"
-        style={{
-          padding: '16px 18px',
-          cursor: 'pointer',
-        }}
+        style={TARJETA_PULSABLE}
         onClick={() => onFilterCategory('COLD')}
         title="Filtrar prospectos COLD (Score < 45)"
       >
@@ -100,7 +112,7 @@ export default function KPICards({ summary, onFilterCategory }) {
         <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Campañas de branding
         </div>
-      </div>
+      </button>
 
       {/* Average Score */}
       <div className="glass-panel" style={{ padding: '16px 18px' }}>

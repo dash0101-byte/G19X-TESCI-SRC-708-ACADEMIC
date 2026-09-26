@@ -14,7 +14,19 @@
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  /* Era #64748b y no llegaba al mínimo de la norma en ninguna de las tres superficies:
+     4.16 sobre --bg-base, 3.90 sobre --bg-surface y 3.70 sobre --bg-surface-elevated,
+     contra los 4.5 que exige WCAG 2.1 §1.4.3 para texto normal. Y este token no pinta
+     adornos: son las etiquetas de TODOS los formularios (.form-label), las cabeceras de
+     TODAS las tablas (.data-table th) y el texto de ayuda de la página pública.
+
+     El valor nuevo es el primer peldaño de la MISMA rampa —35 % del camino de este color
+     al de --text-secondary— que alcanza 4.63 en el peor de los tres fondos. Se elige el
+     primero que pasa y no uno cómodo a propósito: subirlo más acercaría este token al de
+     texto secundario y borraría la jerarquía de tres niveles que la paleta tiene desde el
+     principio. Sigue siendo claramente el más apagado de los tres (4.63 contra 6.86).
+     Medido en pruebas/contraste.test.js, que lo recalcula de aquí en cada ejecución. */
+  --text-muted: #75849b;
   
   /* Acentos de Marca Sobrios y Minimalistas (Monochrome High-Contrast) */
   --color-primary: #ffffff;

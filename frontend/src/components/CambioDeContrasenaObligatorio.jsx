@@ -84,15 +84,15 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
 
         <form onSubmit={enviar}>
           <label htmlFor="cambio-actual" style={etiqueta}>Contraseña actual</label>
-          <input id="cambio-actual" type="password" className="input" style={campo} required
+          <input id="cambio-actual" type="password" className="input-field" style={campo} required
             autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
 
           <label htmlFor="cambio-nueva" style={etiqueta}>Contraseña nueva (mínimo 12 caracteres)</label>
-          <input id="cambio-nueva" type="password" className="input" style={campo} required minLength={12}
+          <input id="cambio-nueva" type="password" className="input-field" style={campo} required minLength={12}
             autoComplete="new-password" value={nueva} onChange={(e) => setNueva(e.target.value)} />
 
           <label htmlFor="cambio-repetida" style={etiqueta}>Repita la contraseña nueva</label>
-          <input id="cambio-repetida" type="password" className="input" style={campo} required minLength={12}
+          <input id="cambio-repetida" type="password" className="input-field" style={campo} required minLength={12}
             autoComplete="new-password" value={repetida} onChange={(e) => setRepetida(e.target.value)} />
 
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '14px', lineHeight: 1.5 }}>

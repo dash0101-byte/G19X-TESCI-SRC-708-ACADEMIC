@@ -163,7 +163,13 @@ export default function Navbar({
           </button>
 
           {/* User Profile Pill */}
-          <div
+          {/* Un `<button>` y no un `<div onClick>`. Era lo segundo, y eso lo dejaba fuera
+              del alcance del teclado: esta pastilla es la ÚNICA puerta al menú de la sesión,
+              y por tanto la única forma de cerrar sesión y de cambiarse la contraseña. Sin
+              ratón no se podía hacer ninguna de las dos cosas. Se le devuelven la tipografía
+              y la alineación del panel para que se vea igual que antes. */}
+          <button
+            type="button"
             onClick={onOpenSessionModal}
             style={{
               display: 'flex',
@@ -174,7 +180,10 @@ export default function Navbar({
               background: 'var(--bg-surface-elevated)',
               border: '1px solid var(--border-subtle)',
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              transition: 'all 0.15s ease',
+              font: 'inherit',
+              color: 'inherit',
+              textAlign: 'left',
             }}
             title="Ver perfil o cambiar usuario"
           >
@@ -202,8 +211,8 @@ export default function Navbar({
                 {user.badge}
               </span>
             </div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>▾</span>
-          </div>
+            <span aria-hidden="true" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '2px' }}>▾</span>
+          </button>
 
         </div>
       </div>

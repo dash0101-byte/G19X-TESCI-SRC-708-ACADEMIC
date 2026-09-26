@@ -94,6 +94,7 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
   const [enviando, setEnviando] = useState(false);
   const [gracias, setGracias] = useState('');
   const formularioRef = useRef(null);
+  const graciasRef = useRef(null);
 
   const cargar = useCallback(async () => {
     if (vistaPrevia) {
@@ -115,6 +116,21 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // El acuse de recibo, al teclado y al lector de pantalla.
+  //
+  // Antes el formulario entero se sustituía por la pantalla de gracias y pasaban dos cosas
+  // que no se ven mirando: el foco estaba en el botón de enviar, que acababa de desaparecer
+  // del documento, así que caía al `<body>`; y la región `aria-live` que anunciaba el
+  // mensaje **se creaba en el mismo instante que su contenido**, que es el caso en que los
+  // lectores de pantalla no la leen —una región viva anuncia lo que CAMBIA dentro de ella, y
+  // para eso tiene que haber estado ahí antes—.
+  //
+  // Llevar el foco al título resuelve las dos: el lector lo lee porque el foco acaba de
+  // llegar, no porque haya cambiado nada, y el teclado queda en el sitio correcto.
+  useEffect(() => {
+    if (gracias) graciasRef.current?.focus();
+  }, [gracias]);
 
   const cambiar = (nombre, valor) => {
     setFormulario((previo) => ({ ...previo, [nombre]: valor }));
@@ -204,8 +220,10 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
   if (gracias) {
     return (
       <main style={envoltorio}>
-        <section className="glass-panel" style={panel} aria-live="polite">
-          <h1 style={titulo}>{gracias}</h1>
+        <section className="glass-panel" style={panel} role="status">
+          {/* `tabIndex={-1}`: no entra en el recorrido del tabulador —no es un control— pero
+              sí puede recibir el foco cuando se lo lleva el efecto de arriba. */}
+          <h1 style={titulo} ref={graciasRef} tabIndex={-1}>{gracias}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             Puedes cerrar esta página. Tus datos se tratan conforme al aviso de privacidad que aceptaste.
           </p>

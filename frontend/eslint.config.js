@@ -53,6 +53,20 @@ export default [
       ...react.configs.flat.recommended.rules,
       ...reactHooks.configs.flat.recommended.rules,
 
+      // Accesibilidad: el conjunto entero, desde el capítulo 36.
+      //
+      // Hasta aquí estaba encendida UNA regla —`label-has-associated-control`— y el
+      // comentario de abajo explicaba por qué: «el conjunto completo señala además cosas de
+      // otras familias (roles ARIA, orden de foco, texto alternativo) que no se han revisado
+      // todavía». Era una deuda anotada con su motivo, y el motivo dejó de valer el día que
+      // esas familias se revisaron: las ocho pantallas pasan ahora el nivel AA medido por
+      // `axe` (`src/pruebas/accesibilidad.test.jsx`).
+      //
+      // Se entra con las 34 y no con una selección: elegir cuáles obedecer sería volver a
+      // tener una lista escrita a mano que se queda corta. Lo que se apaga, se apaga aquí
+      // abajo y con su motivo escrito.
+      ...jsxA11y.flatConfigs.recommended.rules,
+
       // Con el JSX transform automático de Vite, `React` no hace falta en el ámbito y
       // los componentes no tienen que declarar `propTypes` en un proyecto de este
       // tamaño: exigirlo aquí solo produciría ruido sin encontrar defectos.
@@ -85,6 +99,35 @@ export default [
       'jsx-a11y/label-has-associated-control': ['error', {
         assert: 'either',
       }],
+
+      // `no-autofocus`, APAGADA, y esta sí merece el párrafo.
+      //
+      // La regla prohíbe `autoFocus` sin excepciones, y el motivo que da es real: en una
+      // página con contenido, mover el foco a un campo al cargar se salta todo lo que hay
+      // antes —el título, un aviso, la navegación— y quien usa un lector de pantalla se
+      // encuentra dentro de un formulario sin saber en qué página está.
+      //
+      // Los dos sitios donde este proyecto lo usa son justo los dos casos en que eso no
+      // ocurre, y los dos están en `LoginScreen`:
+      //
+      //  1. **El campo de correo de la entrada.** Es una pantalla cuyo contenido ES el
+      //     formulario: un título, dos campos y un botón. No hay nada que saltarse. Quitarlo
+      //     obligaría a todo el mundo a pulsar `Tab` tres veces antes de escribir, sin que
+      //     nadie gane nada.
+      //  2. **El campo del código del segundo factor.** Aquí es más que cómodo: el
+      //     formulario anterior acaba de desaparecer del documento con el foco dentro, así
+      //     que sin `autoFocus` el foco caería al `<body>` y no habría ningún anuncio de que
+      //     el sistema está pidiendo otra cosa. Es exactamente el mismo problema que el
+      //     capítulo 36 arregló en el acuse de recibo de la página de interés, y la misma
+      //     solución: cuando la pantalla se sustituye, el foco tiene que ir a algún sitio.
+      //
+      // Se apaga la regla entera en vez de poner un `eslint-disable` en cada línea porque
+      // dos silencios sueltos en un archivo no explican nada al siguiente que los lea, y
+      // porque la decisión es una sola: en esta aplicación, `autoFocus` se admite en una
+      // pantalla cuyo único contenido es el formulario. Si algún día aparece en una pantalla
+      // con contenido alrededor, será un fallo que esta regla ya no va a señalar; la prueba
+      // de recorrido con teclado sí lo vería.
+      'jsx-a11y/no-autofocus': 'off',
 
       // APAGADA A PROPÓSITO, y conviene saber por qué.
       //
