@@ -53,7 +53,10 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
   };
 
   return (
-    <div style={{
+    // `<main>` y no un `<div>`: es la pantalla entera y no estaba dentro de ninguna región,
+    // así que un lector de pantalla no tenía a dónde saltar y recorría el documento desde
+    // el principio. El elemento cambia; la caja, el estilo y lo que se ve, no.
+    <main style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -94,7 +97,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
         </div>
 
         {expiredNotice && (
-          <div style={{
+          <div role="status" style={{
             background: 'rgba(234, 179, 8, 0.12)',
             border: '1px solid rgba(234, 179, 8, 0.35)',
             color: '#eab308',
@@ -149,7 +152,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
               inputMode="numeric"
               placeholder="000000"
               style={{ width: '100%', marginBottom: '18px', letterSpacing: '0.12em' }}
-              className="input"
+              className="input-field"
             />
 
             {desafio.codigos_de_recuperacion_restantes === 0 && (
@@ -206,7 +209,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
             autoComplete="username"
             placeholder="nombre@plurione.com"
             style={{ width: '100%', marginBottom: '14px' }}
-            className="input"
+            className="input-field"
           />
 
           <label htmlFor="login-password" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
@@ -222,11 +225,14 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
             autoComplete="current-password"
             placeholder="••••••••"
             style={{ width: '100%', marginBottom: '18px' }}
-            className="input"
+            className="input-field"
           />
 
+          {/* `role="alert"` como el del segundo paso. Sin él, «correo o contraseña
+              incorrectos» aparecía en pantalla y no lo anunciaba nadie: quien no ve la
+              pantalla se quedaba esperando a que pasara algo. */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
               color: '#ef4444',
@@ -255,6 +261,6 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
           El acceso y el rol se determinan en el servidor a partir de sus credenciales.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { createLead } from '../services/api';
+import { useVentanaModal } from './ventanaModal';
 
 export default function NewLeadModal({ onClose, onLeadCreated }) {
+  // Nombre, atrapado del foco, `Escape` y devolución del foco al cerrar (capítulo 36).
+  const ventana = useVentanaModal({ alCerrar: onClose, etiquetadoPor: 'alta-de-prospecto-titulo' });
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -68,24 +71,29 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
+  // Velo con `role="presentation"` y cierre según dónde se pulsó; `Escape` para el teclado.
+  // El detalle está explicado en LeadDetailModal.jsx.
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ padding: '28px', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="modal-overlay" role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div {...ventana} className="modal-content" style={{ padding: '28px', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800' }}>Registrar Nuevo Prospecto</h2>
+            <h2 id="alta-de-prospecto-titulo" style={{ fontSize: '1.25rem', fontWeight: '800' }}>Registrar Nuevo Prospecto</h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               El sistema ejecutará el modelo predictivo e inferencia con IA adaptativa de inmediato.
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>
-            ×
+          <button type="button" onClick={onClose} aria-label="Cerrar el alta de prospecto"
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer' }}>
+            <span aria-hidden="true">×</span>
           </button>
         </div>
 
+        {/* `role="alert"`, como en el resto de los formularios del panel. */}
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--hot-border)', padding: '10px 14px', borderRadius: '8px', color: 'var(--hot-text)', fontSize: '0.85rem', marginBottom: '16px' }}>
+          <div role="alert" style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--hot-border)', padding: '10px 14px', borderRadius: '8px', color: 'var(--hot-text)', fontSize: '0.85rem', marginBottom: '16px' }}>
             ⚠️ {error}
           </div>
         )}

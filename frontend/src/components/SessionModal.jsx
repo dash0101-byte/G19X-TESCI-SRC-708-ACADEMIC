@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { changeOwnPassword } from '../services/api';
+import { useVentanaModal } from './ventanaModal';
 
 // Descripción de cada rol, solo para mostrar al usuario qué puede hacer.
 // Los permisos reales los aplica el backend a partir del token; esto es informativo.
@@ -28,6 +29,9 @@ function initials(fullName) {
 }
 
 export default function SessionModal({ user, onLogout, onClose }) {
+  // Nombre, atrapado del foco, `Escape` y devolución del foco al cerrar (capítulo 36).
+  const ventana = useVentanaModal({ alCerrar: onClose, etiquetadoPor: 'sesion-activa-titulo' });
+
   const info = ROLE_INFO[user?.role] || {
     badge: user?.role || 'Sin rol',
     description: 'Permisos determinados por el servidor.',
@@ -78,20 +82,24 @@ export default function SessionModal({ user, onLogout, onClose }) {
     marginBottom: '10px',
   };
 
+  // Velo con `role="presentation"` y cierre según dónde se pulsó; `Escape` para el teclado.
+  // El detalle está explicado en LeadDetailModal.jsx.
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '460px', padding: '24px' }} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div {...ventana} className="modal-content" style={{ maxWidth: '460px', padding: '24px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Sesión activa</h3>
+            <h3 id="sesion-activa-titulo" style={{ fontSize: '1.1rem', fontWeight: '700' }}>Sesión activa</h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               Identidad verificada por el servidor
             </p>
           </div>
-          <button onClick={onClose} className="btn btn-secondary btn-sm" style={{ border: 'none', fontSize: '1rem', padding: '4px 8px' }}>
-            ✕
+          <button type="button" onClick={onClose} aria-label="Cerrar la ventana de sesión"
+            className="btn btn-secondary btn-sm" style={{ border: 'none', fontSize: '1rem', padding: '4px 8px' }}>
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
 

@@ -4,6 +4,7 @@ import AsignarAsesor from './AsignarAsesor';
 import CerrarProspecto from './CerrarProspecto';
 import LlegoPor from './LlegoPor';
 import { ingresosDelFormulario } from '../services/prospecto';
+import { useVentanaModal } from './ventanaModal';
 import {
   AYUDA_DE_TIPO,
   DIRECCIONES,
@@ -103,6 +104,12 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
       tags: initialLead.raw_metadata?.tags || '',
     });
   }, [initialLead]);
+
+  // Lo que convierte este `<div>` flotante en una ventana para el teclado y para un lector
+  // de pantalla: nombre, atrapado del foco, `Escape` y devolución del foco al cerrar
+  // (capítulo 36). Va aquí arriba, con los demás hooks, por lo que dice el comentario de
+  // abajo: el número de hooks no puede depender del prop.
+  const ventana = useVentanaModal({ alCerrar: onClose, etiquetadoPor: 'ficha-360-titulo' });
 
   // Después de TODOS los hooks: así el número de hooks no depende del prop.
   if (!initialLead) return null;
@@ -230,11 +237,23 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
     }
   };
 
+  // El velo cierra al pulsarlo, y eso ya no necesita dos manejadores.
+  //
+  // Antes había uno aquí y otro dentro que solo hacía `stopPropagation`, para que un clic en
+  // la ventana no la cerrara. Lo mismo se consigue mirando DÓNDE se pulsó: si el objetivo es
+  // el velo y no algo de dentro, se cierra. Un manejador menos, y el de dentro desaparece:
+  // era un `onClick` sobre contenido que no es pulsable, que es lo que `jsx-a11y` señala con
+  // razón desde que este capítulo encendió el conjunto entero.
+  //
+  // `role="presentation"`: el velo no es un control ni tiene contenido propio, es un cristal
+  // ahumado. Quien usa el teclado lo cierra con `Escape` —ver `ventanaModal.js`—, que es el
+  // equivalente correcto y no un `onKeyDown` colgado de un `<div>`.
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
+        {...ventana}
         className="modal-content"
-        onClick={(e) => e.stopPropagation()}
         style={{ padding: '28px 32px', maxWidth: '820px' }}
       >
         {/* Header with Title & Action Controls */}
@@ -250,7 +269,7 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: '700', letterSpacing: '-0.02em' }}>
+              <h2 id="ficha-360-titulo" style={{ fontSize: '1.4rem', fontWeight: '700', letterSpacing: '-0.02em' }}>
                 {lead.first_name} {lead.last_name}
               </h2>
               <span className={`badge ${lead.score_category === 'HOT' ? 'badge-hot' : (lead.score_category === 'WARM' ? 'badge-warm' : 'badge-cold')}`}>
@@ -305,8 +324,13 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
         </div>
 
         {/* Feedback Alert if updated */}
+        {/* `role="status"`: sin él, «Prospecto actualizado» aparecía en pantalla y no lo
+            anunciaba nadie. Es justo el mensaje que el capítulo 33 se encargó de que no
+            mintiera —antes decía que había guardado un vaciado que no guardaba—, así que
+            que no llegue a quien no ve la pantalla deja ese trabajo a medias. */}
         {saveSuccessMsg && (
           <div
+            role="status"
             style={{
               padding: '10px 14px',
               background: 'var(--success-bg)',
@@ -334,9 +358,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
               
               {/* Sección: Contacto */}
               <div className="glass-panel" style={{ padding: '18px' }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
                   👤 Información de Contacto
-                </h4>
+                </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label htmlFor="lead-first-name" className="form-label">Nombre(s) *</label>
@@ -407,9 +431,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
 
               {/* Sección: Empresa y Cargo */}
               <div className="glass-panel" style={{ padding: '18px' }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
                   🏢 Empresa, Cargo y Sector
-                </h4>
+                </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {/* Sin `required` ni asterisco desde el capítulo 33, y no es un descuido.
                       La tabla declara las dos columnas `nullable`, así que el servidor
@@ -525,9 +549,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
 
               {/* Sección: Atributos Personalizados / Metadata */}
               <div className="glass-panel" style={{ padding: '18px' }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '14px' }}>
                   ⚙️ Requerimientos Específicos y Metadatos Dinámicos
-                </h4>
+                </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ gridColumn: 'span 2' }}>
                     <label htmlFor="lead-requested-profiles" className="form-label">Perfiles o Solicitud Específica</label>
