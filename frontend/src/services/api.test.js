@@ -523,6 +523,19 @@ describe('el catálogo de endpoints', () => {
     ['fetchOpcionesDeCierre', [], 'GET', '/api/v1/desenlaces/opciones'],
     ['cerrarProspecto', [7, { resultado: 'perdido', motivo: 'precio', cerrado_el: '2026-09-01' }], 'POST', '/api/v1/leads/7/desenlace'],
     ['fetchPanelDeDesenlaces', [], 'GET', '/api/v1/desenlaces/panel'],
+    // La agenda del día (capítulo 28) y el segundo factor (capítulo 35). Ninguna de las
+    // dos familias estaba en esta tabla, y las cinco del segundo factor no las tocaba
+    // ninguna prueba: el módulo bajó del suelo de cobertura el día que entraron.
+    ['fetchBandejaDeHoy', [], 'GET', '/api/v1/agenda/hoy'],
+    ['marcarTareaHecha', [4], 'POST', '/api/v1/agenda/tareas/4/hecha'],
+    ['fetchAvisos', [], 'GET', '/api/v1/agenda/avisos'],
+    ['marcarAvisosLeidos', [], 'POST', '/api/v1/agenda/avisos/leidos'],
+    ['fetchHotQueSeEnfrian', [], 'GET', '/api/v1/agenda/enfriandose'],
+    ['fetchEstadoDeLaDireccionPublica', [], 'GET', '/api/v1/publicaciones/direccion-publica'],
+    ['fetchEstadoDelSegundoFactor', [], 'GET', '/api/v1/auth/segundo-factor'],
+    ['altaDelSegundoFactor', [], 'POST', '/api/v1/auth/segundo-factor/alta'],
+    ['activarSegundoFactor', ['123456'], 'POST', '/api/v1/auth/segundo-factor/activar'],
+    ['bajaDelSegundoFactor', ['123456'], 'POST', '/api/v1/auth/segundo-factor/baja'],
   ];
 
   it.each(RUTAS)('%s → %s %s', async (nombre, argumentos, metodo, ruta) => {
@@ -669,5 +682,129 @@ describe('el catálogo de endpoints', () => {
     expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({
       nueva_contrasena: 'una-frase-larga',
     });
+  });
+});
+
+// ============================================================================
+describe('el acceso en dos pasos (capítulo 35)', () => {
+  // Estas cinco funciones entraron en el capítulo 35 y ninguna prueba las tocaba: el
+  // módulo bajó del suelo de cobertura que `vite.config.js` declara, y el trabajo del
+  // capítulo 36 se encontró el pipeline ya en rojo por esto.
+  //
+  // No son cinco envoltorios cualesquiera. `login` es la única función del cliente que
+  // puede devolver DOS cosas distintas —una sesión o un desafío—, y confundirlas tiene
+  // consecuencias en los dos sentidos: abrir sesión con un desafío deja al panel creyendo
+  // que hay usuario, y tratar una sesión como desafío pide un código que nadie ha pedido.
+
+  it('un login normal abre sesión y devuelve al usuario', async () => {
+    fetchSimulado({
+      '/auth/login': respuesta(200, { access_token: 'un-token', user: USUARIO }),
+      '/auth/me': respuesta(200, USUARIO),
+    });
+
+    const devuelto = await api.login('ana@plurione.test', 'una-frase-larga');
+
+    expect(devuelto).toEqual(USUARIO);
+    expect(api.isAuthenticated()).toBe(true);
+    expect(api.getCurrentUser()).toEqual(USUARIO);
+  });
+
+  it('un login que pide segundo factor devuelve el desafío y NO abre sesión', async () => {
+    // Lo que de verdad se comprueba: que el desafío no se confunde con una sesión. Si
+    // `accessToken` se llenara aquí, el panel se dibujaría entero para alguien que solo ha
+    // demostrado saber la contraseña, y el segundo factor sería decorado.
+    fetchSimulado({
+      '/auth/login': respuesta(200, {
+        tipo: 'segundo_factor', desafio: 'un-desafio', expira_en: 300,
+        codigos_de_recuperacion_restantes: 7,
+      }),
+    });
+
+    const devuelto = await api.login('ana@plurione.test', 'una-frase-larga');
+
+    expect(devuelto.tipo).toBe('segundo_factor');
+    expect(devuelto.desafio).toBe('un-desafio');
+    expect(api.isAuthenticated()).toBe(false);
+    expect(api.getCurrentUser()).toBeNull();
+  });
+
+  it('el segundo paso manda el desafío en el cuerpo, nunca como Authorization', async () => {
+    // El desafío acredita haber superado el primer paso y no es una credencial de sesión.
+    // Si viajara en la cabecera, el segundo factor se saltaría sin más que no pedirlo.
+    const f = fetchSimulado({
+      '/auth/login/segundo-factor': respuesta(200, { access_token: 'un-token', user: USUARIO }),
+    });
+
+    const devuelto = await api.completarLoginConSegundoFactor('un-desafio', '  123456  ');
+
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({
+      desafio: 'un-desafio',
+      // Y el código va sin los espacios que deja un pegado desde el teléfono.
+      codigo: '123456',
+    });
+    expect(f.llamadas[0].opciones.headers.Authorization).toBeUndefined();
+    expect(devuelto).toEqual(USUARIO);
+    expect(api.isAuthenticated()).toBe(true);
+  });
+
+  it('un código equivocado no abre sesión y dice por qué', async () => {
+    fetchSimulado({
+      '/auth/login/segundo-factor': {
+        ok: false, status: 401,
+        json: async () => ({ detail: 'El código no es válido.' }),
+      },
+    });
+
+    await expect(api.completarLoginConSegundoFactor('un-desafio', '000000'))
+      .rejects.toThrow('El código no es válido.');
+    expect(api.isAuthenticated()).toBe(false);
+  });
+
+  it('activar y quitar el segundo factor recortan el código', async () => {
+    const f = fetchSimulado({
+      '/segundo-factor/activar': respuesta(200, {}),
+      '/segundo-factor/baja': respuesta(200, {}),
+    });
+
+    await api.activarSegundoFactor(' 123456 ');
+    await api.bajaDelSegundoFactor('\t654321\n');
+
+    expect(JSON.parse(f.llamadas[0].opciones.body)).toEqual({ codigo: '123456' });
+    expect(JSON.parse(f.llamadas[1].opciones.body)).toEqual({ codigo: '654321' });
+  });
+
+  it('un login incorrecto dice «Email o contraseña incorrectos», no el detalle del servidor', async () => {
+    // El 401 del acceso se traduce en el cliente a propósito: el mensaje del servidor puede
+    // distinguir «no existe esa cuenta» de «la contraseña no es esa», y eso es precisamente
+    // lo que no debe llegar a la pantalla.
+    fetchSimulado({
+      '/auth/login': { ok: false, status: 401, json: async () => ({ detail: 'usuario inexistente' }) },
+    });
+
+    await expect(api.login('quien@plurione.test', 'x')).rejects.toThrow('Email o contraseña incorrectos.');
+  });
+});
+
+describe('los avisos, con y sin filtro', () => {
+  it('«solo sin leer» viaja en la consulta solo cuando se pide', async () => {
+    const f = fetchSimulado({ '/agenda/avisos': respuesta(200, { sin_leer: 0, avisos: [] }) });
+
+    await api.fetchAvisos();
+    expect(f.llamadas[0].url).toBe('/api/v1/agenda/avisos');
+
+    await api.fetchAvisos({ soloSinLeer: true });
+    expect(f.llamadas[1].url).toBe('/api/v1/agenda/avisos?solo_sin_leer=true');
+  });
+
+  it('marcar leídos sin lista manda un cuerpo vacío, no «undefined»', async () => {
+    // El endpoint recibe la lista dentro de un objeto, y un cuerpo ausente no es lo mismo
+    // que uno sin lista: sin cuerpo, el servidor no sabe si se le pide «todos» o nada.
+    const f = fetchSimulado({ '/agenda/avisos/leidos': respuesta(200, { leidos: 3 }) });
+
+    await api.marcarAvisosLeidos();
+    expect(f.llamadas[0].opciones.body).toBe('{}');
+
+    await api.marcarAvisosLeidos([1, 2]);
+    expect(JSON.parse(f.llamadas[1].opciones.body)).toEqual({ ids: [1, 2] });
   });
 });

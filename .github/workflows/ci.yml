@@ -26,8 +26,9 @@ env:
   # deja el suelo tres puntos por debajo para absorber diferencias de plataforma sin
   # convertirlo en un sello de goma. Es un trinquete: solo deberia subir.
   COBERTURA_MINIMA: "85"
-  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (92/86/94/94 sobre los
-  # cuatro modulos con logica). No se repite aqui a proposito: dos numeros para lo mismo
+  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (95/89/98/98 desde el
+  # capitulo 36, sobre los cinco modulos con logica). No se repite aqui a proposito: dos
+  # numeros para lo mismo
   # se desincronizan, y el que manda es el que corre.
 
 jobs:
@@ -2638,6 +2639,115 @@ jobs:
             }
           done
           echo "Politica con lista local de filtradas, integra y aplicada en alta, cambio y restablecimiento."
+
+      # Capitulo 36. La revision de accesibilidad vive en la suite del cliente y se apaga
+      # sin que nada falle: basta con borrar un `describe`, o relajar el nivel que se le
+      # exige a `axe`, y el pipeline se pone VERDE. Es la forma exacta de erosion que el
+      # capitulo 22 previno con las imagenes fijadas: lo que protege no puede depender de
+      # que nadie borre unas lineas.
+      - name: Las ocho pantallas siguen bajo revision de accesibilidad
+        run: |
+          set -euo pipefail
+          revision=frontend/src/pruebas/accesibilidad.test.jsx
+          test -s "$revision" || {
+            echo ""
+            echo "FALLO: desaparecio la revision automatica de accesibilidad (capitulo 36)."
+            exit 1
+          }
+          # Las ocho pantallas que el capitulo se comprometio a revisar, por el componente
+          # que monta cada una. Se comprueba el componente y no el titulo del `describe`
+          # porque el titulo se puede cambiar sin querer y el import, no.
+          for pantalla in PaginaDeInteres LoginScreen App LeadDetailModal Publicaciones \
+                          BandejaDeHoy InformeDePublicacion PanelDeDesenlaces; do
+            # Anclado al principio de la linea: sin el `^`, comentar el import con `//`
+            # seguia contando como presente y la pantalla se quedaba sin revisar.
+            grep -qE "^import $pantalla from" "$revision" || {
+              echo ""
+              echo "FALLO: la revision de accesibilidad ya no monta $pantalla (capitulo 36)."
+              echo "Las ocho pantallas del panel se revisan enteras; quitar una la deja"
+              echo "sin comprobar sin que ninguna prueba se ponga en rojo."
+              exit 1
+            }
+          done
+          # El nivel exigido. Rebajarlo a `wcag2a` dejaria pasar todo lo que AA anade, que
+          # es la mitad de lo que este capitulo arreglo.
+          motor=frontend/src/pruebas/accesibilidad.js
+          for etiqueta in wcag2a wcag2aa wcag21a wcag21aa; do
+            grep -q "'$etiqueta'" "$motor" || {
+              echo ""
+              echo "FALLO: la revision ya no exige $etiqueta (capitulo 36)."
+              exit 1
+            }
+          done
+          # Y la lista de reglas apagadas. Solo una, `color-contrast`, y porque `jsdom` no
+          # dibuja: el contraste se mide aparte, sobre la paleta. Cualquier otra entrada
+          # aqui es una infraccion que se decidio no ver.
+          apagadas=$(sed -n '/^export const REGLAS_APAGADAS = {/,/^};/p' "$motor" \
+            | grep -cE "^\s+'[a-z-]+':" || true)
+          [ "$apagadas" = "1" ] || {
+            echo ""
+            echo "FALLO: la revision de accesibilidad apaga $apagadas reglas y solo una"
+            echo "esta justificada (color-contrast, que necesita maquetacion)."
+            echo "Una regla apagada es una infraccion que el pipeline deja de ver."
+            exit 1
+          }
+          grep -q "'color-contrast'" "$motor" || {
+            echo "FALLO: la unica regla apagada ya no es color-contrast (capitulo 36)."
+            exit 1
+          }
+          echo "Ocho pantallas revisadas contra WCAG 2.1 AA, con una sola regla apagada y justificada."
+
+      # Capitulo 36. `axe-core` estaba en node_modules desde el capitulo 17 sin que nadie la
+      # llamara: la arrastra `eslint-plugin-jsx-a11y`. Declararla directa costo UNA linea del
+      # lock y ni un paquete. Pero una dependencia que solo llega de forma transitiva
+      # desaparece el dia que su portador cambie de version, y entonces la revision de
+      # accesibilidad se cae con un error de import que parece un problema de instalacion.
+      - name: La accesibilidad se comprueba con dependencias declaradas y sin silencios
+        run: |
+          set -euo pipefail
+          grep -q '"axe-core"' frontend/package.json || {
+            echo ""
+            echo "FALLO: axe-core ya no es dependencia directa (capitulo 36)."
+            echo "Llega igual por eslint-plugin-jsx-a11y, asi que todo seguiria funcionando"
+            echo "hasta el dia que ese plugin cambie de version. Declarela."
+            exit 1
+          }
+          # Sin `^` ni `~`: el resto de las dependencias de desarrollo van fijadas exactas y
+          # esta tambien. Una version que se mueve sola cambia lo que el pipeline exige.
+          grep -qE '"axe-core": "[0-9]+\.[0-9]+\.[0-9]+"' frontend/package.json || {
+            echo "FALLO: axe-core no va fijada a una version exacta (capitulo 36)."
+            exit 1
+          }
+          # Un `eslint-disable` de una regla de accesibilidad silencia el analisis en el
+          # sitio exacto donde algo esta mal, y no deja rastro en ninguna prueba.
+          if grep -rn 'eslint-disable.*jsx-a11y' frontend/src frontend/eslint.config.js; then
+            echo ""
+            echo "FALLO: hay reglas de accesibilidad silenciadas en linea (capitulo 36)."
+            echo "Si la regla no aplica a ese caso, apaguela en eslint.config.js con su"
+            echo "motivo escrito: alli la prueba de linter.test.js obliga a declararla."
+            exit 1
+          fi
+          # Las tres comprobaciones que no son `axe` y que el capitulo dejo escritas.
+          for prueba in contraste.test.js teclado.test.jsx anuncios.test.jsx clases.test.js linter.test.js; do
+            test -s "frontend/src/pruebas/$prueba" || {
+              echo "FALLO: falta frontend/src/pruebas/$prueba (capitulo 36)."
+              exit 1
+            }
+          done
+          # Y la medicion con volumen del backend, que es donde se encontro el N+1 de la
+          # bandeja. Sin ella, una consulta por fila vuelve a entrar sin que nada lo diga:
+          # con seis prospectos, una consulta por fila y una para todas tardan lo mismo.
+          test -s backend/tests/test_rendimiento_con_volumen.py || {
+            echo "FALLO: falta la medicion con volumen del backend (capitulo 36)."
+            exit 1
+          }
+          grep -q 'contains_eager(Tarea.lead)' backend/app/services/agenda_del_dia.py || {
+            echo ""
+            echo "FALLO: la bandeja «Hoy» vuelve a leer el prospecto tarea a tarea (capitulo 36)."
+            echo "Con cuarenta tareas abiertas eran cuarenta consultas de mas."
+            exit 1
+          }
+          echo "axe-core declarada y fijada, sin silencios en linea, y las seis comprobaciones en su sitio."
 
   # ============================================================================
   # Migraciones de base de datos

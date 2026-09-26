@@ -3,7 +3,27 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 24 de septiembre de 2026 (capítulo 32)
+**Última revisión:** 25 de septiembre de 2026 (capítulo 36)
+
+> **Revisión del capítulo 36.** La congelación se mantiene. El capítulo 36 fue calidad del
+> cliente, no funcionalidad: ninguna pantalla nueva, ningún campo nuevo, ninguna frase nueva
+> en el README. Lo que hizo fue **comprobar** lo que el sistema ya afirmaba —que se puede
+> usar con teclado, que el texto se lee, que los errores llegan a quien no ve la pantalla— y
+> corregir los seis sitios donde no era cierto (R36).
+>
+> Encontró además dos cosas que no estaban en ninguna lista, y las dos son de la clase que
+> este documento no puede prever:
+>
+> * **El suelo de cobertura del cliente estaba roto en `main`.** El capítulo 35 añadió al
+>   módulo de sesión las cinco funciones del segundo factor sin una sola prueba; la suite
+>   pasaba y la cobertura no, y la cobertura es lo que el CI ejecuta. Corregido en el 36
+>   (R36 §36.9), que es donde entra por §1: «una guarda del CI en rojo».
+> * **La bandeja «Hoy» hacía una consulta por tarea.** No se veía con seis prospectos: con
+>   seis filas, una consulta por fila y una para todas tardan lo mismo. Se vio al medir con
+>   300 prospectos y 5 000 actividades (R36 §36.7).
+>
+> §6.4 pasa de cinco restos menores a nueve: los cuatro nuevos son deuda **visual** que el
+> capítulo encontró y no pagó porque pagarla es diseñar, y eso estaba fuera de su alcance.
 
 > **Revisión del capítulo 32.** La congelación se mantiene tal cual: solo entran
 > correcciones de fallos, con el criterio de §1. Lo que cambia es el inventario. §6.1 —«lo
@@ -94,10 +114,17 @@ hacer todavía»:
 que no dice qué descartó obliga a volver a plantear cada año las mismas discusiones ya
 zanjadas.
 
-Cada entrada lleva su origen entre paréntesis: `R25 §25.10` es el reporte 25, apartado
-25.10. **Ojo con la numeración**: desde el Reporte 29 el número del reporte va uno por
-detrás del capítulo (el capítulo 29 no escribió reporte propio), así que el Reporte 29
-contiene el capítulo 30 y sus apartados se numeran `30.x`.
+Cada entrada lleva su origen entre paréntesis: `R25 §25.10` remite al **capítulo** 25,
+apartado 25.10.
+
+**Ojo con la numeración, que se ha desfasado dos veces.** Hasta el capítulo 28, el número
+del reporte y el del capítulo coincidían. El capítulo 29 no escribió reporte propio, así que
+a partir de ahí el reporte va **uno** por detrás; el capítulo 31 tampoco, y desde el capítulo
+32 va **dos**. Hoy: el capítulo 36 está en el `Reporte_34`, y sus apartados se numeran `36.x`.
+
+Por eso las referencias de este documento van por **capítulo** y no por reporte: es lo único
+que no vuelve a moverse. `R36 §36.8` es el capítulo 36, apartado 36.8, que vive en el
+archivo `Reporte_34_...`.
 
 ---
 
@@ -533,7 +560,7 @@ cambiados, sin copiar valores.
 | # | Qué | Por qué no se hizo | Origen |
 | :---: | :--- | :--- | :---: |
 | 17 | **El código QR no se ha escaneado con un teléfono** | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso** | R27 §27.13 |
-| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no | R28 §28.13 |
+| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable**: las ocho pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36). Lo que sigue sin responder es si **lo que ese lector dice se entiende**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 |
 
 ### 6.4. Restos menores
 
@@ -549,6 +576,10 @@ cambiados, sin copiar valores.
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
 | 29 | Un administrador **no puede quitarle el segundo factor a otro** desde el panel: la salida (b) de la guía existe en el diseño pero no tiene botón, porque la gestión de cuentas no ganó esa operación. Hoy se resuelve por la vía (c), que es la misma sentencia SQL | R35 §35.9 |
+| 30 | **`CompartirEnRedes` se dibuja sin ningún estilo.** El componente no usa ni un estilo en línea: se apoya entero en **catorce clases que la hoja no define**, así que el panel de difusión y el del QR salen con el estilo por omisión del navegador. Escribirlas no es corregir un nombre —eso fue el caso de `input`, ya arreglado—, es **diseñar** el panel: colores, espaciados y estados. Está inventariado en `frontend/src/pruebas/clases.test.js`, que además impide que la lista crezca | R36 §36.6 |
+| 31 | **`btn-danger` no existe.** «Cerrar sesión» pide un aspecto de acción destructiva que la paleta no tiene, así que se dibuja como un `.btn` a secas —borde transparente, sin fondo— y no parece un botón. Darle uno exige un color nuevo en la paleta | R36 §36.6 |
+| 32 | **El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control. Subirlo es una decisión de paleta con efecto en todas las pantallas, no una corrección puntual | R36 §36.8 |
+| 33 | **`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición | R36 §36.8 |
 
 ---
 
@@ -599,7 +630,7 @@ Un orden sugerido, no un plan. Cada paso está construido y solo hay que ejecuta
 | Qué | Dónde |
 | :--- | :--- |
 | El estado completo del sistema | `README.md` |
-| Los treinta capítulos con su detalle | `docs/reportes/` |
+| Los capítulos con su detalle | `docs/reportes/` |
 | Todo compilado, con portada e índice | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` |
 | La historia que se enseña, con sus reglas | `docs/Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md` |
 | El guion cronometrado y su ensayo | `docs/Guion_Cronometrado_de_la_Demo.md` |

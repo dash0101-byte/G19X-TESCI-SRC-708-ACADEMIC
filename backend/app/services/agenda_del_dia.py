@@ -34,7 +34,7 @@ import datetime
 from typing import Dict, List, Optional, Sequence
 
 from sqlalchemy import case
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from app.core.agenda import ABIERTA, HECHA, HOT_SIN_CONTACTO, HOT_SIN_CONTACTO_LIDER, etiqueta_de_regla
 from app.core.autorizacion import AlcanceDeCartera
@@ -143,9 +143,19 @@ def bandeja_de_hoy(
     de_quien = asesor_visible(alcance, asesor_id)
     horizonte = ahora + datetime.timedelta(hours=HORIZONTE_HORAS)
 
+    # `contains_eager` y no solo el `join`: cada tarea enseña el nombre, la empresa, el score
+    # y la categoría de su prospecto, y sin esto SQLAlchemy los iba a buscar **tarea a
+    # tarea**. Con cuarenta tareas abiertas eran cuarenta consultas más —medido en
+    # `tests/test_rendimiento_con_volumen.py`, que es donde se encontró—, y ese coste no se
+    # ve en una suite de seis prospectos ni en una bandeja de dos tareas: crece justo cuando
+    # la bandeja empieza a servir para algo.
+    #
+    # Se usa `contains_eager` y no `joinedload` porque el `join` ya está hecho, para el
+    # filtro y para el orden. `joinedload` añadiría un SEGUNDO `join` a la misma tabla.
     abiertas = (
         db.query(Tarea)
         .join(Lead, Lead.id == Tarea.lead_id)
+        .options(contains_eager(Tarea.lead))
         .filter(Tarea.asesor_id == de_quien, Tarea.estado == ABIERTA, en_seguimiento())
         .order_by(Lead.current_score.desc(), Tarea.vence_el.asc(), Tarea.id.asc())
         .all()
@@ -203,9 +213,13 @@ def campana(
     limite: int = MAX_AVISOS,
 ) -> Campana:
     """Los avisos de quien pregunta. Siempre los suyos: un aviso tiene un destinatario."""
+    # Lo mismo que en la bandeja: cada aviso enseña a su prospecto. Aquí el daño estaba
+    # acotado por `MAX_AVISOS`, así que eran diez consultas de más y no cuarenta; se arregla
+    # igual porque es el mismo defecto y la campana se abre en todas las pantallas.
     consulta = (
         db.query(Aviso)
         .join(Lead, Lead.id == Aviso.lead_id)
+        .options(contains_eager(Aviso.lead))
         .filter(Aviso.usuario_id == alcance.usuario_id, en_seguimiento())
     )
     if solo_sin_leer:

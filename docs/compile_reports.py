@@ -75,6 +75,10 @@ REPORT_FILES = [
     # esperando, y no por falta de tiempo sino porque hacerlo a medias produce una cuenta
     # de administración que se bloquea sola.
     ("Reporte_33_Segundo_Factor_para_Administracion_El_Secreto_que_no_se_Guarda_y_la_Cuenta_que_no_se_Bloquea_Sola.md", "Capítulo 35: Segundo Factor para Administración — El Secreto que no se Guarda y la Cuenta que no se Bloquea Sola"),
+    # Paga la deuda que el propio `eslint.config.js` se dejó anotada en el capítulo 17: el
+    # conjunto de reglas de accesibilidad entra entero porque las familias que decía no
+    # haber revisado, ya están revisadas.
+    ("Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md", "Capítulo 36: Accesibilidad Comprobada — La Ventana que no Era Ventana, el Color que no Llegaba y la Consulta por Fila"),
 ]
 
 
@@ -203,7 +207,7 @@ Una plataforma integral bajo **Clean Architecture (Puertos y Adaptadores)**, ope
 10. **Bucle de realimentación sin fuga de información.** Cada puntuación guarda una **instantánea del vector tal como estaba al puntuar**, y el dataset se etiqueta sobre esa instantánea: un prospecto ganado lleva propuesta enviada y reunión agendada, y entrenar sobre su estado actual enseñaría que enviar propuestas causa cierres. Los prospectos aún en el embudo se **excluyen**, no se cuentan como perdidos.
 11. **Observabilidad del modelo.** Monitor de deriva por índice PSI con perfil de referencia atado por huella a su artefacto, registro versionado de modelos con procedencia de los datos, y verificación de la huella SHA-256 del artefacto antes de deserializarlo —si no coincide, el artefacto **no se carga** y el sistema sigue con el heurístico en lugar de ejecutar un `pickle` sustituido—.
 12. **Fiabilidad operativa.** Registro estructurado con `request_id`, métricas de Prometheus, copias de seguridad con **prueba de restauración**, imágenes de terceros fijadas por huella con renovación explícita, y un lanzador único para toda la pila.
-13. **Aseguramiento de calidad.** **1485 pruebas** de backend en Pytest con **93 % de cobertura** y **385 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **40 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa.
+13. **Aseguramiento de calidad.** **1494 pruebas** de backend en Pytest con **93 % de cobertura** y **472 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **42 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa. Las **ocho pantallas** del cliente se revisan además contra el nivel **AA de WCAG 2.1** desde la propia suite, se recorren con teclado y miden su contraste sobre la paleta declarada.
 
 ### Lo que este trabajo se negó a hacer
 

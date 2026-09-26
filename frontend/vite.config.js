@@ -58,15 +58,24 @@ export default defineConfig({
         'src/components/SessionModal.jsx',
         'src/components/CambioDeContrasenaObligatorio.jsx',
       ],
-      // El suelo va justo por debajo de lo medido (95 / 88 / 97 / 97), no en un número
-      // redondo y cómodo: un suelo del 80 % con la cobertura real en el 95 % deja pasar
-      // una regresión de quince puntos sin decir nada, que es tanto como no tenerlo.
-      // Cuando la cobertura suba de verdad, este suelo sube con ella.
+      // El suelo va justo por debajo de lo medido, no en un número redondo y cómodo: un
+      // suelo del 80 % con la cobertura real en el 95 % deja pasar una regresión de quince
+      // puntos sin decir nada, que es tanto como no tenerlo. Cuando la cobertura suba de
+      // verdad, este suelo sube con ella.
+      //
+      // **Capítulo 36.** Y cuando baja, el pipeline se pone en rojo, que es para lo que
+      // está. Eso fue exactamente lo que pasó y nadie lo vio: el capítulo 35 añadió al
+      // módulo de sesión las cinco funciones del segundo factor sin una sola prueba, la
+      // cobertura cayó a 91.0 / 85.4 / 93.1 / 93.7 y **este suelo ya estaba roto en `main`**
+      // antes de empezar el capítulo 36. Se corrigió ahí, probando las cinco y de paso las
+      // cinco de la agenda, que tampoco estaban en la tabla de rutas.
+      //
+      // Lo medido ahora es 95.7 / 89.4 / 98.3 / 98.3, y el suelo sube con ello.
       thresholds: {
-        statements: 92,
-        branches: 86,
-        functions: 94,
-        lines: 94,
+        statements: 95,
+        branches: 89,
+        functions: 98,
+        lines: 98,
       },
     },
   },

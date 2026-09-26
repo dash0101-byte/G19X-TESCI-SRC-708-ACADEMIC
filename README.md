@@ -34,9 +34,15 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1485 pruebas en el backend (93 % de cobertura) y 385 en
-> el cliente (94,5 %), `ruff` y `eslint` sin avisos, y 10 trabajos de integración continua
-> con 40 guardas de regresión de configuración peligrosa y cuatro guardas de propiedades.
+> **Calidad en las dos mitades.** 1494 pruebas en el backend (93 % de cobertura) y 472 en
+> el cliente (95,7 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
+> encendidas—, y 10 trabajos de integración continua con 42 guardas de regresión de
+> configuración peligrosa y cuatro guardas de propiedades.
+>
+> **Las ocho pantallas pasan el nivel AA de WCAG 2.1**, medido por `axe-core` desde la
+> propia suite del cliente; se recorren enteras con el teclado; el contraste de la paleta se
+> calcula contra el mínimo de la norma leyendo `index.css`; y los errores de formulario
+> llegan a un lector de pantalla. El detalle, en el [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md).
 
 > ## 🧊 Proyecto congelado el 24-09-2026
 >
@@ -1137,7 +1143,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1485 pruebas
+### Backend — 1494 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1217,7 +1223,7 @@ exactamente lo que el extractor del dataset sabría usar; y que el panel sea de 
 devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
 es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
 
-### Cliente — 385 pruebas
+### Cliente — 472 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1226,7 +1232,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 385 pruebas
+npm test                # 472 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```
@@ -1239,14 +1245,28 @@ prospectos, el simulador, el menú de la sesión, la pantalla de cambio obligato
 contraseña, el reparto de la cartera de las bajas en el panel de administración, la ficha del
 prospecto y la bandeja «Sin asociar»—.
 
+Desde el capítulo 36 se comprueba además **la accesibilidad**, en cinco archivos bajo
+`src/pruebas/`: las ocho pantallas montadas contra WCAG 2.1 AA (`axe-core`), el recorrido
+real del tabulador, el contraste de la paleta contra el mínimo de la norma, que los errores
+y los aciertos de los formularios lleguen a un lector de pantalla, y que toda clase que el
+marcado usa exista en la hoja de estilos. Ese último nació de un defecto real: tres
+pantallas pedían una clase de campo que no existe y se dibujaban con el estilo del
+navegador.
+
 El suelo de cobertura vive en `frontend/vite.config.js` y va **justo por debajo de lo
-medido** (92 / 86 / 94 / 94 frente a 95 / 88 / 97 / 97), no en un número redondo: un
+medido** (95 / 89 / 98 / 98 frente a 95,7 / 89,4 / 98,3 / 98,3), no en un número redondo: un
 suelo del 80 % con la cobertura real en el 95 % deja pasar una regresión de quince puntos
-sin decir nada.
+sin decir nada. Y cuando baja, el pipeline se pone en rojo, que es para lo que está: el
+capítulo 36 se encontró ese suelo **ya roto**, porque las cinco funciones del segundo factor
+habían entrado sin prueba.
 
 `react-hooks/exhaustive-deps` está en `error`, no en aviso. Un aviso permanente que nadie
-atiende enseña a ignorar la salida del `linter`. Hay una regla apagada a propósito
-—`react-hooks/set-state-in-effect`— con el motivo escrito en `eslint.config.js`.
+atiende enseña a ignorar la salida del `linter`. Lo mismo vale para las **34 reglas de
+`jsx-a11y`**, encendidas enteras desde el capítulo 36 y todas en `error`: encontraron cuatro
+controles que solo se podían pulsar con el ratón, uno de ellos la única puerta a cerrar
+sesión. Hay dos reglas apagadas a propósito —`react-hooks/set-state-in-effect` y
+`jsx-a11y/no-autofocus`— con el motivo escrito en `eslint.config.js`, y una prueba
+(`src/pruebas/linter.test.js`) que obliga a que cualquier otra que se apague lleve el suyo.
 
 > La suite es autosuficiente: corre sobre SQLite en memoria y crea sus propios datos.
 > **No** hace falta sembrar antes, y no debe hacerse: las pruebas no tocan ninguna base
@@ -1318,6 +1338,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **32** | [Reporte 32](docs/reportes/Reporte_32_Salir_a_Internet_por_una_Puerta_Estrecha_Tunel_a_Coste_Cero_y_la_Direccion_que_Caduca.md) | Salir a internet por una puerta estrecha (capítulo 34): un túnel gratuito publica **solo** la página de interés —lista blanca en un servidor aparte, 404 para todo lo demás— con HTTPS y sin abrir puertos del router; la dirección pública sigue siendo un solo ajuste, así que pasar a un dominio es cambiar un valor; y como la dirección de un túnel gratuito cambia en cada arranque, el sistema avisa cuando deja de responder y marca los enlaces ya repartidos que no llevan aquí. Comprobado desde fuera de la red: 5 rutas publicadas, 25 negadas. 10 defectos reintroducidos, 10 detectados. |
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos que sigue la demostración, 16 preguntas técnicas de sínodo y **8 preguntas incómodas** con su respuesta honesta: por qué no se lee LinkedIn, por qué el modelo no conoce los canales nuevos y por qué no hay desenlaces sintéticos. |
 | **33** | [Reporte 33](docs/reportes/Reporte_33_Segundo_Factor_para_Administracion_El_Secreto_que_no_se_Guarda_y_la_Cuenta_que_no_se_Bloquea_Sola.md) | Segundo factor para administración (capítulo 35): TOTP obligatorio para `System_Admin` y opcional para el resto, con QR y diez códigos de recuperación de un solo uso. El secreto **no se guarda**: se deriva de `SECRET_KEY` y una sal por alta, así que la base no contiene nada que cifrar. El alta no activa hasta comprobar un código, el desafío del login es de tipo propio y no sirve como sesión, un código no vale dos veces, y **la última administración no puede quitarse el suyo**. TOTP escrito sobre la biblioteca estándar y comprobado contra los 18 vectores oficiales del RFC 6238. 10 defectos reintroducidos, 10 detectados. |
+| **34** | [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md) | Accesibilidad comprobada (capítulo 36): las **ocho pantallas** pasan el nivel AA de WCAG 2.1, medido por `axe-core` desde la propia suite —la biblioteca ya estaba instalada desde el capítulo 17 y nadie la llamaba: declararla costó **una línea** del lock—. La ficha 360 **no era una ventana** para el teclado ni para un lector de pantalla: sin rol, sin nombre, sin atrapado del foco, sin `Escape` y sin devolverlo al cerrar. Cuatro controles del panel solo se podían pulsar con el ratón, y uno era la única puerta a **cerrar sesión**. El contraste se calcula leyendo la paleta de `index.css`, porque `jsdom` no dibuja pero los colores están escritos: un token no llegaba al mínimo y pintaba las etiquetas de todos los formularios. Y midiendo con **300 prospectos y 5 000 actividades** apareció un N+1: la bandeja «Hoy» hacía una consulta por tarea. 20 defectos reintroducidos, 20 detectados. |
 | **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
 | **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
 | **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |
