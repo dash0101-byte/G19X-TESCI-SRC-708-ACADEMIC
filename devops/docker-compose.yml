@@ -364,6 +364,24 @@ services:
     image: plurione/leadscoring-backend:local
     container_name: plurione_leadscoring_monitor_deriva
     restart: unless-stopped
+    # La sonda de salud de la imagen NO sirve aquí, y dejarla puesta miente (29-09-2026).
+    #
+    # Este contenedor comparte imagen con el backend, así que hereda su `HEALTHCHECK`: una
+    # petición a `http://127.0.0.1:8000/health`. Pero aquí no corre ninguna API —corre el
+    # bucle que dice `command`—, así que esa petición no puede contestar nunca y Docker
+    # marca el servicio `unhealthy` a los pocos minutos y para siempre. Se encontró al
+    # levantar la pila: dos de seis servicios en rojo, los dos funcionando perfectamente.
+    #
+    # Se desactiva en vez de inventar otra sonda porque no hay nada que sondear que el
+    # estado del contenedor no diga ya: el proceso del `command` es el PID 1, de modo que
+    # si muere, el contenedor muere, y `restart: unless-stopped` lo vuelve a levantar. Una
+    # sonda que comprobara «el proceso vive» solo repetiría eso con otras palabras.
+    #
+    # Y sobre todo: una columna de salud con dos rojos permanentes que hay que aprender a
+    # ignorar es peor que no tenerla. Es el mismo argumento con el que `eslint.config.js`
+    # se niega a dejar avisos que nadie va a atender.
+    healthcheck:
+      disable: true
     command:
       - python
       - /app/observabilidad/drift_monitor.py
@@ -441,6 +459,24 @@ services:
     image: plurione/leadscoring-backend:local
     container_name: plurione_leadscoring_retencion_historial
     restart: unless-stopped
+    # La sonda de salud de la imagen NO sirve aquí, y dejarla puesta miente (29-09-2026).
+    #
+    # Este contenedor comparte imagen con el backend, así que hereda su `HEALTHCHECK`: una
+    # petición a `http://127.0.0.1:8000/health`. Pero aquí no corre ninguna API —corre el
+    # bucle que dice `command`—, así que esa petición no puede contestar nunca y Docker
+    # marca el servicio `unhealthy` a los pocos minutos y para siempre. Se encontró al
+    # levantar la pila: dos de seis servicios en rojo, los dos funcionando perfectamente.
+    #
+    # Se desactiva en vez de inventar otra sonda porque no hay nada que sondear que el
+    # estado del contenedor no diga ya: el proceso del `command` es el PID 1, de modo que
+    # si muere, el contenedor muere, y `restart: unless-stopped` lo vuelve a levantar. Una
+    # sonda que comprobara «el proceso vive» solo repetiría eso con otras palabras.
+    #
+    # Y sobre todo: una columna de salud con dos rojos permanentes que hay que aprender a
+    # ignorar es peor que no tenerla. Es el mismo argumento con el que `eslint.config.js`
+    # se niega a dejar avisos que nadie va a atender.
+    healthcheck:
+      disable: true
     command:
       - python
       - /app/scripts/retencion_historial.py
