@@ -4,7 +4,7 @@
 #
 # Dos destinos, y conviene entender por qué (N-17):
 #
-#   production-stage  (por defecto) — compila la SPA aquí dentro. Es lo que usa
+#   production-stage  — compila la SPA aquí dentro. Es lo que usa
 #                     `docker compose up --build` en un portátil: basta el código.
 #
 #   desde-artefacto   — NO compila: copia el `dist/` que ya viene en el contexto.
@@ -12,6 +12,21 @@
 #                     `frontend`, corre allí las pruebas y el `linter` sobre ese
 #                     código, publica el resultado como artefacto y lo mete tal cual
 #                     en la imagen.
+#
+# NINGUNA DE LAS DOS ES «LA DE POR DEFECTO», Y ESTA LÍNEA DECÍA QUE SÍ (29-09-2026).
+#
+# Decía «production-stage (por defecto)», y no lo era: cuando un servicio de Compose no
+# declara `target`, Docker construye la **última** etapa del archivo, que es la de abajo del
+# todo. `desde-artefacto` se añadió después de `production-stage`, así que pasó a ser la que
+# se construía sin que nadie lo decidiera, y `docker compose up --build` dejó de compilar
+# nada: servía el `dist/` que hubiera quedado en la carpeta del portátil.
+#
+# Se encontró al levantar la pila para mirar el trabajo del capítulo 36 y ver que el panel
+# servía el bundle de cinco días antes. `devops/docker-compose.yml` declara ahora
+# `target: production-stage`, y un control del CI exige que cualquier Dockerfile de tres
+# etapas o más diga cuál quiere: con dos, la última es la de ejecución y no hay ambigüedad;
+# a partir de tres, cuál es la buena no se deduce del orden, y el orden es lo único que
+# Docker mira.
 #
 # La distinción no es cosmética. Con un solo destino, el pipeline compilaba dos veces:
 # una en el trabajo `frontend` —la que se probaba— y otra dentro de este Dockerfile

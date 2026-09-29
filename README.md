@@ -36,7 +36,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 > **Calidad en las dos mitades.** 1494 pruebas en el backend (93 % de cobertura) y 472 en
 > el cliente (95,7 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
-> encendidas—, y 10 trabajos de integración continua con 42 guardas de regresión de
+> encendidas—, y 10 trabajos de integración continua con 43 guardas de regresión de
 > configuración peligrosa y cuatro guardas de propiedades.
 >
 > **Las ocho pantallas pasan el nivel AA de WCAG 2.1**, medido por `axe-core` desde la

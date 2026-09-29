@@ -3,7 +3,7 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 25 de septiembre de 2026 (capítulo 36)
+**Última revisión:** 29 de septiembre de 2026 (apéndice del capítulo 36)
 
 > **Revisión del capítulo 36.** La congelación se mantiene. El capítulo 36 fue calidad del
 > cliente, no funcionalidad: ninguna pantalla nueva, ningún campo nuevo, ninguna frase nueva
@@ -24,6 +24,20 @@
 >
 > §6.4 pasa de cinco restos menores a nueve: los cuatro nuevos son deuda **visual** que el
 > capítulo encontró y no pagó porque pagarla es diseñar, y eso estaba fuera de su alcance.
+>
+> **Añadido el 29-09-2026, y es la tercera de esa clase.** Al levantar la pila para mirar el
+> trabajo del capítulo 36, el panel seguía enseñando el defecto que ese capítulo había
+> corregido: servía un bundle de cinco días antes. El servicio del cliente no declaraba
+> `target` en Compose, así que Docker construía la **última** etapa del Dockerfile —la del
+> pipeline, que no compila y copia el `dist/` del contexto— mientras la cabecera de ese
+> mismo Dockerfile afirmaba que la que se construía era la que compila. Ninguna prueba podía
+> verlo: todas miden el código fuente, y lo que fallaba era el empaquetado. Corregido, con
+> el control **43** del CI (R36 §36.13).
+>
+> Las tres —el volumen `deriva` del capítulo 32, el suelo de cobertura roto y esta— tienen
+> la misma forma: **no estaban en ninguna lista, y ninguna apareció leyendo código**.
+> Aparecieron al ejecutar el sistema de verdad. Es lo que este documento no puede prever y
+> la razón de que «verificar levantando la pila» sea una costumbre escrita.
 
 > **Revisión del capítulo 32.** La congelación se mantiene tal cual: solo entran
 > correcciones de fallos, con el criterio de §1. Lo que cambia es el inventario. §6.1 —«lo

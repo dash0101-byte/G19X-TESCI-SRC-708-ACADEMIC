@@ -350,3 +350,108 @@ Entra en §6.4 del documento de congelación:
 * **33.** `var(--accent-primary)` no existe: el girador de carga de `App.jsx` se queda sin color en su borde.
 
 Y sigue abierto, donde ya estaba, el punto **18** de §6.3: **el panel no se ha recorrido con una persona dentro**. Este capítulo comprueba que el marcado que un lector de pantalla necesita esté puesto y bien puesto, que es la parte verificable sin una persona delante. Si lo que ese lector dice se entiende, no lo puede responder ninguna herramienta.
+
+---
+
+## 36.13. Apéndice del 29-09-2026: el panel servía un bundle de cinco días antes
+
+Este apartado se añade cuatro días después de cerrar el capítulo, y cuenta algo que el
+capítulo no hizo sino que **encontró al comprobarse**. Se deja aquí, y no en un capítulo
+nuevo, porque el defecto llevaba desde el capítulo 17 y lo único que lo sacó a la luz fue
+levantar la pila para mirar el trabajo del 36.
+
+### Lo que pasó
+
+Con la pila arriba y sana —las cinco comprobaciones en verde, la migración del segundo
+factor aplicada contra PostgreSQL por primera vez y la puerta estrecha negando sus 25
+rutas—, el panel seguía enseñando **campos blancos sobre el panel oscuro**. Es decir, el
+defecto de §36.6, el que este capítulo corrigió.
+
+Preguntándole al navegador por la clase del campo:
+
+```
+clase: "input"      ← la que no existe
+--text-muted: #64748b   ← el color anterior a §36.4
+```
+
+El contenedor servía el bundle del **24 de septiembre**. El capítulo 36 se cerró el 25.
+
+### Por qué, y por qué no había ningún síntoma
+
+El `Dockerfile` del cliente tiene cuatro etapas, y las dos últimas son destinos:
+
+```
+FROM ... AS build-stage
+FROM ... AS servidor
+FROM servidor AS production-stage     ← compila la SPA desde el código
+FROM servidor AS desde-artefacto      ← NO compila: copia el dist/ del contexto
+```
+
+`devops/docker-compose.yml` no declaraba `target`. **Cuando un servicio de Compose no
+declara `target`, Docker construye la última etapa del archivo**, y la última es
+`desde-artefacto` — la del pipeline, que existe precisamente para *no* compilar: el CI
+compila una vez en el trabajo `frontend`, corre ahí las pruebas y el `linter` sobre ese
+mismo código, y mete el artefacto probado en la imagen.
+
+En un portátil eso significa copiar el `frontend/dist/` que haya en la carpeta. Y como
+`dist/` está en `.gitignore`, ese directorio es lo que dejó la última vez que alguien
+ejecutó `npm run build`, sin fecha ni relación con la revisión que se está levantando.
+
+**La cabecera del propio Dockerfile afirmaba lo contrario**, con estas palabras:
+*«production-stage (por defecto) — compila la SPA aquí dentro. Es lo que usa
+`docker compose up --build` en un portátil»*. No lo era. La etiqueta «por defecto» era
+cierta el día que se escribió, cuando `production-stage` era la última; dejó de serlo en
+cuanto se añadió una etapa debajo, y nada volvió a leer esa frase.
+
+Lo que hace a este defecto difícil de ver es que **`desde-artefacto` lleva su propia
+comprobación dentro**, escrita en el capítulo 17 justo para que un artefacto vacío no pasara
+inadvertido:
+
+```dockerfile
+RUN test -f /usr/share/nginx/html/index.html && test -d /usr/share/nginx/html/assets
+```
+
+Esa comprobación pasa perfectamente con un bundle de hace cinco días. Comprueba que el
+artefacto **no llegue vacío**, no que sea el de este código. Son dos preguntas distintas y
+solo se estaba haciendo la primera.
+
+En una máquina limpia el fallo sí es ruidoso —sin `dist/`, la construcción se detiene ahí—.
+En cualquier máquina que haya compilado alguna vez, sirve algo antiguo **para siempre** y
+sin decir nada.
+
+### Lo corregido
+
+1. `devops/docker-compose.yml` declara `target: production-stage`, con el motivo escrito al
+   lado.
+2. La cabecera del `Dockerfile` deja de afirmar que hay una etapa «por defecto», y explica
+   que la que Docker elige es la última.
+3. Un control nuevo del CI, el **43**: lee el compose como YAML —no con expresiones
+   regulares, que fue el primer intento y cruzaba las fronteras entre servicios— y, para
+   cada servicio que se construye, calcula **qué etapa se construiría de verdad** y exige
+   tres cosas:
+   * que un `target` declarado **exista** en su Dockerfile;
+   * que un Dockerfile de **tres etapas o más** declare `target`. Con dos, la última es la
+     de ejecución y no hay ambigüedad; a partir de tres, cuál es la buena no se deduce del
+     orden, y el orden es lo único que Docker mira;
+   * que **nunca** se construya la etapa que consume un artefacto ya compilado.
+
+   Reinyectados los tres casos —quitar el `target`, apuntarlo a una etapa que no existe y
+   apuntarlo a la del pipeline—, el control los detecta los tres y nombra cuál es.
+
+Tras reconstruir con el `target` correcto, el bundle de la imagen pasa de 341 580 a 352 215
+bytes, `--text-muted` es `#75849b`, la clase del campo es `input-field` y aparecen
+`aria-modal` y `ficha-360-titulo`. Es decir: el capítulo 36 estaba en el disco desde el
+día 25 y no había llegado nunca a ejecutarse.
+
+### Lo que esto dice, y que vale más que el arreglo
+
+Todo lo que este capítulo midió lo midió sobre el **código fuente**: `vitest` monta los
+componentes del repositorio, `axe` los audita, el contraste se lee de `index.css`. Ninguna
+de esas comprobaciones tiene forma de saber qué acabó dentro de la imagen, y ninguna es
+menos válida por ello: lo que fallaba no era el código ni su verificación, era el empaquetado.
+
+Es exactamente la lección que el documento de congelación ya se había llevado en el capítulo
+32 con el volumen `deriva` —un defecto que ninguna lista preveía y que solo apareció al
+levantar la pila de verdad— y la razón de que el proyecto tenga esa costumbre escrita. La
+suite responde «¿hace el código lo que promete?». Levantar la pila responde otra pregunta:
+«¿es ese el código que se está ejecutando?».

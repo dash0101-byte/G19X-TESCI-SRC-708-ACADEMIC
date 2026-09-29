@@ -2749,6 +2749,96 @@ jobs:
           }
           echo "axe-core declarada y fijada, sin silencios en linea, y las seis comprobaciones en su sitio."
 
+      # 29-09-2026. Encontrado al levantar la pila para mirar el trabajo del capitulo 36: el
+      # panel servia un bundle de cinco dias antes, y `up -d --build` habia terminado con
+      # exito.
+      #
+      # El motivo: cuando un servicio de Compose no declara `target`, Docker construye la
+      # ULTIMA etapa del Dockerfile. La del cliente tiene cuatro, y la ultima es
+      # `desde-artefacto` -la del pipeline, que NO compila y copia el `dist/` del contexto-.
+      # La cabecera del propio Dockerfile dice que `production-stage` es «la que usa
+      # docker compose up --build en un portatil»; no lo era.
+      #
+      # No hay sintoma. La comprobacion que `desde-artefacto` lleva dentro -que existan
+      # index.html y assets/- pasa con cualquier bundle viejo: comprueba que el artefacto no
+      # llegue vacio, no que sea el de este codigo.
+      - name: Cada servicio construye la etapa que dice construir
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re, sys
+          try:
+              import yaml
+          except ImportError:
+              sys.exit("Falta PyYAML; este control lee el compose como YAML y no con regex.")
+
+          COMPOSE = pathlib.Path("devops/docker-compose.yml")
+          RAIZ = pathlib.Path(".").resolve()
+          servicios = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))["services"]
+          fallos = []
+          con_build = 0
+
+          for nombre, definicion in sorted(servicios.items()):
+              build = (definicion or {}).get("build")
+              if not isinstance(build, dict):
+                  continue
+              con_build += 1
+              contexto = build.get("context", ".")
+              ruta = (COMPOSE.parent / contexto / build.get("dockerfile", "Dockerfile")).resolve()
+              target = build.get("target")
+
+              try:
+                  texto = ruta.read_text(encoding="utf-8")
+              except OSError:
+                  fallos.append(f"{nombre}: no se pudo leer {ruta}")
+                  continue
+
+              etapas = re.findall(r"^FROM\s+\S+(?:\s+AS\s+(\S+))?", texto, re.MULTILINE)
+              nombradas = [e for e in etapas if e]
+              construida = target or (etapas[-1] if etapas else "")
+
+              print(f"  {nombre:<22} etapas={len(etapas)}  "
+                    f"target={'si' if target else 'NO'}  -> construye '{construida or '(sin nombre)'}'")
+
+              # 1. Un `target` declarado tiene que existir.
+              if target and target not in nombradas:
+                  fallos.append(
+                      f"{nombre}: declara target '{target}' y esa etapa no existe en "
+                      f"{ruta.relative_to(RAIZ)}. Hay: {', '.join(nombradas) or 'ninguna nombrada'}")
+
+              # 2. Con tres etapas o mas, el `target` es OBLIGATORIO. Con dos, la ultima es
+              #    la de ejecucion y no hay ambiguedad; a partir de tres, cual es la buena
+              #    no se deduce del orden, y el orden es lo unico que Docker mira.
+              if len(etapas) >= 3 and not target:
+                  fallos.append(
+                      f"{nombre}: {ruta.relative_to(RAIZ)} tiene {len(etapas)} etapas y el "
+                      f"servicio no declara `target`, asi que Docker construira la ultima "
+                      f"('{etapas[-1]}'). Diga cual quiere.")
+
+              # 3. Y nunca la etapa que consume un artefacto ya compilado: esa es del
+              #    pipeline, que compila aparte y deja el resultado en el contexto. En una
+              #    maquina de desarrollo copiaria lo que quedara de la ultima vez.
+              if construida and construida.startswith("desde-artefacto"):
+                  fallos.append(
+                      f"{nombre}: construiria '{construida}', que NO compila y copia el "
+                      f"dist/ del contexto. En una maquina de desarrollo eso sirve un bundle "
+                      f"viejo sin que nada falle.")
+
+          # Sin esto, un compose renombrado o un cambio de estructura dejaria el bucle sin
+          # servicios y el control pasaria sin haber mirado ninguno.
+          if con_build < 3:
+              fallos.append(f"solo se encontraron {con_build} servicios con `build:`; se esperaban al menos 3")
+
+          if fallos:
+              print("")
+              print("FALLO: lo que se construye no es lo que se cree construir.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("")
+          print(f"Los {con_build} servicios que se construyen nombran una etapa a proposito.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

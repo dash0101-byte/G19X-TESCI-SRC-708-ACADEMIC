@@ -568,6 +568,22 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      # `target` EXPLÍCITO, y es imprescindible aunque el Dockerfile llame «por defecto» a
+      # esta etapa. Sin esta línea, Docker construye la ÚLTIMA etapa del archivo, y la
+      # última es `desde-artefacto`: la del pipeline, que no compila nada y copia el `dist/`
+      # que encuentre en el contexto.
+      #
+      # Lo que eso producía: `python devops/pila.py up -d --build` terminaba con éxito y
+      # servía el `dist/` que hubiera quedado en el portátil de la última vez que alguien
+      # corrió `npm run build`. Se encontró el 29-09-2026 al levantar la pila para mirar el
+      # trabajo del capítulo 36: el panel servía el bundle del día 24.
+      #
+      # No hay síntoma. La comprobación que `desde-artefacto` lleva dentro —que existan
+      # `index.html` y `assets/`— pasa perfectamente con un bundle viejo: comprueba que el
+      # artefacto no llegue vacío, no que sea el de este código. Y `dist/` está en
+      # `.gitignore`, así que en una máquina limpia la construcción falla de golpe y en una
+      # que ya compiló alguna vez sirve algo antiguo para siempre.
+      target: production-stage
     container_name: plurione_leadscoring_frontend
     restart: unless-stopped
     ports:
