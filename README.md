@@ -34,14 +34,16 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1530 pruebas en el backend (93 % de cobertura) y 544 en
+> **Calidad en las dos mitades.** 1530 pruebas en el backend (93 % de cobertura) y 576 en
 > el cliente (95,8 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
-> encendidas—, y 10 trabajos de integración continua con 48 guardas de regresión de
-> configuración peligrosa y cuatro guardas de propiedades.
+> encendidas—, y 10 trabajos de integración continua con 51 guardas de regresión de
+> configuración peligrosa y cinco guardas de propiedades.
 >
 > **Las nueve pantallas pasan el nivel AA de WCAG 2.1**, medido por `axe-core` desde la
 > propia suite del cliente; se recorren enteras con el teclado; el contraste de la paleta se
-> calcula contra el mínimo de la norma leyendo `index.css`; y los errores de formulario
+> calcula contra el mínimo de la norma leyendo `index.css` —incluido el contorno de los
+> controles y el hecho de que el foco se distinga de él—; todo lo que el marcado nombra,
+> clases y variables de la paleta, se comprueba que exista; y los errores de formulario
 > llegan a un lector de pantalla. El detalle, en el [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md).
 
 > ## 🧊 Proyecto congelado el 24-09-2026
@@ -1274,13 +1276,15 @@ prospectos, el simulador, el menú de la sesión, la pantalla de cambio obligato
 contraseña, el reparto de la cartera de las bajas en el panel de administración, la ficha del
 prospecto y la bandeja «Sin asociar»—.
 
-Desde el capítulo 36 se comprueba además **la accesibilidad**, en cinco archivos bajo
+Desde el capítulo 36 se comprueba además **la accesibilidad**, en seis archivos bajo
 `src/pruebas/`: las nueve pantallas montadas contra WCAG 2.1 AA (`axe-core`), el recorrido
 real del tabulador, el contraste de la paleta contra el mínimo de la norma, que los errores
-y los aciertos de los formularios lleguen a un lector de pantalla, y que toda clase que el
-marcado usa exista en la hoja de estilos. Ese último nació de un defecto real: tres
-pantallas pedían una clase de campo que no existe y se dibujaban con el estilo del
-navegador.
+y los aciertos de los formularios lleguen a un lector de pantalla, que toda clase que el
+marcado usa exista en la hoja de estilos, y —desde el capítulo 39— que toda variable de la
+paleta que el marcado nombra exista en ella. Los dos últimos nacieron de defectos reales y
+son el mismo defecto: tres pantallas pedían una clase de campo que no existe y se dibujaban
+con el estilo del navegador; el tablero pedía tres degradados que tampoco existen y
+dibujaba su gráfico vacío. **Las dos listas se sacan del código**, no se escriben a mano.
 
 El suelo de cobertura vive en `frontend/vite.config.js` y va **justo por debajo de lo
 medido** (95 / 89 / 98 / 98 frente a 95,7 / 89,4 / 98,3 / 98,3), no en un número redondo: un
@@ -1370,6 +1374,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **34** | [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md) | Accesibilidad comprobada (capítulo 36): las **ocho pantallas** pasan el nivel AA de WCAG 2.1, medido por `axe-core` desde la propia suite —la biblioteca ya estaba instalada desde el capítulo 17 y nadie la llamaba: declararla costó **una línea** del lock—. La ficha 360 **no era una ventana** para el teclado ni para un lector de pantalla: sin rol, sin nombre, sin atrapado del foco, sin `Escape` y sin devolverlo al cerrar. Cuatro controles del panel solo se podían pulsar con el ratón, y uno era la única puerta a **cerrar sesión**. El contraste se calcula leyendo la paleta de `index.css`, porque `jsdom` no dibuja pero los colores están escritos: un token no llegaba al mínimo y pintaba las etiquetas de todos los formularios. Y midiendo con **300 prospectos y 5 000 actividades** apareció un N+1: la bandeja «Hoy» hacía una consulta por tarea. 20 defectos reintroducidos, 20 detectados. |
 | **35** | [Reporte 35](docs/reportes/Reporte_35_La_Cadena_de_Suministro_se_Mantiene_Sola_Cinco_Caracteres_que_Salen_el_Tercero_que_no_Puede_Bloquear_y_el_Aviso_que_no_Decide.md) | La cadena de suministro se mantiene sola (capítulo 37): cierra **§3.7 y §3.8** de la congelación demostrando que la premisa de las dos era falsa —ninguna necesitaba la cuenta externa que decían necesitar—. Las contraseñas se comprueban ahora contra el servicio público **por rango**: salen **cinco caracteres** del resumen SHA-1 y nada más, con relleno para que el tamaño tampoco hable. Si el servicio cae o tarda, **no se bloquea a nadie** y el resultado es el de antes, carácter a carácter. La salida verifica contra el **almacén del sistema**, porque con el paquete de la biblioteca el fallo sería silencioso. Y `dependabot.yml` vigila seis ecosistemas **avisando**, mientras `renovar_imagenes.py` sigue decidiendo. 17 defectos reintroducidos, 17 detectados — y tres disparos en falso destapados de paso, los tres por buscar una palabra en vez de una forma. |
 | **36** | [Reporte 36](docs/reportes/Reporte_36_Un_Derecho_sin_Pantalla_La_Respuesta_que_no_Distingue_el_Borrado_que_se_Escribe_y_el_Numero_que_Llego_al_Tablero.md) | Un derecho sin pantalla (capítulo 38): abre la congelación para **tres puntos de §6.2 y ninguno más** —los tres eran la misma cosa, una capacidad que existe, está probada y no se puede usar desde donde hay que usarla—. Los derechos del titular tenían API desde la Fase 14 y **ningún sitio desde donde ejercerlos**: ahora hay pantalla que busca por correo, enseña qué consta y de dónde llegó, exporta el documento del servidor y suprime **exigiendo que el correo se escriba**, con su constancia. La respuesta es **la misma** para quien nunca entró y para quien ya se fue, porque distinguirlas convertiría la pantalla en el oráculo que la huella con clave de la bitácora evita; y la igualdad del correo la decide el cliente, porque el buscador del listado trae también a quien solo se parece. Sin lógica de supresión nueva: el servidor es el del capítulo 37 más un archivo de pruebas. Y escaneando un QR con un teléfono apareció lo gordo: **no lo leía ningún lector desde el capítulo 27**, porque la información de formato iba transpuesta, y las diecinueve pruebas del QR estaban verdes por ser todas simétricas respecto de la diagonal. 29 defectos reintroducidos, 29 detectados. |
+| **37** | [Reporte 37](docs/reportes/Reporte_37_Lo_que_el_Marcado_Pedia_y_la_Hoja_no_Tenia_La_Barra_que_no_Pintaba_el_Contorno_que_no_se_Veia_y_el_Criterio_que_Casi_Rompe_el_Otro.md) | Lo que el marcado pedía y la hoja no tenía (capítulo 39): abre la congelación para **cuatro puntos de §6.4 y ninguno más**, y el primero estaba **mal medido**. Lo anotado como «cosmético: falta un color» eran **cinco variables en nueve sitios**, y un `var()` que no resuelve no deja la propiedad en su valor anterior sino en el **inicial**: la barra de distribución del tablero se dibujaba **vacía** y la opción elegida de la ficha 360 **sin contorno**. El hallazgo, sin embargo, no es el defecto sino lo que apareció al corregirlo: subir el borde de un control a los 3.0 que pide **§1.4.11** lo dejaba a **1.11:1** del aro de foco, es decir, cumplía un criterio **rompiendo §2.4.7**; los dos tokens se mueven juntos y el cambio de estado se mide en los **dos** controles donde ocurre, porque el que manda es el botón y medir solo el campo dejaba pasar un valor que allí falla. Además: la hoja del panel de difusión —catorce clases que no existían—, un color de acción destructiva que **no** es el de HOT porque ese rojo es una temperatura de prospecto, el estado apagado de los botones, que no existía en toda la hoja, y un suelo para el código QR medido en **píxeles por módulo**. Lo que impide que vuelva a pasar es que las dos listas —clases y variables— **se sacan del código**. 27 defectos reintroducidos, 27 detectados. |
 | **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
 | **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
 | **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |

@@ -7,11 +7,43 @@
   --bg-surface-elevated: #151922;
   --bg-surface-hover: #1c212d;
   --bg-subtle: rgba(255, 255, 255, 0.025);
-  
+  /* El fondo de un campo, y el que toma al recibir el foco. Estaban escritos a mano en
+     tres reglas distintas de esta hoja. Son tokens desde el capítulo 39 por un motivo que
+     no es el orden: el contraste del borde de un control se mide contra el fondo del
+     control, y `contraste.test.js` solo sabe medir lo que está en `:root`. Un color
+     escrito a mano en una regla es un color que ninguna comprobación mira. */
+  --bg-field: #0b0d14;
+  --bg-field-focus: #11141e;
+
+  /* Tres niveles de borde para lo que NO es un control: separar paneles, filas de una
+     tabla y secciones. No identifican nada, así que §1.4.11 no les pide contraste y se
+     quedan donde estaban. El borde de un control es otro token, --border-control. */
   --border-subtle: rgba(255, 255, 255, 0.07);
   --border-medium: rgba(255, 255, 255, 0.12);
-  --border-focus: rgba(255, 255, 255, 0.35);
-  
+
+  /* El contorno de un campo, un botón secundario o un selector: esto SÍ identifica un
+     control, y WCAG 2.1 §1.4.11 le pide 3.0:1 contra lo que lo rodea. Llevaba
+     --border-subtle, que da 1.12 sobre el fondo del campo: el contorno no se veía hasta
+     que llegaba el foco (§6.4 punto 32).
+
+     0.34 es la primera alfa que alcanza 3.0 en el peor de los cinco fondos donde hay
+     controles —3.02 sobre --bg-base, 3.06 sobre el fondo del campo, 3.10 / 3.11 / 3.08
+     sobre las tres superficies—. Se elige la primera que pasa, no una cómoda: cada décima
+     de más acerca este borde al del foco, y el foco tiene que seguir distinguiéndose. */
+  --border-control: rgba(255, 255, 255, 0.34);
+
+  /* Y por eso el aro de foco sube con él. Era 0.35, que contra el 0.34 de arriba da una
+     razón de 1.11: con el borde en reposo corregido, el foco habría dejado de verse. Es
+     el riesgo de arreglar un criterio rompiendo otro —§2.4.7 pide que el foco sea
+     visible—, así que los dos se mueven juntos.
+
+     0.71 es la primera alfa en que el cambio de estado alcanza 3.0 **en los dos sitios
+     donde ocurre**: 3.30 en un campo (de 0.34 sobre #0b0d14 a 0.71 sobre #11141e) y 3.06
+     en un botón secundario (de 0.34 sobre --bg-surface-elevated a 0.71 sobre
+     --bg-surface-hover). El segundo es el que manda, y es el que obliga a pasar de 0.70.
+     Medido en pruebas/contraste.test.js, que lo recalcula de aquí. */
+  --border-focus: rgba(255, 255, 255, 0.71);
+
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   /* Era #64748b y no llegaba al mínimo de la norma en ninguna de las tres superficies:
@@ -53,6 +85,46 @@
   --success-text: #34d399;
   --success-bg: rgba(16, 185, 129, 0.08);
   --success-border: rgba(16, 185, 129, 0.22);
+
+  /* Acción destructiva (capítulo 39)
+     ---------------------------------
+     No se reutiliza la familia --hot-*: ese rojo es una **temperatura de prospecto**, y
+     pintar «Cerrar sesión» con él diría que ese botón es un prospecto caliente. Que dos
+     cosas se parezcan en la pantalla no las hace lo mismo en la paleta.
+
+     El relleno es sólido y no translúcido como las insignias, porque el problema que
+     cierra es justamente que el botón **no parecía un botón** (§6.4 punto 31): se dibujaba
+     como un `.btn` a secas, sin fondo y con el borde transparente.
+
+     Las medidas: el texto da 6.18:1 sobre el relleno y 4.62:1 sobre el relleno del
+     :hover, los dos por encima de los 4.5 de §1.4.3. El relleno solo da 2.87:1 contra
+     --bg-surface, por debajo de los 3.0 que §1.4.11 pide al contorno de un control —y de
+     ahí el borde más claro, que da de 4.28 a 5.26 sobre las cuatro superficies. El borde
+     no es adorno: es lo que delimita el botón. */
+  --danger-bg: #b91c1c;
+  --danger-bg-hover: #dc2626;
+  --danger-border: #ef4444;
+  --danger-text: #f8fafc;
+
+  /* Lo que el marcado pedía desde hace capítulos y la hoja no tenía (capítulo 39)
+     -----------------------------------------------------------------------------
+     Estos cinco no son colores nuevos: son los nombres con los que el marcado ya pedía
+     colores que esta paleta tiene. Mientras no existieron, el `var()` era inválido y la
+     propiedad entera se caía —no se caía al valor de antes, se caía al inicial—, así que
+     la barra de distribución del tablero se dibujaba **sin fondo ninguno** y la opción
+     elegida de la ficha 360 **sin borde**. Se definen aquí, una vez, en vez de
+     reescribirse en los nueve sitios que los nombran. */
+  --accent-primary: var(--color-primary);
+  /* El nombre es un fósil de una paleta que nunca se escribió: con --color-primary en
+     blanco puro no hay ningún «light» posible por encima. Se conserva el nombre porque lo
+     usa el marcado, y apunta al blanco atenuado, que es lo que ese sitio quería. */
+  --color-primary-light: var(--color-primary-hover);
+  /* Los tres degradados de la barra apilada del tablero. Van del punto al texto de su
+     propio cuadrante, que es el color de la muestra de la leyenda que hay justo debajo:
+     si el segmento y su muestra no fueran el mismo color, la leyenda mentiría. */
+  --hot-gradient: linear-gradient(90deg, var(--hot-dot), var(--hot-text));
+  --warm-gradient: linear-gradient(90deg, var(--warm-dot), var(--warm-text));
+  --cold-gradient: linear-gradient(90deg, var(--cold-dot), var(--cold-text));
 
   /* Los nombres son los de las familias variables autoalojadas (ver fuentes.css).
      Antes ponía 'Inter' y 'JetBrains Mono' a secas: la primera no se descargaba en
@@ -160,6 +232,18 @@ h1, h2, h3, h4, h5 {
   border: 1px solid transparent;
   text-decoration: none;
   line-height: 1.25;
+  /* Encontrado mirando el panel ya maquetado (capítulo 39). `.btn` no decía de qué color
+     es su texto, y en los cuatro `<button>` que la usan sin variante eso no se notaba,
+     porque un botón hereda el color de lo que lo rodea. En el **único** `<a class="btn">`
+     del cliente sí: la hoja del navegador le pone el azul de enlace, que gana a la
+     herencia, y el enlace de «Compartir en LinkedIn» salía en azul oscuro sobre un panel
+     oscuro. `text-decoration: none` ya estaba, así que ni siquiera iba subrayado: era un
+     texto azul marino, ilegible y sin aspecto de nada.
+
+     `inherit` y no un token: lo que hace esto es que un `.btn` sin variante se comporte en
+     un enlace igual que en un botón, que es lo que cualquiera que escriba la clase espera.
+     Las variantes de abajo ponen el suyo y mandan ellas. */
+  color: inherit;
 }
 
 .btn-primary {
@@ -177,13 +261,47 @@ h1, h2, h3, h4, h5 {
 
 .btn-secondary {
   background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-control);
   color: var(--text-primary);
 }
 
 .btn-secondary:hover {
   background: var(--bg-surface-hover);
-  border-color: var(--border-medium);
+  border-color: var(--border-focus);
+}
+
+/* El botón de una acción que no se puede deshacer: «Cerrar sesión», «Suprimir estos
+   datos…» y «Suprimir definitivamente». Por qué el color es propio y no el de HOT, y de
+   dónde salen sus tres medidas, está arriba en la paleta. */
+.btn-danger {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.btn-danger:hover {
+  background: var(--danger-bg-hover);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+/* Ningún `:disabled` en toda la hoja, y quince componentes que deshabilitan botones
+   (capítulo 39). El caso que lo hizo visible: «Suprimir definitivamente» está apagado
+   hasta que se escribe el correo, y con un relleno rojo sólido un botón apagado se ve
+   exactamente igual que uno que funciona. Un botón que parece pulsable y no lo es no es
+   un detalle cosmético: es la pantalla diciendo algo que no es verdad.
+
+   Se apaga con colores y no con `opacity`, que habría atenuado el texto hasta un valor
+   que nadie mide. Este par —--text-muted sobre --bg-surface-elevated— ya está en la tabla
+   de contraste y da 4.63:1, así que el botón apagado sigue leyéndose. */
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .btn-sm {
@@ -194,8 +312,8 @@ h1, h2, h3, h4, h5 {
 /* Inputs y Formularios */
 .input-field {
   width: 100%;
-  background: #0b0d14;
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-field);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   color: var(--text-primary);
@@ -207,7 +325,7 @@ h1, h2, h3, h4, h5 {
 
 .input-field:focus {
   border-color: var(--border-focus);
-  background: #11141e;
+  background: var(--bg-field-focus);
 }
 
 .form-label {
@@ -284,12 +402,14 @@ h1, h2, h3, h4, h5 {
 ::-webkit-scrollbar-track {
   background: var(--bg-base);
 }
+/* El tirador de la barra es un control, y llevaba --border-subtle: 1.15:1 contra la
+   canaleta, es decir, no se veía dónde estaba. Sube con los campos. */
 ::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
+  background: var(--border-control);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-medium);
+  background: var(--border-focus);
 }
 
 /* ==========================================================================
@@ -378,9 +498,9 @@ h1, h2, h3, h4, h5 {
   text-align: center;
   min-height: 48px;
   padding: 6px 8px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
-  background: #0b0d14;
+  background: var(--bg-field);
   color: var(--text-secondary);
   font-size: 0.85rem;
   line-height: 1.2;
@@ -441,4 +561,218 @@ h1, h2, h3, h4, h5 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ==========================================================================
+   Difusión y código QR (capítulo 39)
+   ==========================================================================
+   `CompartirEnRedes` no usa ni un estilo en línea: se apoyaba entero en las catorce
+   clases de aquí abajo, y **ninguna existía**. El panel de difusión y el del código QR
+   salían por tanto con el estilo por omisión del navegador: casillas de sistema, listas
+   con viñetas, botones pegados y un código QR del tamaño que el SVG trajera puesto. Era
+   el punto 30 de §6.4 y llevaba tres capítulos abierto, porque escribirlo no era corregir
+   un nombre mal escrito —eso fue el caso de `input`— sino decidir cómo se ve un panel.
+
+   Se escribe con los tokens que ya están arriba y sin añadir ni un color: lo que faltaba
+   era la hoja, no la paleta. */
+
+.interes-redes {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 0;
+  min-width: 0;
+}
+.interes-redes legend {
+  padding: 0 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.interes-redes-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+/* La casilla y su texto son un solo blanco de 44 px de alto: el mínimo que una persona
+   acierta con el pulgar, el mismo criterio que la página pública usa en sus campos. */
+.interes-red-casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.interes-red-casilla:hover {
+  border-color: var(--border-focus);
+}
+.interes-red-casilla input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.interes-red-casilla:has(input:focus-visible) {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Texto de ayuda y texto de error, que no tenían estilo propio en ninguna parte de la
+   hoja aunque tres componentes los pidieran. Los dos reutilizan el tamaño y el color que
+   la página pública ya usa para lo mismo. */
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.form-error {
+  font-size: 0.8rem;
+  color: var(--hot-text);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.interes-compartir {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.interes-compartir h5 {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.interes-compartir-lista {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.interes-compartir-lista > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+}
+.interes-compartir-red {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8125rem;
+  margin-bottom: 8px;
+}
+/* El recuento de caracteres de la red, en cifra tabular: cambiar de 279 a 280 no debe
+   mover el número de sitio. */
+.interes-compartir-cuenta {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.interes-compartir-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.interes-compartir-sin-boton {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.interes-compartir-aviso {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+/* El aviso de que la dirección pública no contesta. Es el único de este panel que avisa
+   de algo que hace inútil lo que se está haciendo —compartir o imprimir un enlace muerto—,
+   así que se distingue del resto en lugar de parecer una nota al pie. Llevaba estilo en
+   línea desde el capítulo 38 justamente porque esta clase no existía. */
+.interes-compartir-caida {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--warm-text);
+  border-radius: var(--radius-sm);
+  color: var(--warm-text);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.interes-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+}
+.interes-qr label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.interes-qr select {
+  min-height: 40px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+}
+.interes-qr select:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+/* El código, en blanco y con margen blanco alrededor: el SVG trae su propia zona
+   tranquila de cuatro módulos, y encima va este relleno para que el borde del panel no
+   haga de quinto patrón. */
+.interes-qr-dibujo {
+  padding: 8px;
+  border-radius: var(--radius-xs);
+  background: #ffffff;
+  align-self: stretch;
+  max-width: 336px;
+}
+/* El tamaño se fija aquí y no en el generador, porque es una decisión de pantalla.
+   El suelo son **5 píxeles CSS por módulo**, medido y no estimado: el enlace público más
+   largo que este panel puede producir —unos cien caracteres, con la red en la consulta—
+   cabe en una versión 6, que son 41 módulos, más los 8 de la zona tranquila: 49. A 248 px
+   eso da 5.06 por módulo, y a 320 da 6.53. Por debajo de 5 la cámara de un teléfono
+   empieza a fallar a la distancia a la que se mira un papel, que es exactamente lo que
+   este código es: material impreso. Comprobado en pruebas/tokens.test.js, que recalcula
+   los módulos del enlace con el mismo generador en lugar de creerse este comentario.
+
+   El suelo va escrito como `min(248px, 100%)` y no como 248 a secas: por debajo de unos
+   290 px de ventana un mínimo rígido sacaría una barra de desplazamiento horizontal a la
+   página entera, que es lo que WCAG §1.4.10 no quiere. Donde hay sitio, el suelo manda;
+   donde no lo hay, el código se encoge y se amplía con los dedos. */
+.interes-qr-dibujo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: min(248px, 100%);
+  max-width: 320px;
 }

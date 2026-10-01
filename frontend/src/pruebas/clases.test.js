@@ -15,8 +15,10 @@
 // prueba, el componente se monta y la pantalla funciona. Solo se ve distinta, y solo si
 // alguien la mira.
 //
-// Al escribir la comprobación aparecieron quince clases más en el mismo estado. No se
-// corrigen aquí y el motivo está escrito abajo, en `SIN_DEFINIR`.
+// Al escribir la comprobación aparecieron quince clases más en el mismo estado, y el
+// capítulo 36 las anotó en `SIN_DEFINIR` en vez de corregirlas, porque corregirlas era
+// escribir la hoja de un panel entero. **El capítulo 39 las escribió**, así que el
+// inventario está vacío; por qué el mecanismo se conserva vacío está abajo, en él.
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -27,44 +29,36 @@ import { HOJA } from './contraste.js';
 /**
  * Clases que el marcado usa y la hoja NO define, aceptadas a sabiendas.
  *
- * Esto **no** es una lista de excepciones cómodas: es un inventario de una deuda que este
- * capítulo encontró y decidió no pagar, con el motivo. Corregirla no es escribir bien un
- * nombre —lo que se hizo con `input-field`— sino **diseñar** un panel entero: elegir
- * colores, espaciados y estados para catorce clases que hoy no existen. Eso es rediseñar
- * una pantalla, y el capítulo 36 lo excluyó de su alcance por escrito.
+ * **Está vacía, y el capítulo 39 la vació.** Llevaba las catorce clases de
+ * `CompartirEnRedes` y `btn-danger`: lo que faltaba no era corregir un nombre —eso fue el
+ * caso de `input-field`— sino escribir la hoja de un panel entero y meter un color de
+ * acción destructiva en la paleta. Eran los puntos 30 y 31 de §6.4 y están cerrados.
  *
- * Queda anotado en §6.4 del documento de congelación. Mientras tanto esta lista hace dos
- * cosas: deja constancia de qué falta exactamente, y **impide que la deuda crezca**, porque
- * una clase nueva sin definir no está aquí y pone la prueba en rojo.
+ * **El mecanismo se conserva, vacío, y no es lo mismo que retirarlo.** La pregunta se
+ * planteó: si no hay deuda, ¿para qué la lista? La respuesta es que esta lista no existe
+ * para guardar nombres, existe para que aceptar una deuda **cueste escribirla con su
+ * motivo**. Quitarla dejaría dos salidas peores el día que vuelva a hacer falta: comentar
+ * la comprobación, o meter la clase en la hoja con una regla vacía para que la encuentre.
+ * Las dos se parecen demasiado a arreglarlo.
+ *
+ * Hay una prueba abajo que comprueba que sigue vacía. No prohíbe volver a usarla: obliga a
+ * borrar esa prueba para hacerlo, que es justo el tamaño de decisión que corresponde.
  */
-const SIN_DEFINIR = {
-  // `CompartirEnRedes` no usa ni un solo estilo en línea: se apoya entera en estas catorce
-  // clases, y ninguna existe. El panel de difusión y el del QR se dibujan por tanto sin
-  // ningún estilo. Es el panel de «Compartir en redes» dentro de Publicaciones; la página
-  // pública, que usa el prefijo `interes-` de verdad, sí está definida entera.
-  'interes-redes': 'CompartirEnRedes — el panel de difusión no tiene hoja (§6.4)',
-  'interes-redes-lista': 'CompartirEnRedes (§6.4)',
-  'interes-red-casilla': 'CompartirEnRedes (§6.4)',
-  'interes-compartir': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-lista': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-red': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-cuenta': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-acciones': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-sin-boton': 'CompartirEnRedes (§6.4)',
-  'interes-compartir-aviso': 'CompartirEnRedes (§6.4)',
-  'interes-qr': 'CompartirEnRedes (§6.4)',
-  'interes-qr-dibujo': 'CompartirEnRedes (§6.4)',
-  'form-hint': 'CompartirEnRedes — texto de ayuda sin estilo propio (§6.4)',
-  'form-error': 'CompartirEnRedes — texto de error sin estilo propio (§6.4)',
-  // El botón de cerrar sesión pide un aspecto de acción destructiva que la paleta no tiene.
-  // Hoy se dibuja como un `.btn` a secas: borde transparente y sin fondo, es decir, no
-  // parece un botón. Darle uno exige un color nuevo en la paleta, que el capítulo excluyó.
-  'btn-danger': 'SessionModal, «Cerrar sesión» — la paleta no tiene color de acción destructiva (§6.4)',
-};
+const SIN_DEFINIR = {};
 
-/** Las clases que la hoja define, leídas de ella. */
+/**
+ * Las clases que la hoja define, leídas de ella.
+ *
+ * Los comentarios se quitan primero, y no es un detalle: esta hoja nombra sus propias
+ * clases dentro de los comentarios para explicar de dónde sale cada decisión. Sin quitarlos,
+ * una clase **mencionada** en una explicación contaría como definida, y la comprobación se
+ * aprobaría con la documentación de un arreglo en lugar de con el arreglo. Es la misma
+ * lección que el capítulo 37 aprendió en las guardas del CI: buscar una forma, no una
+ * palabra, y buscarla en el código y no en lo que el código dice de sí mismo.
+ */
 function clasesDefinidas(css) {
-  return new Set([...css.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+  const sinComentarios = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  return new Set([...sinComentarios.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]));
 }
 
 /** Todos los `.jsx` del cliente que no son pruebas. */
@@ -107,7 +101,7 @@ describe('las clases del marcado', () => {
   it('se leen de verdad la hoja y los componentes', () => {
     // Sin esto, una ruta mal resuelta dejaría las dos listas vacías y la comprobación de
     // abajo pasaría sin haber mirado nada. Es el mismo cuidado que en `contraste.test.js`.
-    expect(definidas.size).toBeGreaterThan(30);
+    expect(definidas.size).toBeGreaterThan(45);
     expect(archivos.length).toBeGreaterThan(20);
     expect(definidas.has('input-field')).toBe(true);
     // Y la que empezó todo esto: `input` a secas no existe, y por eso no se puede usar.
@@ -132,6 +126,20 @@ describe('las clases del marcado', () => {
     ).toEqual([]);
   });
 
+  it('la lista de deuda aceptada está vacía', () => {
+    // El capítulo 39 pagó las quince entradas que el 36 inventarió. Mientras esto siga
+    // así, «la hoja define todo lo que el marcado pide» es una frase sin asteriscos.
+    //
+    // Volver a usar la lista es legítimo y hay casos en que será lo correcto. Lo que esta
+    // prueba impide es hacerlo sin mirar: hay que borrarla, y borrar una prueba se ve en
+    // el diff.
+    expect(
+      Object.entries(SIN_DEFINIR).map(([clase, motivo]) => `${clase} — ${motivo}`),
+      'Hay deuda aceptada otra vez. Si es una decisión, borre esta prueba y dígalo en el '
+      + 'documento de congelación; si no lo es, defina la clase en la hoja.',
+    ).toEqual([]);
+  });
+
   it('la lista de deuda aceptada no guarda nombres que ya se arreglaron', () => {
     // Una lista de excepciones que no se limpia acaba tapando defectos nuevos con el nombre
     // de defectos viejos. Si alguien escribe la hoja de `CompartirEnRedes`, esta prueba
@@ -152,6 +160,35 @@ describe('las clases del marcado', () => {
       olvidadas,
       `Estas clases ya no las usa ningún componente: quítelas de SIN_DEFINIR — ${olvidadas.join(', ')}`,
     ).toEqual([]);
+  });
+
+  it('un «.btn» sin variante sabe de qué color es su texto', () => {
+    // Encontrado mirando el panel ya maquetado (capítulo 39), que es lo único que lo
+    // encuentra: `.btn` no declaraba `color`, y en los cuatro `<button>` que la usan sin
+    // variante eso no se nota, porque un botón hereda el color de lo que lo rodea. En un
+    // `<a>` no: la hoja del navegador le pone el azul de enlace, que gana a la herencia.
+    // El único `<a class="btn">` del cliente —«Compartir en LinkedIn»— salía en azul
+    // marino sobre un panel oscuro, y sin subrayado, porque `.btn` sí quitaba eso.
+    const regla = /\n\.btn \{([\s\S]*?)\n\}/.exec(HOJA);
+    expect(regla, 'desapareció la regla base de .btn').not.toBeNull();
+    expect(
+      regla[1],
+      '.btn volvió a no declarar color: un <a class="btn"> sin variante sale con el azul '
+      + 'de enlace del navegador',
+    ).toMatch(/color:\s*inherit/);
+  });
+
+  it('y ningún enlace se queda con «btn» a secas', () => {
+    // El arreglo de arriba hace legible ese caso; esto impide que vuelva a haber un enlace
+    // con aspecto de nada. Las variantes son las que le dan fondo y borde.
+    const sueltos = [];
+    for (const ruta of archivos) {
+      const codigo = readFileSync(ruta, 'utf8');
+      for (const anclas of codigo.matchAll(/<a\s+className="([^"]*\bbtn\b[^"]*)"/g)) {
+        if (!/btn-(primary|secondary|danger)/.test(anclas[1])) sueltos.push(`${ruta} — «${anclas[1]}»`);
+      }
+    }
+    expect(sueltos, `Estos enlaces usan .btn sin variante:\n${sueltos.join('\n')}`).toEqual([]);
   });
 
   it('las pantallas de credenciales usan la clase de campo de la hoja', () => {

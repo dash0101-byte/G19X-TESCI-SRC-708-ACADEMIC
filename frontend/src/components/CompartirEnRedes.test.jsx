@@ -208,6 +208,19 @@ describe('cuando la dirección pública no contesta', () => {
     expect(aviso).toHaveTextContent(/no llega a ninguna parte/i);
   });
 
+  it('ya no lleva estilo en línea: el aviso tiene clase propia en la hoja', () => {
+    // El capítulo 38 le puso borde y color a mano porque las catorce clases de este panel
+    // no existían y un aviso sin formato no lo lee nadie. El 39 escribió la hoja, y con
+    // una clase propia: compartir `interes-compartir-aviso` con las notas de cada red
+    // habría hecho que esto se viera como una nota al pie.
+    pintar({ direccionCaida: true });
+
+    const aviso = screen.getByRole('alert');
+    expect(aviso).toHaveClass('interes-compartir-caida');
+    expect(aviso).not.toHaveClass('interes-compartir-aviso');
+    expect(aviso.getAttribute('style')).toBeNull();
+  });
+
   it('y dice que el código no está mal, que lo que falla es el otro extremo', () => {
     // Si no, el aviso parecería decir que el QR está roto y alguien lo volvería a generar.
     pintar({ direccionCaida: true });

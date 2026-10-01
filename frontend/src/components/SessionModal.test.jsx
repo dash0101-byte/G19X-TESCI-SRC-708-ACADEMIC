@@ -102,6 +102,15 @@ describe('cerrar el modal', () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('y se ve como lo que es: un botón de acción destructiva', () => {
+    // `btn-danger` estuvo escrito aquí desde el capítulo 29 y **no existía en la hoja**
+    // hasta el 39 (§6.4 punto 31), así que este botón se dibujaba como un `.btn` a secas:
+    // sin fondo y con el borde transparente. El único que cierra la sesión era el que menos
+    // se veía de los dos del pie.
+    montar();
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toHaveClass('btn-danger');
+  });
 });
 
 describe('cambio de la contraseña propia', () => {

@@ -20,8 +20,10 @@ import {
   aRgb,
   componer,
   luminancia,
+  medirCambios,
   medirTodo,
   razon,
+  resolverAlias,
   tokensDeTexto,
   variablesDe,
   HOJA as CSS,
@@ -106,6 +108,77 @@ describe('la paleta', () => {
     expect(aro.minimo).toBe(MINIMO_NO_TEXTO);
     expect(aro.peor.razon).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
   });
+
+  it('el contorno de un control en reposo también llega a 3.0', () => {
+    // §6.4 punto 32, abierto desde el capítulo 36: el borde de un campo sin foco daba
+    // 1.12:1 contra el fondo del campo, es decir, el contorno no existía hasta que llegaba
+    // el foco. Lo que §1.4.11 pide no es que un control se vea cuando se usa, es que se
+    // vea que está ahí.
+    const reposo = medirTodo(variables).find((m) => m.texto === '--border-control');
+    expect(reposo, '--border-control dejó de estar en la tabla de pares').toBeDefined();
+    expect(reposo.minimo).toBe(MINIMO_NO_TEXTO);
+    expect(reposo.peor.razon).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
+    // Y se mide sobre los cinco fondos donde hay controles, no sobre uno cómodo.
+    expect(reposo.medidas.map((m) => m.fondo)).toContain('--bg-field');
+  });
+
+  it('el borde del botón destructivo delimita el botón', () => {
+    // El relleno rojo sólido solo da 2.87:1 contra el panel: por debajo de 3.0. Si el
+    // borde desapareciera, el botón dejaría de tener contorno perceptible y §1.4.11 se
+    // incumpliría con el mismo color de relleno que parece suficiente a la vista.
+    const borde = medirTodo(variables).find((m) => m.texto === '--danger-border');
+    expect(borde.minimo).toBe(MINIMO_NO_TEXTO);
+    expect(borde.peor.razon).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
+    expect(razon(variables['--danger-bg'], variables['--bg-surface'])).toBeLessThan(MINIMO_NO_TEXTO);
+  });
+});
+
+describe('arreglar un criterio sin romper el otro', () => {
+  const variables = variablesDe(CSS);
+
+  it('el foco se sigue distinguiendo del reposo en los dos controles donde cambia', () => {
+    // Esta es la prueba que el capítulo 39 necesitaba antes de tocar nada. Subir el borde
+    // en reposo de 0.07 a 0.34 cumple §1.4.11; dejar el aro de foco en 0.35 lo habría
+    // puesto a 1.11 del reposo, es decir, habría cumplido §1.4.11 **incumpliendo** §2.4.7,
+    // que pide que el foco sea visible. Los dos tokens se mueven juntos o ninguno.
+    for (const cambio of medirCambios(variables)) {
+      expect(
+        cambio.razon,
+        `${cambio.donde}: el cambio de estado solo da ${cambio.razon.toFixed(2)}:1, así que `
+        + 'el foco no se distingue del reposo',
+      ).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
+    }
+  });
+
+  it('mide los dos sitios donde el cambio ocurre, no uno', () => {
+    // El campo da 3.30 y el botón secundario 3.06: es el **botón** el que obliga a 0.71,
+    // porque pasa de un fondo más claro a otro más claro todavía. Medir solo el campo
+    // habría dejado pasar 0.70, que en el botón se queda en 2.99.
+    const cambios = medirCambios(variables);
+    expect(cambios).toHaveLength(2);
+    expect(cambios.map((c) => c.donde).join(' ')).toMatch(/campo[\s\S]*bot/);
+  });
+});
+
+describe('un token puede apuntar a otro', () => {
+  const variables = variablesDe(CSS);
+
+  it('sigue el alias hasta el color', () => {
+    expect(variables['--accent-primary']).toBe('var(--color-primary)');
+    expect(resolverAlias(variables['--accent-primary'], variables)).toBe('#ffffff');
+    expect(resolverAlias('#abcdef', variables)).toBe('#abcdef');
+  });
+
+  it('no se cuelga con un alias circular: lo dice', () => {
+    // Una suite colgada no informa de nada. Esto es lo que diferencia un límite de saltos
+    // de una recursión sin fondo.
+    const circulo = { '--a': 'var(--b)', '--b': 'var(--a)' };
+    expect(() => resolverAlias('var(--a)', circulo)).toThrow(/circular/);
+  });
+
+  it('un alias a un token que no existe no pasa por color', () => {
+    expect(() => resolverAlias('var(--no-existe)', {})).toThrow(/no está en :root/);
+  });
 });
 
 describe('el modo claro', () => {
@@ -120,15 +193,29 @@ describe('el modo claro', () => {
 });
 
 describe('el texto pequeño no se aprueba llamándolo grande', () => {
-  it('todos los pares se miden contra 4.5, salvo el aro de foco', () => {
+  // Los únicos pares que se miden contra 3.0 son los tres que no son texto: §1.4.11 habla
+  // de bordes y de estados, no de letras. Se enumeran aquí, y no se deduce del nombre del
+  // token, para que bajarle el mínimo a un color de texto obligue a tocar esta lista.
+  const NO_TEXTO = ['--border-control', '--border-focus', '--danger-border'];
+
+  it('todos los pares se miden contra 4.5, salvo los tres bordes', () => {
     // La norma permite 3.0 para texto de 24 px, o de 18.66 px en negrita. Esta interfaz va
     // de 0.7 a 0.875 rem —de 11 a 14 px— y no tiene nada de ese tamaño, así que no hay
     // ningún par que pueda acogerse a esa excepción. Escrito como prueba para que nadie
     // rebaje un mínimo en lugar de arreglar un color.
     for (const par of PARES) {
       const minimo = par.minimo ?? MINIMO_TEXTO;
-      if (par.texto === '--border-focus') expect(minimo).toBe(MINIMO_NO_TEXTO);
-      else expect(minimo).toBe(MINIMO_TEXTO);
+      if (NO_TEXTO.includes(par.texto)) expect(minimo).toBe(MINIMO_NO_TEXTO);
+      else expect(minimo, `${par.texto} — ${par.donde}`).toBe(MINIMO_TEXTO);
     }
+  });
+
+  it('y ningún par con 3.0 se cuela sin estar en esa lista', () => {
+    const colados = PARES.filter((p) => p.minimo === MINIMO_NO_TEXTO && !NO_TEXTO.includes(p.texto));
+    expect(
+      colados.map((p) => p.texto),
+      'Estos pares se miden contra 3.0 y no son ninguno de los bordes: o son texto y les '
+      + 'toca 4.5, o hay que decir aquí por qué no lo son',
+    ).toEqual([]);
   });
 });

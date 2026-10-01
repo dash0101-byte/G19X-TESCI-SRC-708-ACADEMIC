@@ -3,7 +3,51 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 38)
+**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 39)
+
+> **Revisión del capítulo 39.** La congelación se mantiene, y este capítulo la abrió **para
+> cuatro puntos de §6.4 y para ninguno más**: el 33, el 30, el 31 y el 32.
+>
+> Pasan el criterio del §1 de la forma más incómoda posible: **el README promete el nivel AA
+> de WCAG 2.1 para las nueve pantallas**, y había un par de colores que no llegaba; la hoja
+> declara un sistema de diseño, y el marcado le pedía clases y tokens que no existían. No hay
+> pantalla nueva, ni endpoint, ni esquema, ni migración: **el servidor del capítulo 39 es,
+> byte a byte, el del 38** (R37).
+>
+> **El punto 33 estaba mal medido, y conviene decirlo.** Decía «`var(--accent-primary)` no
+> existe… cosmético, y en un elemento que dura lo que una petición». Eran **cinco** tokens en
+> nueve sitios, y dos no eran cosméticos: un `var()` que no resuelve no deja la propiedad en
+> su valor anterior, la deja en el **inicial**, así que la barra de distribución del tablero
+> se dibujaba **vacía** y la opción elegida de la ficha 360 se quedaba **sin contorno**. Es el
+> riesgo de anotar un defecto por el ejemplar que uno tiene delante en vez de por su forma: el
+> defecto no era «falta un color», era «el marcado nombra cosas que nadie comprueba que
+> existan», y eso tiene tantos ejemplares como nombres haya (R37 §39.2).
+>
+> **El hallazgo del capítulo no es el defecto: es lo que apareció al arreglarlo.** Subir el
+> borde de un control a los 3.0 que pide §1.4.11 lo dejaba a **1.11:1** del aro de foco, que
+> estaba una centésima por encima: §1.4.11 cumplido **incumpliendo §2.4.7**, con el contorno
+> por fin visible y el foco invisible. Los dos tokens se mueven juntos, y el cambio de estado
+> se mide ahora en los **dos** controles donde ocurre, porque el que manda es el botón
+> secundario y medir solo el campo habría dejado pasar un valor que allí falla (R37 §39.5).
+>
+> §6.4 pasa de **catorce entradas abiertas de quince a once de dieciséis**: se cierran la 30,
+> la 31, la 32 y la 33, y entra la **36**, que el propio capítulo encontró y no pagó. Además
+> se corrigieron dos cosas que no estaban en ningún punto y que entraron **porque sin ellas la
+> corrección habría introducido algo peor que lo que cierra** — por eso no abren entrada: se
+> cierran el mismo día que se encuentran:
+>
+> * **La hoja no tenía ningún `:disabled`**, y quince componentes apagan botones. Mientras los
+>   botones fueron blancos o grises no dolía; con un relleno rojo sólido, «Suprimir
+>   definitivamente» apagado se habría visto igual que encendido (R37 §39.8).
+> * **`.btn` no declaraba `color`.** En un `<button>` se hereda y no se nota; en el único
+>   `<a class="btn">` del cliente gana la hoja del navegador, y «Compartir en LinkedIn» salía
+>   en azul de enlace sobre un panel oscuro: **1.87:1**. Lo encontró mirar la pantalla ya
+>   maquetada, que es lo único que lo encuentra (R37 §39.9).
+>
+> El inventario `SIN_DEFINIR` de `clases.test.js` queda **vacío** y el mecanismo **se
+> conserva**: no existe para guardar nombres, existe para que aceptar una deuda cueste
+> escribirla con su motivo. Hay una prueba que comprueba que sigue vacío, y volver a usarlo
+> obliga a borrarla — que es justo el tamaño de decisión que corresponde.
 
 > **Revisión del capítulo 38.** La congelación se mantiene, y este capítulo la abrió **para
 > tres puntos de §6.2 y para ninguno más**: el 16, el 14 y el 11.
@@ -759,7 +803,7 @@ defectos reintroducidos y 22 detectados.
 | # | Qué | Por qué no se hizo | Origen |
 | :---: | :--- | :--- | :---: |
 | 17 | ~~**El código QR no se ha escaneado con un teléfono**~~ | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso**. **Hecho el 01-10-2026, y no lo leyó**: la información de formato iba transpuesta desde el capítulo 27, así que ningún lector podía empezar a decodificar. Las diecinueve pruebas del QR estaban verdes porque todas miden propiedades **simétricas respecto de la diagonal**. Corregido, con un lector escrito dentro de la suite y el control 48 del CI (R36 §38.10a) | R27 §27.13 · R36 §38.10 |
-| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable**: las ocho pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36). Lo que sigue sin responder es si **lo que ese lector dice se entiende**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 |
+| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable** —las nueve pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36)— y **el 39 la acercó más**: todo lo que el marcado nombra, clases y variables de la paleta, existe ahora en la hoja, y el contorno de los controles llega al mínimo de §1.4.11 sin que el foco deje de distinguirse (R37). Lo que sigue sin responder es si **lo que se ve y lo que ese lector dice se entienden**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 · R37 §39.14 |
 | 19 | **Nadie ha visto una solicitud de Dependabot en este repositorio** | `.github/dependabot.yml` está bien formado y el control 45 comprueba que cubre los seis ecosistemas y que la renovación a mano sigue mandando. Lo que ninguna prueba sustituye es el **primer lunes** que abra solicitudes de verdad: qué propone, si el CI las deja verdes y si alguna choca con la guarda `--solo-fijacion` | R37 §37.10 |
 | 20 | **La comprobación de contraseñas filtradas no se ha ejecutado nunca contra el servicio real** | La suite usa una sonda simulada a propósito: una suite que depende de un tercero se pone roja los días que ese tercero tiene un mal día. Lo que falta por saber es si el contexto TLS del sistema basta desde la máquina del despliegue — y si no bastara, **el síntoma sería silencioso**: la política ante «no se pudo preguntar» es seguir adelante, así que la comprobación estaría apagada de hecho mientras el código afirma tenerla. **Es lo primero que hay que mirar en la bitácora el día del despliegue**, buscando el `WARNING` de `app.core.filtradas_remotas` | R37 §37.4 · §37.10 |
 
@@ -777,11 +821,12 @@ defectos reintroducidos y 22 detectados.
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
 | 29 | Un administrador **no puede quitarle el segundo factor a otro** desde el panel: la salida (b) de la guía existe en el diseño pero no tiene botón, porque la gestión de cuentas no ganó esa operación. Hoy se resuelve por la vía (c), que es la misma sentencia SQL | R35 §35.9 |
-| 30 | **`CompartirEnRedes` se dibuja sin ningún estilo.** El componente no usa ni un estilo en línea: se apoya entero en **catorce clases que la hoja no define**, así que el panel de difusión y el del QR salen con el estilo por omisión del navegador. Escribirlas no es corregir un nombre —eso fue el caso de `input`, ya arreglado—, es **diseñar** el panel: colores, espaciados y estados. Está inventariado en `frontend/src/pruebas/clases.test.js`, que además impide que la lista crezca. **Sigue abierto tras el capítulo 38**, con una excepción de una línea: el aviso de «la dirección pública no contesta» que entró ahí lleva estilo en línea, porque un aviso que se ve igual que el cuerpo del texto no lo lee nadie, y darle borde y color a uno no es diseñar el panel (R36 §38.10c) | R36 §36.6 |
-| 31 | **`btn-danger` no existe.** «Cerrar sesión» pide un aspecto de acción destructiva que la paleta no tiene, así que se dibuja como un `.btn` a secas —borde transparente, sin fondo— y no parece un botón. Darle uno exige un color nuevo en la paleta | R36 §36.6 |
-| 32 | **El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control. Subirlo es una decisión de paleta con efecto en todas las pantallas, no una corrección puntual | R36 §36.8 |
-| 33 | **`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición | R36 §36.8 |
+| 30 | ~~**`CompartirEnRedes` se dibuja sin ningún estilo.** El componente no usa ni un estilo en línea: se apoyaba entero en **catorce clases que la hoja no definía**, así que el panel de difusión y el del QR salían con el estilo por omisión del navegador~~ — **cerrado en el capítulo 39**: las catorce están escritas, con los tokens que ya existían y sin añadir ni un color, porque lo que faltaba era la hoja y no la paleta. El aviso de «la dirección pública no contesta» pierde el estilo en línea que el capítulo 38 le puso, y **no** hereda la clase de las notas de cada red: tiene la suya, porque un aviso de que lo que se está haciendo no sirve para nada no puede verse como una nota al pie. El tamaño del código QR deja de ser el que trajera el SVG y pasa a tener un suelo medido —**5 píxeles CSS por módulo**, 5,99 con el enlace real—, que es la unidad en que una cámara de teléfono resuelve o no resuelve un código. Al mirar el panel ya maquetado apareció además que `.btn` no declaraba `color`: el único `<a class="btn">` del cliente salía en azul de enlace sobre el panel oscuro, 1.87:1 (R37 §39.9, §39.10) | R36 §36.6 |
+| 31 | ~~**`btn-danger` no existe.** «Cerrar sesión» pide un aspecto de acción destructiva que la paleta no tiene, así que se dibuja como un `.btn` a secas —borde transparente, sin fondo— y no parece un botón~~ — **cerrado en el capítulo 39**: la paleta tiene una familia `--danger-*` propia, y **no** se reutilizó la de HOT, porque ese rojo es una temperatura de prospecto y pintar «Cerrar sesión» con él diría que ese botón es un prospecto caliente. Relleno sólido con 6.18:1 de texto y borde aparte, porque el relleno solo da 2.87:1 contra el panel y lo que delimita el botón es el borde. Lo usan «Cerrar sesión» y los dos de la pantalla de derechos; el de confirmar era `btn-primary`, el mismo blanco que «Buscar», y en esta paleta el blanco significa «la acción esperada de esta pantalla». Al darle relleno sólido apareció que **la hoja no tenía ningún `:disabled`** y quince componentes apagan botones: se escribió, con colores y no con `opacity`, sobre un par ya medido (R37 §39.7, §39.8) | R36 §36.6 |
+| 32 | ~~**El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control~~ — **cerrado en el capítulo 39**, y no subiendo `--border-subtle`: ese token dibuja a la vez el contorno de un campo y la raya entre dos filas de una tabla, y §1.4.11 habla de **controles**, no de líneas. Hay ahora dos familias: `--border-subtle` y `--border-medium` para separar, y **`--border-control`** (3.02:1 en el peor de los cinco fondos) para delimitar un control. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: con el reposo en 0.34 y el aro de foco donde estaba, 0.35, los dos quedaban a 1.11:1 entre sí —§1.4.11 cumplido **incumpliendo §2.4.7**—, así que el foco sube a 0.71, la primera alfa en que el cambio de estado alcanza 3.0 **en los dos controles donde ocurre**. El que manda es el botón secundario: con 0.70 se queda en 2.99, y medir solo el campo lo habría dejado pasar (R37 §39.5, §39.6) | R36 §36.8 |
+| 33 | ~~**`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición~~ — **cerrado en el capítulo 39, y estaba mal medido**: eran **cinco** tokens en nueve sitios, y dos no eran cosméticos. Un `var()` que no resuelve no deja la propiedad en su valor anterior, la deja en el **inicial**: `background: var(--hot-gradient)` dejaba la barra de distribución del tablero en `transparent` —el gráfico que dice cómo se reparte la cartera no pintaba nada— y el `border` de la opción elegida de la ficha 360 se caía entero a `border-style: none`. Los cinco están definidos, y lo que impide que vuelva a pasar no es haberlos escrito sino `frontend/src/pruebas/tokens.test.js`, que **saca la lista del código** como `clases.test.js` hace con las clases: un token nuevo sin definir nace en rojo. `var(--x, respaldo)` no cuenta como defecto —alguien dijo qué pasa si no está— y por eso los que lo llevan están inventariados: si no, bastaría una coma para silenciar la comprobación (R37 §39.2, §39.3, §39.4) | R36 §36.8 |
 | 34 | **La lista LOCAL de contraseñas filtradas no se actualiza sola.** Viene de §3.7, que el capítulo 37 cerró a medias: la comprobación contra el servicio público por rango añade cientos de millones de huellas, pero la lista de la imagen —la que decide cuando no hay internet— sigue siendo la foto del capítulo 23. Se regenera con `scripts/generar_lista_de_contrasenas.py`. No depende de ninguna cuenta; depende de que alguien lo corra, y por eso ya no vive en §3 | R23 §23.7 · R37 §37.10 |
+| 36 | **La hoja no tiene estado de error para los campos.** Un `.input-field` con un valor inválido se ve exactamente igual que uno correcto: lo que avisa es el `.form-error` de debajo. Cumple la norma —el error no se comunica solo por color— pero deja al ojo sin pista de **qué** campo, y en un formulario de ocho campos eso es leer ocho mensajes para encontrar uno. Es la misma familia que el punto 32: un estado que el marcado conoce y la hoja no dibuja | R37 §39.14 |
 
 ---
 

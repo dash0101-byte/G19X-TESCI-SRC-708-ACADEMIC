@@ -25,8 +25,17 @@ export default function AnalyticsCharts({ summary, campaigns }) {
 
         {/* Stacked Progress Bar */}
         <div style={{ height: '24px', width: '100%', display: 'flex', borderRadius: '8px', overflow: 'hidden', marginBottom: '20px', border: '1px solid var(--border-subtle)' }}>
-          <div style={{ width: `${hotWidth}%`, background: 'var(--hot-gradient)' }} title={`HOT: ${summary.hot_leads_count}`} />
-          <div style={{ width: `${warmWidth}%`, background: 'var(--warm-gradient)' }} title={`WARM: ${summary.warm_leads_count}`} />
+          {/* Los tres degradados no existían en la paleta hasta el capítulo 39, así que
+              `var()` era inválido, la declaración entera se caía al valor inicial y esta
+              barra —el gráfico que dice cómo se reparte la cartera— se dibujaba
+              **vacía**. Estaba anotado como «cosmético» en §6.4; no lo era.
+
+              La línea oscura entre segmentos es necesaria por lo mismo que la barra: una
+              vez que pinta, hay que poder decir dónde acaba uno y empieza el otro, y los
+              rojos y ámbares vecinos solo se separan 1.75:1 entre sí. La línea da de 5.26
+              a 9.21 contra los colores que separa. */}
+          <div style={{ width: `${hotWidth}%`, background: 'var(--hot-gradient)', boxShadow: 'inset -1px 0 0 var(--bg-base)' }} title={`HOT: ${summary.hot_leads_count}`} />
+          <div style={{ width: `${warmWidth}%`, background: 'var(--warm-gradient)', boxShadow: 'inset -1px 0 0 var(--bg-base)' }} title={`WARM: ${summary.warm_leads_count}`} />
           <div style={{ width: `${coldWidth}%`, background: 'var(--cold-gradient)' }} title={`COLD: ${summary.cold_leads_count}`} />
         </div>
 

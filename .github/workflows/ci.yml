@@ -3454,6 +3454,417 @@ jobs:
           print("La informacion de formato del QR esta donde la norma la busca, y la suite lee el codigo.")
           PY
 
+      # ------------------------------------------------------------------ control 49
+      # Todo `var(--x)` que el cliente pida, la paleta lo define.
+      #
+      # §6.4 punto 33 anotaba un caso suelto -«var(--accent-primary) no existe»- y lo
+      # llamaba «cosmetico, y en un elemento que dura lo que una peticion». Eran cinco
+      # tokens en nueve sitios, y dos no eran cosmeticos: los tres degradados son el UNICO
+      # fondo de la barra apilada del tablero, que se dibujaba vacia, y --accent-primary es
+      # el borde de la opcion elegida en la ficha 360, que se quedaba sin contorno.
+      #
+      # Un `var()` que no resuelve no se cae al valor anterior: deja la declaracion
+      # INVALIDA en el momento de calcular el valor, y la propiedad toma el valor inicial.
+      # `background: var(--hot-gradient)` no deja el fondo que hubiera, lo deja transparente.
+      #
+      # Esta guarda no comprueba que exista una prueba: repite el barrido ella misma, en
+      # Python y sobre los archivos. Si manana alguien borra `tokens.test.js`, el barrido
+      # sigue corriendo aqui. 9 defectos reintroducidos, 9 detectados.
+      - name: Todo token que el marcado pide esta en la paleta
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          CLIENTE = pathlib.Path("frontend/src")
+          HOJA = CLIENTE / "index.css"
+
+          css = HOJA.read_text(encoding="utf-8")
+          raiz = re.search(r":root\s*\{(.*?)\n\}", css, re.S)
+          if not raiz:
+              sys.exit("FALLO: no se encontro el bloque :root de index.css.")
+          cuerpo = re.sub(r"/\*.*?\*/", "", raiz.group(1), flags=re.S)
+          definidos = set(re.findall(r"(--[\w-]+)\s*:", cuerpo))
+          if len(definidos) < 40:
+              sys.exit(f"FALLO: solo se leyeron {len(definidos)} tokens de :root; el barrido no mide nada.")
+
+          # Los que llevan respaldo escrito -`var(--x, algo)`- no son defecto: alguien dijo
+          # que pasa si el token no esta. Se inventarian para que anadir una coma no sirva
+          # para silenciar esto.
+          CON_RESPALDO = {"--bg-panel"}
+
+          def sin_comentarios(ruta, texto):
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              if ruta.suffix == ".css":
+                  return texto
+              # Solo las de principio de linea: `//` en medio es casi siempre un https://.
+              return "\n".join(re.sub(r"^\s*//.*$", "", l) for l in texto.splitlines())
+
+          archivos = [
+              r for r in sorted(CLIENTE.rglob("*"))
+              if r.suffix in {".js", ".jsx", ".css"} and ".test." not in r.name
+          ]
+          if len(archivos) < 30:
+              sys.exit(f"FALLO: solo se encontraron {len(archivos)} archivos de cliente.")
+
+          fallos = []
+          for ruta in archivos:
+              limpio = sin_comentarios(ruta, ruta.read_text(encoding="utf-8"))
+              for linea_n, linea in enumerate(limpio.splitlines(), 1):
+                  for token, cierre in re.findall(r"var\(\s*(--[\w-]+)\s*([,)])", linea):
+                      if token in definidos:
+                          continue
+                      if cierre == "," and token in CON_RESPALDO:
+                          continue
+                      como = f"var({token}, ...)" if cierre == "," else f"var({token})"
+                      fallos.append(f"{ruta.as_posix()}:{linea_n} pide {como} y :root no lo define")
+
+          # Y los cinco que este capitulo definio, por su nombre: si alguien los quita, el
+          # barrido de arriba ya lo dice, pero el mensaje es mas claro aqui.
+          for token in ("--accent-primary", "--color-primary-light",
+                        "--hot-gradient", "--warm-gradient", "--cold-gradient"):
+              if token not in definidos:
+                  fallos.append(f"desaparecio {token} de la paleta")
+
+          # Los degradados tienen que pintar algo, y del color de su cuadrante: la leyenda
+          # que hay justo debajo de la barra usa --hot-text, --warm-text y --cold-text, asi
+          # que un degradado que no los lleve convierte esa leyenda en una etiqueta falsa.
+          for familia in ("hot", "warm", "cold"):
+              valor = re.search(rf"--{familia}-gradient\s*:\s*([^;]+);", cuerpo)
+              if not valor:
+                  continue
+              valor = valor.group(1)
+              if not valor.strip().startswith("linear-gradient("):
+                  fallos.append(f"--{familia}-gradient dejo de ser un degradado: {valor.strip()}")
+              for extremo in (f"var(--{familia}-dot)", f"var(--{familia}-text)"):
+                  if extremo not in valor:
+                      fallos.append(f"--{familia}-gradient ya no lleva {extremo}: la leyenda del tablero mentiria")
+
+          # La prueba que hace esto mismo en la suite tiene que seguir sacando la lista DEL
+          # CODIGO. Una lista de tokens escrita a mano caduca en el siguiente cambio, que es
+          # exactamente el defecto que §6.4 punto 33 tenia.
+          prueba = CLIENTE / "pruebas" / "tokens.test.js"
+          if not prueba.exists():
+              fallos.append("desaparecio frontend/src/pruebas/tokens.test.js")
+          else:
+              codigo = sin_comentarios(prueba, prueba.read_text(encoding="utf-8"))
+              for simbolo, porque in [
+                  ("readdirSync", "recorre los archivos en vez de llevar una lista escrita"),
+                  (r"matchAll(/var\(", "saca los tokens del codigo con una expresion"),
+                  ("sinComentarios", "quita los comentarios antes de buscar, para no satisfacerse con su propia cabecera"),
+                  ("toBeGreaterThan(40)", "comprueba que leyo la paleta de verdad"),
+                  ("toBeGreaterThan(30)", "comprueba que leyo los archivos de verdad"),
+              ]:
+                  if simbolo not in codigo:
+                      fallos.append(f"tokens.test.js perdio «{simbolo}»: {porque}")
+
+          if fallos:
+              print("FALLO: el marcado vuelve a nombrar colores que la paleta no tiene.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Los {len(definidos)} tokens de la paleta cubren todo lo que piden {len(archivos)} archivos de cliente.")
+          PY
+
+      # ------------------------------------------------------------------ control 50
+      # El contorno de un control se ve sin foco, y el foco se sigue distinguiendo.
+      #
+      # §6.4 punto 32: el borde de un campo sin foco daba 1.12:1 contra el fondo del campo,
+      # es decir, no se veia que el control estuviera ahi hasta que se le ponia el foco.
+      # WCAG 2.1 §1.4.11 pide 3.0 para lo que identifica un control.
+      #
+      # Lo que hace a esto una guarda y no una comprobacion mas: arreglarlo estuvo a un paso
+      # de romper otro criterio. Con el borde en reposo a 0.34 de alfa y el aro de foco donde
+      # estaba, 0.35, la razon entre los dos era 1.11 -el contorno por fin visible y el foco
+      # invisible, cumpliendo §1.4.11 e incumpliendo §2.4.7-. Los dos tokens se mueven
+      # juntos o ninguno, y eso es lo que se vigila aqui: los dos minimos a la vez.
+      #
+      # Se recalcula la formula de la norma en Python, sobre los colores de index.css, sin
+      # depender de la suite del cliente. 7 defectos reintroducidos, 7 detectados.
+      - name: El borde de un control llega a 3.0 y el foco se distingue del reposo
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          HOJA = pathlib.Path("frontend/src/index.css")
+          css = HOJA.read_text(encoding="utf-8")
+          raiz = re.search(r":root\s*\{(.*?)\n\}", css, re.S)
+          if not raiz:
+              sys.exit("FALLO: no se encontro el bloque :root de index.css.")
+          cuerpo = re.sub(r"/\*.*?\*/", "", raiz.group(1), flags=re.S)
+          tokens = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", cuerpo))
+
+          MINIMO = 3.0
+
+
+          def valor(token, saltos=8):
+              if token not in tokens:
+                  sys.exit(f"FALLO: el token {token} no esta en :root.")
+              bruto = tokens[token].strip()
+              for _ in range(saltos):
+                  alias = re.fullmatch(r"var\(\s*(--[\w-]+)\s*\)", bruto)
+                  if not alias:
+                      return bruto
+                  bruto = tokens.get(alias.group(1), "").strip()
+              sys.exit(f"FALLO: alias circular resolviendo {token}.")
+
+
+          def rgb(texto):
+              hexa = re.fullmatch(r"#([0-9a-fA-F]{6})", texto)
+              if hexa:
+                  d = hexa.group(1)
+                  return (int(d[0:2], 16), int(d[2:4], 16), int(d[4:6], 16), 1.0)
+              rgba = re.fullmatch(r"rgba?\(([^)]+)\)", texto)
+              if not rgba:
+                  sys.exit(f"FALLO: color que no se sabe leer: {texto}")
+              p = [float(x) for x in rgba.group(1).split(",")]
+              return (p[0], p[1], p[2], p[3] if len(p) > 3 else 1.0)
+
+
+          def componer(encima, debajo):
+              r1, g1, b1, a = encima
+              r2, g2, b2, _ = debajo
+              if a >= 1:
+                  return (r1, g1, b1, 1.0)
+              return (r1 * a + r2 * (1 - a), g1 * a + g2 * (1 - a), b1 * a + b2 * (1 - a), 1.0)
+
+
+          def luminancia(color):
+              def canal(v):
+                  s = v / 255
+                  return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+              return 0.2126 * canal(color[0]) + 0.7152 * canal(color[1]) + 0.0722 * canal(color[2])
+
+
+          def razon(uno, otro):
+              a, b = luminancia(uno), luminancia(otro)
+              claro, oscuro = max(a, b), min(a, b)
+              return (claro + 0.05) / (oscuro + 0.05)
+
+
+          # La formula, contra un valor que no depende de este proyecto: blanco sobre negro
+          # da 21. Sin esto, una formula mal transcrita aprobaria cualquier paleta.
+          if abs(razon(rgb("#ffffff"), rgb("#000000")) - 21.0) > 0.001:
+              sys.exit("FALLO: la formula de contraste de esta guarda no calcula bien.")
+
+          fallos = []
+
+          # 1. El contorno en reposo, sobre los cinco fondos donde hay controles. Se compone
+          #    con CADA fondo y se compara con ese mismo fondo: es lo que pasa de verdad.
+          FONDOS = ("--bg-base", "--bg-surface", "--bg-surface-elevated",
+                    "--bg-surface-hover", "--bg-field")
+          for fondo in FONDOS:
+              atras = rgb(valor(fondo))
+              medida = razon(componer(rgb(valor("--border-control")), atras), atras)
+              if medida < MINIMO:
+                  fallos.append(
+                      f"--border-control da {medida:.2f}:1 sobre {fondo} y §1.4.11 pide {MINIMO}"
+                  )
+
+          # 2. El cambio de estado, en los dos sitios donde ocurre y los fondos no son los
+          #    mismos. El que manda es el boton secundario, que pasa de un fondo claro a
+          #    otro mas claro: con 0.70 de alfa se queda en 2.99.
+          CAMBIOS = (
+              ("un campo", "--border-control", "--bg-field", "--border-focus", "--bg-field-focus"),
+              ("un boton secundario", "--border-control", "--bg-surface-elevated",
+               "--border-focus", "--bg-surface-hover"),
+          )
+          for donde, b1, f1, b2, f2 in CAMBIOS:
+              reposo = componer(rgb(valor(b1)), rgb(valor(f1)))
+              foco = componer(rgb(valor(b2)), rgb(valor(f2)))
+              medida = razon(reposo, foco)
+              if medida < MINIMO:
+                  fallos.append(
+                      f"en {donde} el foco solo se separa {medida:.2f}:1 del reposo: §2.4.7 "
+                      "pide que el foco sea visible, y arreglar §1.4.11 no puede romperlo"
+                  )
+
+          # 3. Y los controles tienen que seguir usando ese token. Subirlo en :root y dejar
+          #    los campos con --border-subtle seria tener la paleta corregida y la pantalla
+          #    igual que antes.
+          sin_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+          for selector in (r"\.input-field", r"\.btn-secondary", r"\.interes-boton",
+                           r"\.interes-red-casilla"):
+              regla = re.search(rf"\n{selector}\s*\{{(.*?)\}}", sin_comentarios, re.S)
+              if not regla:
+                  fallos.append(f"desaparecio la regla de {selector.replace(chr(92), '')}")
+                  continue
+              if "var(--border-control)" not in regla.group(1):
+                  fallos.append(
+                      f"{selector.replace(chr(92), '')} dejo de usar var(--border-control): "
+                      "su contorno vuelve a no verse"
+                  )
+
+          # 4. Y la suite tiene que seguir midiendo las dos cosas.
+          prueba = pathlib.Path("frontend/src/pruebas/contraste.test.js")
+          codigo = re.sub(r"/\*.*?\*/", "", prueba.read_text(encoding="utf-8"), flags=re.S)
+          codigo = "\n".join(re.sub(r"^\s*//.*$", "", l) for l in codigo.splitlines())
+          for simbolo, porque in [
+              ("--border-control", "mide el contorno en reposo"),
+              ("medirCambios", "mide el cambio de estado, que es lo que podia romperse"),
+              ("--danger-border", "mide el contorno del boton destructivo"),
+          ]:
+              if simbolo not in codigo:
+                  fallos.append(f"contraste.test.js perdio «{simbolo}»: {porque}")
+
+          if fallos:
+              print("FALLO: el contorno de los controles o la visibilidad del foco se rompio.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("El contorno en reposo pasa de 3.0 en los cinco fondos y el foco se separa de el.")
+          PY
+
+      # ------------------------------------------------------------------ control 51
+      # La hoja dibuja todo lo que el marcado pide, sin lista de excepciones.
+      #
+      # §6.4 punto 30: `CompartirEnRedes` no usa ni un estilo en linea y se apoyaba entero
+      # en catorce clases que la hoja no definia, asi que el panel de difusion y el del
+      # codigo QR salian con el estilo por omision del navegador. Punto 31: `btn-danger` no
+      # existia, y «Cerrar sesion» se dibujaba como un `.btn` a secas -sin fondo y con el
+      # borde transparente-, es decir, no parecia un boton.
+      #
+      # La guarda repite el barrido de `clases.test.js` en Python y SIN lista de
+      # excepciones: el inventario `SIN_DEFINIR` quedo vacio y aqui no hay forma de volver
+      # a llenarlo. Ademas mide el boton destructivo y el tamano del codigo QR, que es el
+      # unico numero de este capitulo que no sale de la norma sino de una camara de telefono.
+      # 11 defectos reintroducidos, 11 detectados.
+      - name: El panel de difusion, el boton destructivo y el tamano del QR
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          CLIENTE = pathlib.Path("frontend/src")
+          css = (CLIENTE / "index.css").read_text(encoding="utf-8")
+          hoja = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+          definidas = set(re.findall(r"\.([a-zA-Z][\w-]*)", hoja))
+          if len(definidas) < 45:
+              sys.exit(f"FALLO: solo se leyeron {len(definidas)} clases de la hoja.")
+
+          componentes = [r for r in sorted(CLIENTE.rglob("*.jsx")) if ".test." not in r.name]
+          if len(componentes) < 20:
+              sys.exit(f"FALLO: solo se encontraron {len(componentes)} componentes.")
+
+          fallos = []
+
+          # 1. Toda clase del marcado, definida. Sin excepciones: no hay aqui ningun
+          #    equivalente de SIN_DEFINIR que se pueda ampliar.
+          patron = re.compile(r"className=(?:\"([^\"{}]*)\"|\{`([^`]*)`\})")
+          for ruta in componentes:
+              texto = ruta.read_text(encoding="utf-8")
+              for coincidencia in patron.finditer(texto):
+                  crudo = coincidencia.group(1) or coincidencia.group(2) or ""
+                  linea = texto.count("\n", 0, coincidencia.start()) + 1
+                  for clase in re.sub(r"\$\{[^}]*\}", " ", crudo).split():
+                      if clase not in definidas:
+                          fallos.append(f"{ruta.as_posix()}:{linea} usa «{clase}» y la hoja no la define")
+
+          # 2. Y el inventario de deuda aceptada sigue vacio. Si alguien lo vuelve a llenar,
+          #    el barrido de arriba ya lo dice; esto dice ademas que fue a proposito.
+          clases_test = (CLIENTE / "pruebas" / "clases.test.js").read_text(encoding="utf-8")
+          inventario = re.search(r"const SIN_DEFINIR = \{(.*?)\n?\};", clases_test, re.S)
+          if not inventario:
+              fallos.append("desaparecio el inventario SIN_DEFINIR de clases.test.js")
+          elif inventario.group(1).strip():
+              fallos.append("SIN_DEFINIR volvio a tener entradas: hay clases sin definir aceptadas")
+
+          # 3. El boton destructivo: relleno solido, borde que lo delimita, y el estado
+          #    apagado dibujado. Sin `:disabled`, un boton rojo lleno apagado se ve igual
+          #    que uno que funciona, y la pantalla dice algo que no es verdad.
+          regla_danger = re.search(r"\n\.btn-danger\s*\{(.*?)\}", hoja, re.S)
+          if not regla_danger:
+              fallos.append("desaparecio la regla de .btn-danger")
+          else:
+              for propiedad in ("background:", "border:", "color:"):
+                  if propiedad not in regla_danger.group(1):
+                      fallos.append(f".btn-danger perdio «{propiedad}»: vuelve a no parecer un boton")
+          regla_apagado = re.search(r"\n\.btn:disabled[^{]*\{(.*?)\}", hoja, re.S)
+          if not regla_apagado:
+              fallos.append("desaparecio el estado apagado de los botones (.btn:disabled)")
+          else:
+              if "opacity" in regla_apagado.group(1):
+                  fallos.append(
+                      ".btn:disabled usa opacity, que atenua el texto hasta un valor que "
+                      "ninguna comprobacion mide"
+                  )
+              if "not-allowed" not in regla_apagado.group(1):
+                  fallos.append(".btn:disabled perdio el cursor not-allowed")
+
+          # Y `.btn` a secas tiene que decir de que color es su texto. Encontrado mirando
+          # el panel ya maquetado: en un `<button>` el color se hereda y no se nota, pero
+          # en un `<a>` gana la hoja del navegador y el enlace sale en azul de enlace sobre
+          # un panel oscuro. Es el mismo defecto de siempre -el marcado pide algo que la
+          # hoja no dice- en la propiedad que menos se mira.
+          regla_btn = re.search(r"\n\.btn \{(.*?)\n\}", hoja, re.S)
+          if not regla_btn:
+              fallos.append("desaparecio la regla base de .btn")
+          elif not re.search(r"color:\s*inherit", regla_btn.group(1)):
+              fallos.append(
+                  ".btn volvio a no declarar color: un <a class='btn'> sin variante sale "
+                  "con el azul de enlace del navegador"
+              )
+          for ruta in componentes:
+              for ancla in re.findall(r"<a\s+className=\"([^\"]*\bbtn\b[^\"]*)\"", ruta.read_text(encoding="utf-8")):
+                  if not re.search(r"btn-(primary|secondary|danger)", ancla):
+                      fallos.append(f"{ruta.as_posix()} tiene un enlace con «{ancla}»: .btn sin variante")
+
+          # Y los tres botones que lo piden lo siguen pidiendo.
+          for ruta, etiqueta in [
+              ("frontend/src/components/SessionModal.jsx", "Cerrar sesion"),
+              ("frontend/src/components/DerechosDelTitular.jsx", "los dos de suprimir"),
+          ]:
+              if "btn-danger" not in pathlib.Path(ruta).read_text(encoding="utf-8"):
+                  fallos.append(f"{ruta} dejo de marcar como destructivo {etiqueta}")
+
+          # 4. El tamano del codigo QR, en pixeles CSS por modulo. El enlace publico mas
+          #    largo que ese panel produce -unos cien caracteres- cabe en una version 6: 41
+          #    modulos, mas los 8 de la zona tranquila. El suelo son 5 por modulo.
+          SUELO_POR_MODULO = 5
+          MODULOS = 41 + 8
+          regla_qr = re.search(r"\.interes-qr-dibujo svg\s*\{(.*?)\}", hoja, re.S)
+          if not regla_qr:
+              fallos.append("desaparecio la regla que fija el tamano del codigo QR")
+          else:
+              ancho = re.search(r"min-width:\s*min\((\d+)px,\s*100%\)", regla_qr.group(1))
+              if not ancho:
+                  fallos.append(
+                      "el suelo del codigo QR dejo de estar escrito como min(Npx, 100%): "
+                      "rigido saca una barra horizontal a la pagina entera (§1.4.10)"
+                  )
+              else:
+                  por_modulo = int(ancho.group(1)) / MODULOS
+                  if por_modulo < SUELO_POR_MODULO:
+                      fallos.append(
+                          f"el codigo QR se queda en {por_modulo:.2f} px por modulo y el suelo "
+                          f"son {SUELO_POR_MODULO}: una camara de telefono empieza a no resolverlo"
+                      )
+              if "height: auto" not in regla_qr.group(1):
+                  fallos.append("el codigo QR dejo de escalar con el sitio que tiene")
+
+          # 5. El aviso de la direccion caida tiene clase propia y ya no estilo en linea.
+          #    Compartir la clase de las notas de cada red lo convierte en una nota al pie.
+          compartir = pathlib.Path("frontend/src/components/CompartirEnRedes.jsx").read_text(encoding="utf-8")
+          if "interes-compartir-caida" not in compartir:
+              fallos.append("el aviso de la direccion caida perdio su clase propia")
+          if re.search(r"role=\"alert\"[\s\S]{0,200}?style=\{\{", compartir):
+              fallos.append("el aviso de la direccion caida volvio al estilo en linea")
+
+          if fallos:
+              print("FALLO: hay marcado que la hoja no dibuja, o el QR dejo de ser escaneable.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Las {len(definidas)} clases de la hoja cubren {len(componentes)} componentes, sin excepciones.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

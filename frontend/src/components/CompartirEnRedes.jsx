@@ -124,25 +124,13 @@ export default function CompartirEnRedes({ publicacion, onCopiar, direccionCaida
   return (
     <div className="interes-compartir">
       {direccionCaida && (
-        // El único estilo en línea del componente, y va aquí a propósito. El resto se
-        // apoya en catorce clases que la hoja no define (§6.4, punto 30), así que sale sin
-        // formato; para un texto de ayuda eso es feo y para un **aviso** es inútil, porque
-        // un aviso que se ve igual que el cuerpo no lo lee nadie. Escribir las catorce
-        // clases es diseñar el panel entero y sigue fuera de alcance; darle borde y color a
-        // esta no lo es.
-        <div
-          role="alert"
-          className="interes-compartir-aviso"
-          style={{
-            padding: '10px 12px',
-            marginBottom: '12px',
-            border: '1px solid var(--warm-text)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--warm-text)',
-            fontSize: '0.8rem',
-            lineHeight: '1.5',
-          }}
-        >
+        // Llevaba el único estilo en línea del componente, y ya no hace falta: las catorce
+        // clases de este panel están escritas en la hoja desde el capítulo 39, con una
+        // clase propia para este aviso. Antes compartía `interes-compartir-aviso` con las
+        // notas de cada red, que es lo contrario de lo que hace falta aquí: esto avisa de
+        // que lo que se está haciendo no sirve para nada, y un aviso que se ve igual que
+        // una nota al pie no lo lee nadie.
+        <div role="alert" className="interes-compartir-caida">
           <strong>La dirección pública no contesta ahora mismo.</strong> Lo que se copie,
           se comparta o se imprima desde aquí —el enlace y el código QR— lleva a esa
           dirección, así que hoy no llega a ninguna parte. El código se dibuja igual porque
@@ -163,7 +151,12 @@ export default function CompartirEnRedes({ publicacion, onCopiar, direccionCaida
             </div>
             <div className="interes-compartir-acciones">
               {red.compartir ? (
-                <a className="btn btn-sm" href={red.compartir} {...DESTINO}>
+                // `btn btn-sm` a secas dejaba este enlace con el azul de la hoja del
+                // navegador sobre el panel oscuro. Lleva la variante secundaria y no la
+                // principal a propósito: en esta paleta el blanco significa «la acción
+                // esperada de esta pantalla», y compartir en una red concreta es una de
+                // varias, igual de importante que «Copiar texto», que está al lado.
+                <a className="btn btn-sm btn-secondary" href={red.compartir} {...DESTINO}>
                   Compartir en {red.etiqueta}
                 </a>
               ) : (

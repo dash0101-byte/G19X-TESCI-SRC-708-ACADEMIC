@@ -337,6 +337,29 @@ describe('la supresión', () => {
     await usuario.click(screen.getByRole('button', { name: 'Suprimir estos datos…' }));
   }
 
+  it('los dos botones de suprimir se ven como acciones destructivas, y el blanco deja de significar borrar', async () => {
+    // El que abre la supresión era `btn` a secas —sin fondo ni borde, el elemento menos
+    // visible de la pantalla— y el que la confirma era `btn-primary`, el mismo blanco que
+    // «Buscar». En esta paleta el blanco significa «la acción esperada de esta pantalla»,
+    // y borrar los datos de una persona no lo es. Los dos pasan al color de acción
+    // destructiva que el capítulo 39 metió en la paleta (§6.4 punto 31).
+    const usuario = userEvent.setup();
+    montar();
+
+    await consultar(usuario);
+    await screen.findByText('Ana Titular');
+    const abrir = screen.getByRole('button', { name: 'Suprimir estos datos…' });
+    expect(abrir).toHaveClass('btn-danger');
+
+    await usuario.click(abrir);
+    const confirmar = screen.getByRole('button', { name: 'Suprimir definitivamente' });
+    expect(confirmar).toHaveClass('btn-danger');
+    expect(confirmar).not.toHaveClass('btn-primary');
+    // Y sigue apagado hasta que se escriba el correo: el color no sustituye a la
+    // confirmación escrita, se suma a ella.
+    expect(confirmar).toBeDisabled();
+  });
+
   it('dice qué se borra, qué no y que el CRM no se entera', async () => {
     const usuario = userEvent.setup();
     montar();

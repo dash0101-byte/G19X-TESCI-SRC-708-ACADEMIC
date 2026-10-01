@@ -76,6 +76,30 @@ export function variablesDe(css = HOJA) {
 // Color
 // ---------------------------------------------------------------------------
 
+/**
+ * Un token puede apuntar a otro: `--accent-primary: var(--color-primary)`.
+ *
+ * Esa forma de escribirlo entró en el capítulo 39 y es la correcta —el marcado pedía
+ * `--accent-primary` desde hacía capítulos y lo que quería era el blanco de la paleta, así
+ * que decirlo con un alias no repite el valor y no deja dos copias que se puedan separar—,
+ * pero dejaba a esta comprobación sin nada que medir: `aRgb` no sabe leer `var(...)`.
+ *
+ * Se siguen las referencias hasta llegar a un color. El límite de saltos no es adorno: un
+ * alias circular colgaría la suite en vez de fallar, y una suite colgada no dice nada.
+ */
+export function resolverAlias(valor, variables, saltos = 8) {
+  let actual = String(valor).trim();
+  for (let i = 0; i < saltos; i += 1) {
+    const alias = /^var\(\s*(--[\w-]+)\s*\)$/.exec(actual);
+    if (!alias) return actual;
+    if (variables[alias[1]] === undefined) {
+      throw new Error(`El alias ${alias[1]} no está en :root`);
+    }
+    actual = String(variables[alias[1]]).trim();
+  }
+  throw new Error(`Demasiados saltos resolviendo ${valor}: ¿un alias circular?`);
+}
+
 /** `#rgb`, `#rrggbb` o `rgba(r, g, b, a)` → `[r, g, b, a]` con los canales en 0-255. */
 export function aRgb(valor) {
   const texto = String(valor).trim();
@@ -104,8 +128,10 @@ export function aRgb(valor) {
  * daría el contraste de un color que no existe en ninguna pantalla.
  */
 export function componer(encima, debajo) {
-  const [r1, g1, b1, a] = aRgb(encima);
-  const [r2, g2, b2] = aRgb(debajo);
+  // Los dos admiten ya la forma `[r, g, b, a]`, igual que `luminancia`: un borde se
+  // compone a veces sobre un fondo que a su vez salió de una composición.
+  const [r1, g1, b1, a] = Array.isArray(encima) ? encima : aRgb(encima);
+  const [r2, g2, b2] = Array.isArray(debajo) ? debajo : aRgb(debajo);
   if (a >= 1) return [r1, g1, b1, 1];
   return [r1 * a + r2 * (1 - a), g1 * a + g2 * (1 - a), b1 * a + b2 * (1 - a), 1];
 }
@@ -199,14 +225,95 @@ export const PARES = [
     donde: '.btn-primary y su estado :hover',
   },
 
-  // --- Lo que no es texto (1.4.11) ---
+  // --- El botón de acción destructiva (capítulo 39) ---
   {
-    texto: '--border-focus', fondo: ['--bg-surface', '--bg-base'],
+    texto: '--danger-text', fondo: ['--danger-bg', '--danger-bg-hover'],
+    donde: '.btn-danger y su :hover — «Cerrar sesión» y los dos botones de suprimir',
+  },
+
+  // --- Los tokens que el marcado pedía y la paleta no tenía (capítulo 39) ---
+  //
+  // Dos de los cinco se usan como **color de texto**, así que entran en la tabla con el
+  // mínimo de texto aunque su nombre no acabe en `-text` y `tokensDeTexto` no los reclame.
+  // Que una lista automática no los exija no significa que no haya que medirlos.
+  {
+    texto: '--accent-primary', fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated'],
+    donde: 'el nombre del prospecto en el informe de publicación, que es un botón-enlace',
+  },
+  {
+    texto: '--color-primary-light', fondo: ['--bg-surface', '--bg-surface-elevated'],
+    donde: 'el «⏳ Evaluando…» del simulador de scoring',
+  },
+
+  // --- Lo que no es texto (1.4.11) ---
+  //
+  // `componer_sobre_el_fondo` en lugar del antiguo `componer_texto_sobre`: un borde
+  // translúcido se mezcla con **el fondo que tiene detrás**, que es distinto en cada sitio
+  // donde el control vive. Mezclarlo siempre con `--bg-surface` y después compararlo con
+  // `--bg-base` medía un color que en esa pantalla no existe. La diferencia era pequeña
+  // —centésimas— y el resultado no cambiaba de lado, pero medir bien no es opcional
+  // cuando lo medido es el argumento.
+  {
+    texto: '--border-control',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover', '--bg-field'],
     minimo: MINIMO_NO_TEXTO,
-    componer_texto_sobre: '--bg-surface',
-    donde: 'el aro de foco: .input-field:focus y .interes-boton:has(input:focus-visible)',
+    componer_sobre_el_fondo: true,
+    donde: 'el contorno en reposo de .input-field, .btn-secondary, .interes-boton, '
+      + '.interes-red-casilla y el selector del QR (§6.4 punto 32)',
+  },
+  {
+    texto: '--border-focus',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover', '--bg-field-focus'],
+    minimo: MINIMO_NO_TEXTO,
+    componer_sobre_el_fondo: true,
+    donde: 'el aro de foco: .input-field:focus, .interes-boton:has(input:focus-visible) '
+      + 'y los :focus-visible del panel de difusión',
+  },
+  {
+    texto: '--danger-border',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    minimo: MINIMO_NO_TEXTO,
+    donde: 'el contorno de .btn-danger — su relleno solo da 2.87:1 contra el panel, así '
+      + 'que lo que delimita el botón es el borde',
   },
 ];
+
+/**
+ * Los dos sitios donde el foco **cambia** el aspecto de un control, medidos.
+ *
+ * Esto no lo pide WCAG 2.1 por número —§2.4.7 solo exige que el foco sea visible—, y por
+ * eso no está en la tabla de arriba, que es la de los mínimos de la norma. Está aquí
+ * porque el capítulo 39 estuvo a un paso de arreglar §1.4.11 rompiendo §2.4.7: subir el
+ * borde en reposo a 3.0 lo dejaba a 1.11 del aro de foco, es decir, con el contorno por
+ * fin visible y el foco invisible. Dos criterios que se empujan, y un número que lo dice.
+ *
+ * Se mide el color compuesto del borde en reposo contra el color compuesto del borde con
+ * foco, en los dos controles donde el cambio ocurre y los fondos no son los mismos.
+ */
+export const CAMBIOS_DE_ESTADO = [
+  {
+    donde: 'un campo: .input-field pasa de --bg-field a --bg-field-focus',
+    reposo: { borde: '--border-control', fondo: '--bg-field' },
+    foco: { borde: '--border-focus', fondo: '--bg-field-focus' },
+  },
+  {
+    donde: 'un botón secundario: .btn-secondary:hover pasa a --bg-surface-hover',
+    reposo: { borde: '--border-control', fondo: '--bg-surface-elevated' },
+    foco: { borde: '--border-focus', fondo: '--bg-surface-hover' },
+  },
+];
+
+/** La razón entre el borde en reposo y el borde con el estado puesto, ya compuestos. */
+export function medirCambios(variables = variablesDe()) {
+  const color = ({ borde, fondo }) => {
+    const detras = resolverAlias(variables[fondo], variables);
+    return componer(resolverAlias(variables[borde], variables), detras);
+  };
+  return CAMBIOS_DE_ESTADO.map((cambio) => ({
+    ...cambio,
+    razon: razon(color(cambio.reposo), color(cambio.foco)),
+  }));
+}
 
 /** Los tokens del `:root` que son color de texto y por tanto tienen que estar en `PARES`. */
 export function tokensDeTexto(variables) {
@@ -222,13 +329,10 @@ export function medir(par, variables) {
   const resolver = (token) => {
     const valor = variables[token];
     if (valor === undefined) throw new Error(`El token ${token} no está en :root`);
-    return valor;
+    return resolverAlias(valor, variables);
   };
 
-  // El color del texto, compuesto si lleva alfa (los bordes la llevan).
-  const texto = par.componer_texto_sobre
-    ? componer(resolver(par.texto), resolver(par.componer_texto_sobre))
-    : aRgb(resolver(par.texto));
+  const texto = aRgb(resolver(par.texto));
 
   const fondos = Array.isArray(par.fondo)
     ? par.fondo.map((token) => ({ nombre: token, color: aRgb(resolver(token)) }))
@@ -237,7 +341,12 @@ export function medir(par, variables) {
       color: componer(resolver(par.fondo.sobre), resolver(par.fondo.encima_de)),
     }];
 
-  const medidas = fondos.map((f) => ({ fondo: f.nombre, razon: razon(texto, f.color) }));
+  // Un color translúcido que se mezcla con cada fondo, y no con uno fijo: es lo que pasa
+  // de verdad con un borde, que no es el mismo color sobre un campo que sobre un panel.
+  const medidas = fondos.map((f) => ({
+    fondo: f.nombre,
+    razon: razon(par.componer_sobre_el_fondo ? componer(resolver(par.texto), f.color) : texto, f.color),
+  }));
   const peor = medidas.reduce((a, b) => (a.razon <= b.razon ? a : b));
   return { ...par, minimo: par.minimo ?? MINIMO_TEXTO, medidas, peor };
 }

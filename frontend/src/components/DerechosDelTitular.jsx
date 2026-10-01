@@ -369,7 +369,11 @@ export default function DerechosDelTitular() {
                   Descargar el archivo con sus datos
                 </button>
                 {!pidiendoSupresion && (
-                  <button type="button" className="btn" onClick={() => { limpiar(); setPidiendoSupresion(true); }}>
+                  // `btn` a secas no dibujaba nada —ni fondo ni borde— porque la paleta no
+                  // tenía color de acción destructiva (§6.4 punto 31). El botón que abre el
+                  // borrado de los datos de una persona no puede ser el elemento menos
+                  // visible de la pantalla.
+                  <button type="button" className="btn btn-danger" onClick={() => { limpiar(); setPidiendoSupresion(true); }}>
                     Suprimir estos datos…
                   </button>
                 )}
@@ -416,9 +420,14 @@ export default function DerechosDelTitular() {
                     style={{ maxWidth: '360px' }}
                   />
                   <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+                    {/* Era `btn-primary`, es decir, el mismo blanco que «Buscar». El
+                        blanco de esta paleta significa «la acción esperada de esta
+                        pantalla», y borrar los datos de una persona no lo es. Apagado
+                        hasta que el correo esté escrito, y apagado se ve apagado desde el
+                        capítulo 39: antes no había ningún `:disabled` en la hoja. */}
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-danger"
                       disabled={!puedeSuprimir || suprimiendo}
                       onClick={suprimir}
                     >
