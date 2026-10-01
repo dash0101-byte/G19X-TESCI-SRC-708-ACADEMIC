@@ -536,6 +536,11 @@ describe('el catálogo de endpoints', () => {
     ['altaDelSegundoFactor', [], 'POST', '/api/v1/auth/segundo-factor/alta'],
     ['activarSegundoFactor', ['123456'], 'POST', '/api/v1/auth/segundo-factor/activar'],
     ['bajaDelSegundoFactor', ['123456'], 'POST', '/api/v1/auth/segundo-factor/baja'],
+    // Los derechos del titular (capítulo 38). Los dos endpoints existen desde la Fase 14
+    // y están comprobados tabla por tabla en el backend; lo que entró ahora es la forma
+    // de pedirlos desde el panel.
+    ['exportarDatosDelTitular', [42], 'GET', '/api/v1/leads/42/exportar'],
+    ['suprimirTitular', [42], 'DELETE', '/api/v1/leads/42'],
   ];
 
   it.each(RUTAS)('%s → %s %s', async (nombre, argumentos, metodo, ruta) => {
@@ -806,5 +811,92 @@ describe('los avisos, con y sin filtro', () => {
 
     await api.marcarAvisosLeidos([1, 2]);
     expect(JSON.parse(f.llamadas[1].opciones.body)).toEqual({ ids: [1, 2] });
+  });
+});
+
+// ----------------------------------------------------------------- derechos del titular
+describe('buscar al titular por su correo (capítulo 38)', () => {
+  // La pantalla de derechos exporta y BORRA lo que esta función devuelve. El listado busca
+  // por `LIKE` sobre cinco columnas, así que lo que trae no es «la persona de ese correo»
+  // sino «todo lo que contiene ese texto en alguna parte». La igualdad la decide aquí, y
+  // si no la decidiera nadie se notaría tarde: con una sola persona en la base funciona.
+  const ANA = { id: 42, email: 'ana@ejemplo.test', first_name: 'Ana' };
+  const DIANA = { id: 43, email: 'diana@ejemplo.test', first_name: 'Diana' };
+
+  it('devuelve la ficha cuyo correo es exactamente el buscado', async () => {
+    fetchSimulado({ '/leads': respuesta(200, { items: [DIANA, ANA], total: 2 }) });
+
+    await expect(api.buscarTitularPorCorreo('ana@ejemplo.test')).resolves.toEqual(ANA);
+  });
+
+  it('no devuelve a quien solo contiene el correo buscado', async () => {
+    // El caso que convierte un derecho en un daño: suprimir a «diana@ejemplo.test» porque
+    // alguien pidió el borrado de «ana@ejemplo.test». Es el mismo cuidado que tiene el
+    // servicio al rastrear el correo dentro de las cargas del CRM.
+    fetchSimulado({ '/leads': respuesta(200, { items: [DIANA], total: 1 }) });
+
+    await expect(api.buscarTitularPorCorreo('ana@ejemplo.test')).resolves.toBeNull();
+  });
+
+  it('la igualdad no distingue mayúsculas ni espacios alrededor', async () => {
+    fetchSimulado({ '/leads': respuesta(200, { items: [ANA], total: 1 }) });
+
+    await expect(api.buscarTitularPorCorreo('  ANA@Ejemplo.TEST ')).resolves.toEqual(ANA);
+  });
+
+  it('pide la página entera que el endpoint admite', async () => {
+    // Un `LIKE` sobre un dominio corriente puede traer muchas filas y la que interesa no
+    // tiene por qué venir primera: con el tope por omisión de 50 la ficha buscada podía
+    // quedarse fuera de la página y la pantalla habría contestado «no consta» sobre una
+    // persona que está.
+    const f = fetchSimulado({ '/leads': respuesta(200, { items: [], total: 0 }) });
+
+    await api.buscarTitularPorCorreo('ana@ejemplo.test');
+
+    expect(f.llamadas[0].url).toContain('limit=200');
+    expect(f.llamadas[0].url).toContain('search=ana%40ejemplo.test');
+  });
+
+  it('un correo en blanco no pregunta nada', async () => {
+    const f = fetchSimulado({ '/leads': respuesta(200, { items: [ANA], total: 1 }) });
+
+    await expect(api.buscarTitularPorCorreo('   ')).resolves.toBeNull();
+    await expect(api.buscarTitularPorCorreo(null)).resolves.toBeNull();
+    expect(f.llamadas).toEqual([]);
+  });
+
+  it('una respuesta sin lista no revienta: es «no consta»', async () => {
+    fetchSimulado({ '/leads': respuesta(200, {}) });
+
+    await expect(api.buscarTitularPorCorreo('ana@ejemplo.test')).resolves.toBeNull();
+  });
+});
+
+describe('exportar y suprimir al titular (capítulo 38)', () => {
+  it('la exportación devuelve el documento del servidor sin tocarlo', async () => {
+    const documento = { formato: 'plurione.titular/1', prospecto_id: 42, actividades: [{ id: 1 }] };
+    fetchSimulado({ '/leads/42/exportar': respuesta(200, documento) });
+
+    await expect(api.exportarDatosDelTitular(42)).resolves.toEqual(documento);
+  });
+
+  it('la supresión acepta el 204 sin cuerpo', async () => {
+    // `apiFetch` devuelve `null` ante un 204 en lugar de intentar leer un JSON que no
+    // existe. Sin eso, un borrado correcto habría llegado a la pantalla como un error de
+    // análisis, y el asesor habría vuelto a pulsar sobre una ficha ya borrada.
+    fetchSimulado({ '/leads/42': { ok: true, status: 204, json: async () => { throw new Error('sin cuerpo'); } } });
+
+    await expect(api.suprimirTitular(42)).resolves.toBeNull();
+  });
+
+  it('un 403 llega con su código, no como un error cualquiera', async () => {
+    fetchSimulado({
+      '/leads/42': respuesta(403, { detail: 'No tiene permisos para esta operación.' }),
+    });
+
+    await expect(api.suprimirTitular(42)).rejects.toMatchObject({
+      status: 403,
+      message: 'No tiene permisos para esta operación.',
+    });
   });
 });

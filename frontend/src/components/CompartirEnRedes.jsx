@@ -87,7 +87,17 @@ function nombreDeArchivo(titulo, etiqueta) {
   return `qr-${limpio || 'publicacion'}-${etiqueta}.svg`;
 }
 
-export default function CompartirEnRedes({ publicacion, onCopiar }) {
+/**
+ * `direccionCaida`: la dirección pública configurada no contesta (capítulo 34).
+ *
+ * Se pasa desde `Publicaciones`, que ya la consulta para el aviso de arriba. Aquí hace
+ * falta por un motivo concreto y encontrado usándolo (01-10-2026): este panel es donde
+ * alguien **actúa** sobre el enlace —lo comparte, lo imprime, lo escanea—, y el aviso de
+ * arriba se queda fuera de la vista en cuanto se despliega una publicación. Un código QR
+ * impecable de una dirección muerta se ve exactamente igual que uno bueno, y el único
+ * momento en que se descubre es con el teléfono en la mano delante del papel ya impreso.
+ */
+export default function CompartirEnRedes({ publicacion, onCopiar, direccionCaida = false }) {
   // Envuelto porque `|| []` crea una lista nueva en cada render, y eso rehacía el código
   // QR —lo más caro de esta pantalla— cada vez que se repintara cualquier otra cosa.
   const difusion = useMemo(() => publicacion.difusion || [], [publicacion.difusion]);
@@ -113,6 +123,32 @@ export default function CompartirEnRedes({ publicacion, onCopiar }) {
 
   return (
     <div className="interes-compartir">
+      {direccionCaida && (
+        // El único estilo en línea del componente, y va aquí a propósito. El resto se
+        // apoya en catorce clases que la hoja no define (§6.4, punto 30), así que sale sin
+        // formato; para un texto de ayuda eso es feo y para un **aviso** es inútil, porque
+        // un aviso que se ve igual que el cuerpo no lo lee nadie. Escribir las catorce
+        // clases es diseñar el panel entero y sigue fuera de alcance; darle borde y color a
+        // esta no lo es.
+        <div
+          role="alert"
+          className="interes-compartir-aviso"
+          style={{
+            padding: '10px 12px',
+            marginBottom: '12px',
+            border: '1px solid var(--warm-text)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--warm-text)',
+            fontSize: '0.8rem',
+            lineHeight: '1.5',
+          }}
+        >
+          <strong>La dirección pública no contesta ahora mismo.</strong> Lo que se copie,
+          se comparta o se imprima desde aquí —el enlace y el código QR— lleva a esa
+          dirección, así que hoy no llega a ninguna parte. El código se dibuja igual porque
+          el enlace es correcto; lo que no responde es el otro extremo.
+        </div>
+      )}
       <h5>Compartir en…</h5>
       <ul className="interes-compartir-lista" aria-label="Redes activas">
         {activas.map((red) => (

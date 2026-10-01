@@ -194,6 +194,41 @@ describe('el código QR', () => {
   });
 });
 
+describe('cuando la dirección pública no contesta', () => {
+  // Encontrado usándolo (01-10-2026). Este panel es donde alguien actúa sobre el enlace
+  // —lo copia, lo comparte, lo imprime—, y el aviso de arriba de «Publicaciones» se queda
+  // fuera de la vista en cuanto se despliega una publicación. Un código QR de una
+  // dirección muerta se ve exactamente igual que uno bueno: el único momento en que se
+  // descubre es con el teléfono delante del papel ya impreso.
+  it('lo dice aquí, donde está el enlace y el código', () => {
+    pintar({ direccionCaida: true });
+
+    const aviso = screen.getByRole('alert');
+    expect(aviso).toHaveTextContent(/La dirección pública no contesta/i);
+    expect(aviso).toHaveTextContent(/no llega a ninguna parte/i);
+  });
+
+  it('y dice que el código no está mal, que lo que falla es el otro extremo', () => {
+    // Si no, el aviso parecería decir que el QR está roto y alguien lo volvería a generar.
+    pintar({ direccionCaida: true });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/el enlace es correcto/i);
+    expect(screen.getByRole('img', { name: `Código QR de ${ENLACE}` })).toBeInTheDocument();
+  });
+
+  it('con la dirección viva, no hay aviso', () => {
+    pintar({ direccionCaida: false });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('y sin saber si contesta, tampoco: «no se ha comprobado» no es una avería', () => {
+    pintar();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
 describe('las casillas de redes del formulario', () => {
   function pintarFormulario(activas = ['linkedin', 'whatsapp']) {
     const onChange = vi.fn();

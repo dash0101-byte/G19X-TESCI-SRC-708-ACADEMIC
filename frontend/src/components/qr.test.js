@@ -222,3 +222,167 @@ describe('svgQR', () => {
     expect(modulos(pequeno)).toBeGreaterThan(100);
   });
 });
+
+// ============================================================================
+// El lector: lo que la suite no tenía, y por eso no vio el único error que había
+// ============================================================================
+//
+// Las pruebas de arriba comprueban propiedades de la norma, y todas ellas son **simétricas
+// respecto de la diagonal**: tres localizadores en esquinas simétricas, dos patrones de
+// sincronismo que son uno el reflejo del otro, dos bandas de formato que se reservan a la
+// vez. Transponer la matriz no rompía ninguna. Y eso es justo lo que le pasaba a la
+// información de formato: iba con la fila y la columna cambiadas, de modo que el código
+// era impecable salvo en los quince bits que dicen cómo leerlo. **Ningún lector detectaba
+// nada**, y la suite estaba verde (01-10-2026, §6.3 punto 17).
+//
+// Lo que faltaba era leer. No una biblioteca —la cadena de suministro del cliente se
+// mantiene corta a propósito, y es la misma razón por la que el generador está escrito a
+// mano—: un lector mínimo escrito aquí, que hace lo que hace una cámara y en el mismo
+// orden. Empieza por el formato, porque es por donde empieza la norma y es lo que estaba
+// roto: sin esos quince bits no se sabe qué máscara quitar y no se puede leer un solo dato.
+//
+// Alcance, dicho para que no se le suponga de más: el recorrido completo se hace sobre la
+// **versión 1**, que no tiene patrones de alineación ni reparto en bloques, así que el mapa
+// de módulos de función es exacto sin reimplementar medio generador. Sobre un enlace de
+// verdad —versión 6— se lee la información de formato, que es idéntica en todas las
+// versiones y es donde estaba el fallo.
+
+/** Los quince bits del formato, leídos de las posiciones que nombra la norma. */
+function leerFormato(matriz, lado) {
+  const primera = [];
+  for (let i = 0; i < 6; i += 1) primera.push(matriz[i][8]);
+  primera.push(matriz[7][8], matriz[8][8], matriz[8][7]);
+  for (let i = 9; i < 15; i += 1) primera.push(matriz[8][14 - i]);
+
+  const segunda = [];
+  for (let i = 0; i < 8; i += 1) segunda.push(matriz[8][lado - 1 - i]);
+  for (let i = 8; i < 15; i += 1) segunda.push(matriz[lado - 15 + i][8]);
+
+  return { primera, segunda };
+}
+
+/** Deshace el XOR de la norma y comprueba el BCH. Devuelve nivel y máscara. */
+function decodificarFormato(bits) {
+  let valor = 0;
+  for (let i = 0; i < 15; i += 1) valor |= bits[i] << i;
+  const limpio = valor ^ 0b101010000010010;
+  // Resto del BCH(15,5): un formato íntegro lo deja en cero.
+  let v = limpio;
+  for (let i = 4; i >= 0; i -= 1) {
+    if (v & (1 << (i + 10))) v ^= 0b10100110111 << i;
+  }
+  return { nivel: (limpio >> 13) & 0b11, mascara: (limpio >> 10) & 0b111, resto: v };
+}
+
+const MASCARAS = [
+  (f, c) => (f + c) % 2 === 0,
+  (f) => f % 2 === 0,
+  (f, c) => c % 3 === 0,
+  (f, c) => (f + c) % 3 === 0,
+  (f, c) => (Math.floor(f / 2) + Math.floor(c / 3)) % 2 === 0,
+  (f, c) => ((f * c) % 2) + ((f * c) % 3) === 0,
+  (f, c) => (((f * c) % 2) + ((f * c) % 3)) % 2 === 0,
+  (f, c) => (((f + c) % 2) + ((f * c) % 3)) % 2 === 0,
+];
+
+/** Los módulos de función de la versión 1, que no tiene patrones de alineación. */
+function esFuncionV1(f, c, lado) {
+  const bloque = (f0, c0, alto, ancho) => f >= f0 && f < f0 + alto && c >= c0 && c < c0 + ancho;
+  if (bloque(0, 0, 9, 9)) return true;
+  if (bloque(0, lado - 8, 9, 8)) return true;
+  if (bloque(lado - 8, 0, 8, 9)) return true;
+  return f === 6 || c === 6;
+}
+
+/** El texto que lleva dentro un código de versión 1, leído como lo leería una cámara. */
+function leerTextoV1(matriz, lado, mascara) {
+  const quita = MASCARAS[mascara];
+  const bits = [];
+  let haciaArriba = true;
+  for (let derecha = lado - 1; derecha >= 1; derecha -= 2) {
+    if (derecha === 6) derecha = 5;
+    for (let paso = 0; paso < lado; paso += 1) {
+      const f = haciaArriba ? lado - 1 - paso : paso;
+      for (const c of [derecha, derecha - 1]) {
+        if (esFuncionV1(f, c, lado)) continue;
+        bits.push(matriz[f][c] ^ (quita(f, c) ? 1 : 0));
+      }
+    }
+    haciaArriba = !haciaArriba;
+  }
+  const lee = (desde, cuantos) => parseInt(bits.slice(desde, desde + cuantos).join(''), 2);
+  // Modo binario (0100) y, en las versiones 1 a 9, un contador de ocho bits.
+  const modo = lee(0, 4);
+  const largo = lee(4, 8);
+  const bytes = [];
+  for (let i = 0; i < largo; i += 1) bytes.push(lee(12 + i * 8, 8));
+  return { modo, largo, texto: new TextDecoder().decode(new Uint8Array(bytes)) };
+}
+
+describe('un lector estándar recupera lo que se escribió', () => {
+  const CORTO = 'HOLA';
+
+  it('el formato dice nivel M y una máscara válida, y su BCH cuadra', () => {
+    const { matriz, lado } = matrizQR(ENLACE);
+    const { primera } = leerFormato(matriz, lado);
+    const { nivel, mascara, resto } = decodificarFormato(primera);
+
+    // Cero significa que los quince bits son un formato íntegro y no quince bits
+    // cualesquiera. Transpuestos no lo eran, y por eso no se leía ningún código.
+    expect(resto).toBe(0);
+    expect(nivel).toBe(0b00);
+    expect(mascara).toBeGreaterThanOrEqual(0);
+    expect(mascara).toBeLessThanOrEqual(7);
+  });
+
+  it('las dos copias del formato dicen lo mismo', () => {
+    // La norma escribe el formato dos veces para que se pueda leer aunque una esquina esté
+    // tapada. Con las dos mitades cambiadas de sitio, la segunda decía otra cosa.
+    const { matriz, lado } = matrizQR(ENLACE);
+    const { primera, segunda } = leerFormato(matriz, lado);
+
+    expect(segunda).toEqual(primera);
+  });
+
+  it('y el módulo oscuro fijo sigue oscuro, que es donde pisaba la segunda copia', () => {
+    const { matriz, lado } = matrizQR(ENLACE);
+    expect(matriz[lado - 8][8]).toBe(1);
+  });
+
+  it('el texto vuelve a salir entero al leer el código de la versión 1', () => {
+    // El recorrido completo: formato, máscara, zigzag y modo binario. Es la prueba que
+    // habría puesto el fallo en rojo, y la única que no es simétrica.
+    const { matriz, lado, version } = matrizQR(CORTO);
+    expect(version).toBe(1);
+
+    const { mascara } = decodificarFormato(leerFormato(matriz, lado).primera);
+    const { modo, largo, texto } = leerTextoV1(matriz, lado, mascara);
+
+    expect(modo).toBe(0b0100);
+    expect(largo).toBe(CORTO.length);
+    expect(texto).toBe(CORTO);
+  });
+
+  it('también con acentos, que ocupan más de un byte', () => {
+    const CON_EÑE = 'ñandú';
+    const { matriz, lado } = matrizQR(CON_EÑE);
+    const { mascara } = decodificarFormato(leerFormato(matriz, lado).primera);
+    const { largo, texto } = leerTextoV1(matriz, lado, mascara);
+
+    expect(largo).toBe(new TextEncoder().encode(CON_EÑE).length);
+    expect(texto).toBe(CON_EÑE);
+  });
+
+  it('la máscara que declara el formato es la que de verdad lleva puesta', () => {
+    // Con cualquier otra, lo que sale del zigzag no empieza por el modo binario. Es la
+    // comprobación que ata las dos mitades: los quince bits del formato y el dibujo.
+    const { matriz, lado } = matrizQR(CORTO);
+    const { mascara } = decodificarFormato(leerFormato(matriz, lado).primera);
+
+    for (let otra = 0; otra < 8; otra += 1) {
+      const { modo } = leerTextoV1(matriz, lado, otra);
+      if (otra === mascara) expect(modo).toBe(0b0100);
+      else expect(modo, `la máscara ${otra} no debería valer`).not.toBe(0b0100);
+    }
+  });
+});

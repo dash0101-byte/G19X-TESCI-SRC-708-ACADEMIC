@@ -346,6 +346,34 @@ describe('la vista previa desde el panel', () => {
     expect(enviarInteres).not.toHaveBeenCalled();
   });
 
+  it('el motivo está junto al botón, no solo arriba del todo', async () => {
+    // Encontrado usándolo (01-10-2026): el aviso de «vista previa» estaba encima del
+    // título y el botón, varias pantallas más abajo dentro de un marco de 375 px. Quien
+    // llegaba al botón lo pulsaba, no pasaba nada —un botón desactivado ni siquiera
+    // dispara el evento— y no había nada cerca que lo explicara.
+    render(<PaginaDeInteres slug={SLUG} vistaPrevia={PUBLICACION} />);
+
+    const boton = screen.getByRole('button', { name: 'Quiero que me contacten' });
+    const explicacion = document.getElementById(boton.getAttribute('aria-describedby'));
+
+    expect(explicacion, 'el botón desactivado debe decir por qué').not.toBeNull();
+    expect(explicacion).toHaveTextContent(/desactivado porque esto es la vista previa/i);
+    expect(explicacion).toHaveTextContent(/no se envía nada/i);
+    // Y pegado: el aviso de arriba sigue estando, pero no es el que resuelve esto.
+    expect(boton.parentElement).toContainElement(explicacion);
+  });
+
+  it('fuera de la vista previa, ni el botón está desactivado ni sobra la explicación', () => {
+    render(<PaginaDeInteres slug={SLUG} />);
+
+    return screen.findByLabelText('Cargo').then(() => {
+      const boton = screen.getByRole('button', { name: 'Quiero que me contacten' });
+      expect(boton).toBeEnabled();
+      expect(boton).not.toHaveAttribute('aria-describedby');
+      expect(screen.queryByText(/desactivado porque esto es la vista previa/i)).not.toBeInTheDocument();
+    });
+  });
+
   it('enseña las opciones de «¿Qué necesitas?» de esa publicación', () => {
     const propias = { ...PUBLICACION, opciones: { ...PUBLICACION.opciones, necesidades: { hablar: 'Hablar con alguien', equipo: 'Montar un equipo' } } };
     render(<PaginaDeInteres slug={SLUG} vistaPrevia={propias} />);

@@ -2645,7 +2645,7 @@ jobs:
       # exige a `axe`, y el pipeline se pone VERDE. Es la forma exacta de erosion que el
       # capitulo 22 previno con las imagenes fijadas: lo que protege no puede depender de
       # que nadie borre unas lineas.
-      - name: Las ocho pantallas siguen bajo revision de accesibilidad
+      - name: Las nueve pantallas siguen bajo revision de accesibilidad
         run: |
           set -euo pipefail
           revision=frontend/src/pruebas/accesibilidad.test.jsx
@@ -2654,17 +2654,23 @@ jobs:
             echo "FALLO: desaparecio la revision automatica de accesibilidad (capitulo 36)."
             exit 1
           }
-          # Las ocho pantallas que el capitulo se comprometio a revisar, por el componente
-          # que monta cada una. Se comprueba el componente y no el titulo del `describe`
-          # porque el titulo se puede cambiar sin querer y el import, no.
+          # Las pantallas que el proyecto se comprometio a revisar, por el componente que
+          # monta cada una. Se comprueba el componente y no el titulo del `describe` porque
+          # el titulo se puede cambiar sin querer y el import, no.
+          #
+          # Eran ocho en el capitulo 36 y son nueve desde el 38, que anadio la de los
+          # derechos del titular. Una pantalla nueva que no entre en esta lista no esta
+          # protegida de que la quiten: la lista es el compromiso, no un inventario que se
+          # rellena solo.
           for pantalla in PaginaDeInteres LoginScreen App LeadDetailModal Publicaciones \
-                          BandejaDeHoy InformeDePublicacion PanelDeDesenlaces; do
+                          BandejaDeHoy InformeDePublicacion PanelDeDesenlaces \
+                          DerechosDelTitular; do
             # Anclado al principio de la linea: sin el `^`, comentar el import con `//`
             # seguia contando como presente y la pantalla se quedaba sin revisar.
             grep -qE "^import $pantalla from" "$revision" || {
               echo ""
-              echo "FALLO: la revision de accesibilidad ya no monta $pantalla (capitulo 36)."
-              echo "Las ocho pantallas del panel se revisan enteras; quitar una la deja"
+              echo "FALLO: la revision de accesibilidad ya no monta $pantalla."
+              echo "Las nueve pantallas del panel se revisan enteras; quitar una la deja"
               echo "sin comprobar sin que ninguna prueba se ponga en rojo."
               exit 1
             }
@@ -2695,7 +2701,7 @@ jobs:
             echo "FALLO: la unica regla apagada ya no es color-contrast (capitulo 36)."
             exit 1
           }
-          echo "Ocho pantallas revisadas contra WCAG 2.1 AA, con una sola regla apagada y justificada."
+          echo "Nueve pantallas revisadas contra WCAG 2.1 AA, con una sola regla apagada y justificada."
 
       # Capitulo 36. `axe-core` estaba en node_modules desde el capitulo 17 sin que nadie la
       # llamara: la arrastra `eslint-plugin-jsx-a11y`. Declararla directa costo UNA linea del
@@ -3060,6 +3066,392 @@ jobs:
                   print(f"  - {f}")
               sys.exit(1)
           print(f"Vigilados {len(cubierto)} ecosistemas; la renovacion a mano sigue mandando.")
+          PY
+
+      # ------------------------------------------------------------------ control 46
+      # R-11 con pantalla (capitulo 38). La API de acceso y supresion existe desde la Fase
+      # 14 y la suite la comprueba tabla por tabla; lo que entro ahora es la pantalla, y
+      # con ella cinco propiedades que un cambio razonable se lleva por delante sin que
+      # nada falle:
+      #
+      #   * que la respuesta sea UNA para «no consta», exista la persona o no. Decir «ya se
+      #     suprimio» parece mas util y convierte la pantalla en el oraculo de pertenencia
+      #     que la huella con clave de la bitacora existe para no ser;
+      #   * que la igualdad del correo la decida el cliente. El buscador del listado es un
+      #     LIKE: quedarse con la primera fila exporta -o borra- los datos de otra persona;
+      #   * que el borrado se escriba y no se pulse;
+      #   * que la pantalla diga lo que NO hace (el CRM no se entera);
+      #   * que no la alcance un asesor, y que viva solo dentro de administracion.
+      #
+      # Se quitan los comentarios antes de buscar: tres capitulos seguidos descubrieron
+      # guardas satisfechas por su propia explicacion. 13 defectos reintroducidos, 13
+      # detectados.
+      - name: La pantalla de derechos no es un oraculo ni borra sin que se escriba
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          RAIZ = pathlib.Path(".")
+
+
+          def sin_comentarios(ruta):
+              """
+              El archivo sin sus comentarios.
+
+              Tres capítulos seguidos descubrieron guardas satisfechas por su propia explicación: el
+              párrafo que dice «no se usa `certifi`» contiene «certifi». Aquí se quitan los `//` de
+              línea y los bloques `/* */` antes de buscar nada, para que lo que haga pasar un control
+              sea el código y nunca el comentario que lo justifica.
+              """
+              texto = (RAIZ / ruta).read_text(encoding="utf-8")
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              texto = re.sub(r"\{\s*/\*.*?\*/\s*\}", "", texto, flags=re.S)
+              return "\n".join(
+                  re.sub(r"(?<![:/])//.*$", "", linea) for linea in texto.splitlines()
+              )
+
+
+          fallos = []
+
+          PANTALLA = "frontend/src/components/DerechosDelTitular.jsx"
+          DOCUMENTO = "frontend/src/components/documentoDelTitular.js"
+          SERVICIO = "frontend/src/services/api.js"
+          APP = "frontend/src/App.jsx"
+
+          for ruta in (PANTALLA, DOCUMENTO):
+              if not (RAIZ / ruta).is_file():
+                  sys.exit(f"FALLO: desaparecio {ruta}: los derechos del titular vuelven a ser solo API.")
+
+          pantalla = sin_comentarios(PANTALLA)
+          servicio = sin_comentarios(SERVICIO)
+          app = sin_comentarios(APP)
+
+          # ---------------------------------------------------------------- 1. no es un oraculo
+          # Despues de suprimir, la pantalla queda EXACTAMENTE en la forma vacia: la misma que
+          # contesta para una direccion que nunca entro. Si guardara un «suprimida el ...», bastaria
+          # recorrer una lista de correos para saber quien pidio el borrado, que es lo que la huella
+          # con clave de la bitacora existe para evitar.
+          if not re.search(r"setConsulta\(\{\s*correo:\s*suprimido,\s*ficha:\s*null,\s*documento:\s*null\s*\}\)", pantalla):
+              fallos.append(
+                  "tras suprimir, la pantalla ya no vuelve a la forma vacia: si distingue «ya se "
+                  "suprimio» de «nunca entro», se convierte en un oraculo de pertenencia"
+              )
+
+          # Y solo hay UNA frase para el caso vacio. Dos frases son dos respuestas.
+          if pantalla.count("No consta ninguna ficha con esta direcci") != 1:
+              fallos.append(
+                  "la respuesta «no consta» ya no es una sola: con dos textos, la pantalla puede "
+                  "decir cual de los dos casos es"
+              )
+
+          for prohibido in ("suprimida el", "fue suprimid", "ya se suprimi", "no existe"):
+              if prohibido in pantalla.lower():
+                  fallos.append(f"la pantalla dice «{prohibido}», que distingue lo que no debe distinguir")
+
+          # ------------------------------------------------- 2. la igualdad del correo, en el cliente
+          # El `search` del listado es un LIKE sobre cinco columnas: pedir «ana@x.com» trae tambien a
+          # «diana@x.com» (lo fija `test_la_busqueda_por_correo_trae_tambien_a_quien_solo_se_parece`).
+          # Exportar o borrar la primera fila de esa respuesta entrega -o destruye- los datos de otra
+          # persona.
+          buscar = re.search(r"export async function buscarTitularPorCorreo.*?\n\}", servicio, re.S)
+          if not buscar:
+              fallos.append("desaparecio buscarTitularPorCorreo del modulo de servicios")
+          else:
+              cuerpo = buscar.group(0)
+              if not re.search(r"\.find\(", cuerpo) or "===" not in cuerpo:
+                  fallos.append(
+                      "buscarTitularPorCorreo ya no comprueba la igualdad del correo: el listado "
+                      "busca por coincidencia parcial y devolveria la ficha de otra persona"
+                  )
+              if re.search(r"fichas\[0\]|items\[0\]", cuerpo):
+                  fallos.append(
+                      "buscarTitularPorCorreo se queda con la primera fila de la busqueda, que "
+                      "puede ser de quien solo se parece"
+                  )
+              if "limit: 200" not in cuerpo:
+                  fallos.append(
+                      "buscarTitularPorCorreo ya no pide la pagina entera: con el tope por omision "
+                      "la ficha buscada puede quedarse fuera y la pantalla diria «no consta»"
+                  )
+
+          # -------------------------------------------------- 3. el borrado se escribe, no se pulsa
+          confirmacion = re.search(r"const puedeSuprimir\s*=\s*(.+)", pantalla)
+          if not confirmacion or "escrito" not in confirmacion.group(1) or "===" not in confirmacion.group(1):
+              fallos.append(
+                  "la supresion ya no exige escribir el correo: una confirmacion que se resuelve con "
+                  "un clic donde ya estaba el raton no es una confirmacion, es un segundo boton"
+              )
+          if not re.search(r"disabled=\{!puedeSuprimir(\s*\|\|[^}]*)?\}", pantalla):
+              fallos.append("el boton de suprimir ya no depende de lo escrito")
+
+          # ------------------------------------------------------ 4. dice lo que NO hace, y lo hace
+          if "no suprime en el CRM" not in pantalla:
+              fallos.append(
+                  "la pantalla ya no avisa de que suprimir aqui no suprime en el CRM (§5.3): quien "
+                  "atiende la peticion creeria haberla atendido entera"
+              )
+          if "fuera_de_la_base" not in pantalla:
+              fallos.append("la pantalla ya no enseña lo que el sistema no alcanza, que lo dice el servidor")
+
+          # -------------------------------------------------- 5. las secciones salen del documento
+          recuento = re.search(r"export function recuentoDeSecciones.*?\n\}", sin_comentarios(DOCUMENTO), re.S)
+          if not recuento:
+              fallos.append("desaparecio recuentoDeSecciones")
+          else:
+              if "Object.entries" not in recuento.group(0):
+                  fallos.append(
+                      "las secciones de la pantalla ya no se derivan del documento del servidor: "
+                      "una lista escrita a mano se queda atras en la primera tabla nueva"
+                  )
+              if "typeof" not in recuento.group(0):
+                  fallos.append(
+                      "recuentoDeSecciones ya no distingue una lista de registros de una lista de "
+                      "frases: `fuera_de_la_base` volveria a salir como una fila de la tabla"
+                  )
+
+          # ------------------------------------------------------------- 6. no la alcanza un asesor
+          if not re.search(r"const DIRECCION\s*=\s*\[\s*'Sales_Lead',\s*'System_Admin'\s*\]", pantalla):
+              fallos.append("la pantalla ya no declara que es de direccion")
+          if not re.search(r"if\s*\(!DIRECCION\.includes\(rol\)\)\s*return null", pantalla):
+              fallos.append(
+                  "la pantalla se dibuja sin mirar el rol: a un asesor se le ofreceria un formulario "
+                  "cuyos botones el servidor responde con 403"
+              )
+          # Y en la aplicacion, solo dentro de administracion.
+          if app.count("<DerechosDelTitular") != 1:
+              fallos.append("los derechos del titular se montan en mas de un sitio, o en ninguno")
+          administracion = re.search(r"activeTab === 'admin' &&(.*?)\n\s*\)\}", app, re.S)
+          if not administracion or "<DerechosDelTitular" not in administracion.group(1):
+              fallos.append("los derechos del titular ya no viven dentro de la pestaña de administracion")
+
+          if fallos:
+              print("FALLO: la pantalla de derechos del titular perdio una de sus propiedades.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("Respuesta unica, igualdad exacta, borrado escrito, aviso del CRM y solo direccion.")
+          PY
+
+      # ------------------------------------------------------------------ control 47
+      # Los otros dos huecos que cierra el capitulo 38, los dos de §6.2:
+      #
+      #   * punto 14, la casilla del aviso de privacidad en el alta manual. Lo delicado no
+      #     es que exista, es COMO: sin marcar al nacer -una aceptacion por omision es una
+      #     suposicion con fecha-, enviada siempre y nunca obligatoria (§5.2);
+      #   * punto 11, el contador de «nuevos sin asesor» en el tablero. Anadido alli SIN
+      #     quitarlo de «Publicaciones», enlazado a donde se reparten, pedido solo a quien
+      #     dirige la cartera, y distinguiendo «no se pregunto» de cero.
+      #
+      # 9 defectos reintroducidos, 9 detectados.
+      - name: El alta no supone el consentimiento y el contador llego al tablero
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          RAIZ = pathlib.Path(".")
+
+
+          def sin_comentarios(ruta):
+              texto = (RAIZ / ruta).read_text(encoding="utf-8")
+              texto = re.sub(r"\{\s*/\*.*?\*/\s*\}", "", texto, flags=re.S)
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              return "\n".join(
+                  re.sub(r"(?<![:/])//.*$", "", linea) for linea in texto.splitlines()
+              )
+
+
+          fallos = []
+
+          ALTA = "frontend/src/components/NewLeadModal.jsx"
+          CONTADOR = "frontend/src/components/ContadorSinAsesor.jsx"
+          APP = "frontend/src/App.jsx"
+          PUBLICACIONES = "frontend/src/components/Publicaciones.jsx"
+
+          alta = sin_comentarios(ALTA)
+          contador = sin_comentarios(CONTADOR)
+          app = sin_comentarios(APP)
+          publicaciones = sin_comentarios(PUBLICACIONES)
+
+          # ====================================================== la casilla del aviso de privacidad
+          # La API la admite desde la Fase 15 y el alta del panel no la ofrecia: toda ficha creada a
+          # mano nacia sin constancia de que la persona hubiera aceptado nada (§6.2, punto 14).
+          if 'id="new-lead-privacy-notice"' not in alta:
+              fallos.append("el alta ya no ofrece la casilla del aviso de privacidad (§6.2, punto 14)")
+          if "privacy_notice_accepted: formData.privacy_notice_accepted" not in alta:
+              fallos.append(
+                  "el alta ya no manda la casilla al servidor: el campo se queda vacio y la respuesta "
+                  "de acceso del titular dira «no consta» de gente que si acepto"
+              )
+
+          # Nace SIN marcar. Marcada por omision guardaria una aceptacion que nadie dio, con la fecha
+          # de ahora al lado, y esa fecha la volveria indistinguible de las de verdad.
+          inicial = re.search(r"useState\(\{(.*?)\n\s*\}\);", alta, re.S)
+          if not inicial or "privacy_notice_accepted: false" not in inicial.group(1):
+              fallos.append(
+                  "la casilla del aviso de privacidad ya no nace sin marcar: una aceptacion por "
+                  "omision es una suposicion con fecha, como el pais que ya no se supone"
+              )
+
+          # Y no es obligatoria para guardar (§5.2). Obligarla garantizaria que se marque siempre,
+          # que es lo contrario de que signifique algo: aqui la marca el asesor, no la persona.
+          casilla = re.search(r'id="new-lead-privacy-notice".*?/>', alta, re.S)
+          if casilla and re.search(r"(?<!\w)required(?!\w)", casilla.group(0)):
+              fallos.append(
+                  "la casilla del aviso de privacidad se volvio obligatoria: aceptar el aviso no es "
+                  "condicion para que la ficha exista, y esa decision no es tecnica (§5.2)"
+              )
+
+          # =================================================== el contador de «nuevos sin asesor»
+          # Vivia solo en «Publicaciones» y el tablero es donde el lider mira primero (§6.2, punto 11).
+          if "<ContadorSinAsesor" not in app:
+              fallos.append(
+                  "el contador de «nuevos sin asesor» desaparecio del tablero: vuelve a ser un aviso "
+                  "que hay que ir a buscar (§6.2, punto 11)"
+              )
+          if "<ContadorSinAsesor" not in publicaciones:
+              fallos.append(
+                  "el contador ya no esta en «Publicaciones»: el capitulo 38 lo anadio al tablero "
+                  "SIN quitarlo de donde estaba"
+              )
+          if not re.search(r"await fetchNuevosSinAsesor\(\)", app):
+              fallos.append("el tablero ya no pregunta al servidor cuantos esperan sin asesor")
+          if not re.search(r"onIrARepartir=\{\(\)\s*=>\s*setActiveTab\('leads'\)\}", app):
+              fallos.append(
+                  "el contador del tablero ya no lleva a donde se reparten: un numero sin enlace "
+                  "obliga a buscar a mano las fichas que cuenta"
+              )
+          # Y solo a quien dirige la cartera: la pregunta va DESPUES de la guarda del rol. Pedirla
+          # con la cuenta de un asesor se traga un 403 y llena la bitacora de accesos denegados que
+          # no provoco nadie, que es el mismo criterio que sigue «Publicaciones».
+          if not re.search(r"if \(!esDireccion\) return;[^}]*?await fetchNuevosSinAsesor\(\)", app, re.S):
+              fallos.append(
+                  "el contador se pide sin mirar el rol: un asesor provocaria un 403 por cada carga "
+                  "del tablero, y ninguno lo habria provocado a proposito"
+              )
+
+          # `null` no es cero. «No se pregunto» y «no hay nadie esperando» son respuestas distintas, y
+          # la segunda es una afirmacion: un cero inventado le dice al lider que no tiene nada que
+          # repartir.
+          if not re.search(r"total === null \|\| total === undefined", contador):
+              fallos.append(
+                  "el contador ya no distingue «no se pregunto» de cero: con una comprobacion por "
+                  "veracidad, un cero real desaparece y una falta de respuesta parece un cero"
+              )
+
+          if fallos:
+              print("FALLO: el consentimiento del alta o el contador del tablero perdieron una propiedad.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("Casilla ofrecida, sin marcar y sin obligar; contador en el tablero y en Publicaciones.")
+          PY
+
+      # ------------------------------------------------------------------ control 48
+      # El codigo QR no lo leia NINGUN lector, y la suite estaba verde (01-10-2026).
+      #
+      # Es el punto 17 de §6.3 del documento de congelacion -«el codigo QR no se ha
+      # escaneado con un telefono»- cumpliendose. La causa no era el dibujo: los datos, la
+      # correccion Reed-Solomon, el recorrido en zigzag y las mascaras estaban bien. Lo que
+      # iba transpuesto eran los quince bits que dicen al lector con que mascara esta hecho
+      # el codigo, y sin ellos no se puede empezar a decodificar.
+      #
+      # Por que ninguna prueba lo vio: TODO lo que la suite medía es simetrico respecto de
+      # la diagonal -tres localizadores en esquinas simetricas, dos patrones de sincronismo
+      # que son uno el reflejo del otro, dos bandas de formato reservadas a la vez-, asi que
+      # transponer no rompia ninguna propiedad. El unico modulo que lo habria delatado -el
+      # oscuro fijo, que el bucle pisaba- pasaba su prueba por casualidad.
+      #
+      # Este control vigila las dos mitades del arreglo: que las posiciones sean las de la
+      # norma, y que la suite conserve el LECTOR, que es la unica prueba del QR que no es
+      # simetrica y por tanto la unica capaz de ver esto. 7 defectos reintroducidos, 7
+      # detectados.
+      - name: El codigo QR sigue siendo legible para un lector
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          RAIZ = pathlib.Path(".")
+
+
+          def sin_comentarios(ruta):
+              texto = (RAIZ / ruta).read_text(encoding="utf-8")
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              return "\n".join(
+                  re.sub(r"(?<![:/])//.*$", "", linea) for linea in texto.splitlines()
+              )
+
+
+          fallos = []
+
+          GENERADOR = "frontend/src/components/qr.js"
+          PRUEBAS = "frontend/src/components/qr.test.js"
+
+          generador = sin_comentarios(GENERADOR)
+          pruebas = sin_comentarios(PRUEBAS)
+
+          # El bucle que escribe los quince bits del formato. Es lo unico que estaba mal del
+          # generador entero, y lo que lo hacia ilegible para CUALQUIER lector.
+          bucle = re.search(r"const formato = bitsDeFormato\(mascara\);(.*?)\n\s*\}\n", generador, re.S)
+          if not bucle:
+              sys.exit("FALLO: desaparecio la escritura de la informacion de formato del QR.")
+          bucle = bucle.group(1)
+
+          # Primera copia: columna 8 para los bits 0-5, y fila 8 para los 9-14. Estaba al reves, y
+          # transponer no rompia ninguna de las propiedades que la suite medía, porque todas ellas
+          # -localizadores, sincronismo, separadores, bandas reservadas- son simetricas.
+          esperadas = [
+              (r"if \(i < 6\) modulos\[i\]\[8\] = bit;",
+               "los bits 0-5 de la primera copia van en la COLUMNA 8, no en la fila 8"),
+              (r"else if \(i === 6\) modulos\[7\]\[8\] = bit;",
+               "el bit 6 va en la columna 8, fila 7"),
+              (r"else if \(i === 8\) modulos\[8\]\[7\] = bit;",
+               "el bit 8 va en la fila 8, columna 7"),
+              (r"else modulos\[8\]\[14 - i\] = bit;",
+               "los bits 9-14 de la primera copia van en la FILA 8"),
+              (r"if \(i < 8\) modulos\[8\]\[lado - 1 - i\] = bit;",
+               "los bits 0-7 de la segunda copia van en la fila 8, junto al localizador superior derecho"),
+              (r"else modulos\[lado - 15 \+ i\]\[8\] = bit;",
+               "los bits 8-14 de la segunda copia van en la columna 8, junto al inferior izquierdo"),
+          ]
+          for patron, porque in esperadas:
+              if not re.search(patron, bucle):
+                  fallos.append(f"la informacion de formato del QR cambio de sitio: {porque}")
+
+          # Y el modulo siempre oscuro, que la version con los indices cambiados pisaba con el bit 7
+          # de la segunda copia. Pasaba la prueba que lo vigila por casualidad, porque en los enlaces
+          # que la suite usaba ese bit valia 1.
+          if "poner(lado - 8, 8, 1);" not in generador:
+              fallos.append("desaparecio el modulo siempre oscuro de (lado-8, 8)")
+          if re.search(r"modulos\[lado - 8\]\[8\]\s*=", bucle):
+              fallos.append("la informacion de formato vuelve a pisar el modulo siempre oscuro")
+
+          # El lector de la suite. Es la UNICA prueba del QR que no es simetrica respecto de la
+          # diagonal, y por tanto la unica que puede ver este fallo. Sin ella vuelve a quedar un
+          # generador cuyas pruebas pasan todas con el codigo ilegible.
+          for simbolo, porque in [
+              ("function leerFormato(", "lee los quince bits del formato de donde los busca la norma"),
+              ("function decodificarFormato(", "comprueba el BCH y saca nivel y mascara"),
+              ("function leerTextoV1(", "recorre el zigzag y devuelve el texto"),
+              ("0b101010000010010", "deshace el XOR de la norma"),
+          ]:
+              if simbolo not in pruebas:
+                  fallos.append(f"la suite del QR perdio el lector ({simbolo.rstrip('(')}): {porque}")
+
+          if fallos:
+              print("FALLO: el codigo QR puede haber vuelto a ser ilegible para un lector.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("La informacion de formato del QR esta donde la norma la busca, y la suite lee el codigo.")
           PY
 
   # ============================================================================

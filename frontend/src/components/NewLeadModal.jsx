@@ -23,6 +23,10 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
     budget_range: '',
     work_modality: 'Remoto 100%',
     tags: '',
+    // Si la persona aceptó el aviso de privacidad. Nace SIN marcar, y es lo único que
+    // puede nacer: marcada por omisión guardaría una aceptación que nadie dio, y la fecha
+    // que se anota junto a ella la volvería indistinguible de las de verdad.
+    privacy_notice_accepted: false,
   });
 
   const [showCustomFields, setShowCustomFields] = useState(false);
@@ -57,6 +61,10 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
         initial_activity_type: formData.initial_activity_type,
         initial_notes: formData.initial_notes,
         raw_metadata: customMetadata,
+        // La casilla, tal cual. El servidor anota la fecha y la fuente «manual» solo si
+        // viene `true`; si viene `false`, los dos campos se quedan vacíos y no se supone
+        // nada, que es lo mismo que hace la página de interés con quien no la marca.
+        privacy_notice_accepted: formData.privacy_notice_accepted,
       });
       onLeadCreated();
       onClose();
@@ -381,6 +389,40 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
               </div>
             </div>
           )}
+
+          {/* El aviso de privacidad (§6.2, punto 14).
+              La API lo admitía desde la Fase 15 —`privacy_notice_accepted`— y esta pantalla
+              no lo ofrecía, así que toda ficha dada de alta a mano nacía sin constancia de
+              que la persona hubiera aceptado nada. La página pública sí lo pide, y lo pide
+              como requisito; aquí **no** es requisito, y la diferencia es deliberada: en la
+              página la marca la persona, y aquí la marcaría el asesor por ella. Obligar a
+              marcarla para poder guardar la ficha garantizaría que se marque siempre, que
+              es justo lo contrario de que signifique algo (§5.2 de la congelación). */}
+          <div style={{
+            background: 'var(--bg-base)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '12px 14px',
+            marginBottom: '16px',
+          }}>
+            <label htmlFor="new-lead-privacy-notice" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem' }}>
+              <input
+                id="new-lead-privacy-notice"
+                type="checkbox"
+                checked={formData.privacy_notice_accepted}
+                onChange={(e) => handleChange('privacy_notice_accepted', e.target.checked)}
+                style={{ marginTop: '2px' }}
+              />
+              <span>
+                La persona aceptó el aviso de privacidad y que PluriOne la contacte.
+              </span>
+            </label>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: '1.5' }}>
+              Al marcarla queda registrada la fecha y la hora de ahora, con origen
+              «manual». Sin marcarla el campo se queda vacío: «no consta» y «no aceptó» no
+              son lo mismo, y la ficha no supone ninguno de los dos.
+            </p>
+          </div>
 
           {/* Botones de Acción */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>

@@ -406,9 +406,32 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
             {mensaje('aviso_de_privacidad')}
           </div>
 
-          <button type="submit" className="btn btn-primary interes-enviar" disabled={enviando || Boolean(vistaPrevia)}>
+          {/* El motivo, PEGADO al botón y no solo arriba del todo (01-10-2026).
+              Hasta aquí la vista previa lo decía en un `role="note"` encima del título, y
+              era verdad y no servía: el formulario mide varias pantallas de alto dentro de
+              un marco de 375 px, así que quien llega al botón tiene ese aviso cuatrocientos
+              píxeles más arriba y fuera de la vista. Pulsó, no pasó nada —el botón está
+              desactivado, y un botón desactivado ni siquiera dispara el evento— y no había
+              nada cerca que lo explicara.
+
+              Sigue desactivado, que es lo correcto: desde la vista previa no se envía. Lo
+              que cambia es que ahora se ve por qué sin tener que subir a buscarlo, y el
+              botón lo señala con `aria-describedby` para quien no ve la pantalla. */}
+          <button
+            type="submit"
+            className="btn btn-primary interes-enviar"
+            disabled={enviando || Boolean(vistaPrevia)}
+            aria-describedby={vistaPrevia ? 'interes-sin-envio' : undefined}
+          >
             {enviando ? 'Enviando...' : 'Quiero que me contacten'}
           </button>
+          {vistaPrevia && (
+            <p id="interes-sin-envio" className="interes-ayuda">
+              Este botón está desactivado porque esto es la vista previa: aquí se ve cómo
+              queda la página, pero no se envía nada ni se crea ningún prospecto. Para
+              probar el envío de verdad, abra el enlace público de la publicación.
+            </p>
+          )}
         </form>
       </section>
     </main>

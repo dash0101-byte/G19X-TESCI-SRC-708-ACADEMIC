@@ -12,6 +12,7 @@ import {
   updateCampaign,
 } from '../services/api';
 import CompartirEnRedes, { RedesDelFormulario } from './CompartirEnRedes';
+import ContadorSinAsesor from './ContadorSinAsesor';
 import InformeDePublicacion from './InformeDePublicacion';
 import PaginaDeInteres from './PaginaDeInteres';
 import VistaPreviaDelPost from './VistaPreviaDelPost';
@@ -378,18 +379,12 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       )}
 
       {/* El contador y la comparativa son del líder: uno avisa de que hay trabajo sin
-          repartir, la otra dice qué post lo trajo. Un asesor no los ve, y tampoco se piden. */}
-      {puedeGestionar && sinAsesor !== null && (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', margin: '14px 0', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
-        >
-          <strong style={{ fontSize: '1.2rem', fontFamily: 'var(--font-mono)' }}>{sinAsesor}</strong>
-          <span>
-            Nuevos de publicaciones, sin asesor.
-            {sinAsesor > 0 && ' Están esperando a que alguien los atienda.'}
-          </span>
-        </div>
-      )}
+          repartir, la otra dice qué post lo trajo. Un asesor no los ve, y tampoco se piden.
+
+          El bloque del contador se fue a `ContadorSinAsesor` en el capítulo 38, cuando el
+          tablero ganó el mismo aviso (§6.2, punto 11). Aquí sigue estando y dice lo mismo
+          porque es el mismo componente, no una copia del texto. */}
+      {puedeGestionar && <ContadorSinAsesor total={sinAsesor} />}
 
       {puedeGestionar && comparativa.length > 0 && (
         <div style={{ margin: '14px 0', overflowX: 'auto' }}>
@@ -714,6 +709,10 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                   <CompartirEnRedes
                     publicacion={publicacion}
                     onCopiar={(texto, etiqueta) => copiarTextoSuelto(publicacion, texto, etiqueta)}
+                    // `responde === false` y no `!responde`: `null` es «no se ha
+                    // comprobado», que es lo que contesta un despliegue sin túnel delante,
+                    // y avisar entonces sería inventar una avería.
+                    direccionCaida={direccion ? direccion.responde === false : false}
                   />
                 </div>
               )}

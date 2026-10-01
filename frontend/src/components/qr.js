@@ -399,17 +399,58 @@ export function matrizQR(texto) {
       }
     }
     const formato = bitsDeFormato(mascara);
+    // ========================================================================
+    // La información de formato iba TRANSPUESTA, y por eso no se leía ninguno
+    // ========================================================================
+    // Encontrado el 01-10-2026 escaneando un código con un teléfono, que es el punto 17 de
+    // §6.3 del documento de congelación: «el código QR no se ha escaneado». No detectaba
+    // nada. Ningún lector lo leía, y la causa no estaba en el dibujo sino aquí.
+    //
+    // Estas quince líneas escriben los quince bits que dicen al lector **con qué nivel de
+    // corrección y con qué máscara** está hecho el código. Sin ellos no se puede empezar a
+    // decodificar: es lo primero que se lee, antes que un solo bit de datos.
+    //
+    // Estaban escritos con la fila y la columna cambiadas de sitio. El resto del archivo
+    // trabaja en `modulos[fila][columna]`, y este bucle ponía el primer bit en
+    // `modulos[8][0]` —fila 8, columna 0— cuando la norma lo quiere en la columna 8, fila 0.
+    //
+    // **Por qué ninguna prueba lo vio.** Todo lo que la suite comprobaba es simétrico
+    // respecto de la diagonal: los tres localizadores están en esquinas simétricas, los dos
+    // patrones de sincronismo son uno el reflejo del otro, los separadores también, y las
+    // dos bandas reservadas para el formato —la fila 8 y la columna 8— se reservan a la vez
+    // en `matrizBase`. Transponer no rompía ninguna de esas propiedades. Y el único módulo
+    // que sí lo habría delatado —el oscuro fijo de `(lado-8, 8)`, que este bucle pisaba con
+    // el bit 7 de la segunda copia— pasaba la prueba por casualidad, porque en los enlaces
+    // que la suite usaba ese bit valía 1.
+    //
+    // Los datos, la corrección Reed-Solomon, el recorrido en zigzag y las máscaras estaban
+    // bien: leyendo la matriz vieja con un lector estándar y quitando la máscara a mano
+    // salen los codewords correctos. Lo único que faltaba era poder saber **qué** máscara
+    // quitar.
+    //
+    // Desde aquí, las posiciones son las de la norma y están escritas como columna/fila
+    // para que se puedan comparar con ella línea a línea:
+    //
+    //   primera copia  bits 0-5  → columna 8, filas 0-5      bit 6 → columna 8, fila 7
+    //                  bit 7     → columna 8, fila 8         bit 8 → columna 7, fila 8
+    //                  bits 9-14 → columna 14-i, fila 8
+    //   segunda copia  bits 0-7  → fila 8, columnas lado-1-i (junto al localizador
+    //                                                         superior derecho)
+    //                  bits 8-14 → columna 8, filas lado-15+i (junto al inferior izquierdo)
+    //
+    // La segunda copia llega ahora hasta la fila `lado-7` y no hasta `lado-8`, así que el
+    // módulo siempre oscuro que `matrizBase` puso ahí se queda como estaba.
     for (let i = 0; i < 15; i += 1) {
       const bit = (formato >> i) & 1;
       // Copia junto al localizador superior izquierdo…
-      if (i < 6) modulos[8][i] = bit;
-      else if (i === 6) modulos[8][7] = bit;
+      if (i < 6) modulos[i][8] = bit;
+      else if (i === 6) modulos[7][8] = bit;
       else if (i === 7) modulos[8][8] = bit;
-      else if (i === 8) modulos[7][8] = bit;
-      else modulos[14 - i][8] = bit;
+      else if (i === 8) modulos[8][7] = bit;
+      else modulos[8][14 - i] = bit;
       // …y la segunda copia, repartida entre los otros dos.
-      if (i < 8) modulos[lado - 1 - i][8] = bit;
-      else modulos[8][lado - 15 + i] = bit;
+      if (i < 8) modulos[8][lado - 1 - i] = bit;
+      else modulos[lado - 15 + i][8] = bit;
     }
     const puntos = penalizacion(modulos, lado);
     if (mejor === null || puntos < mejor.puntos) mejor = { puntos, modulos, lado, version };

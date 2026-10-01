@@ -3,7 +3,69 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 37)
+**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 38)
+
+> **Revisión del capítulo 38.** La congelación se mantiene, y este capítulo la abrió **para
+> tres puntos de §6.2 y para ninguno más**: el 16, el 14 y el 11.
+>
+> Los tres eran el mismo fallo con tres caras —**una capacidad que existe, está probada y no
+> se puede usar desde donde hay que usarla**— y los tres pasan el criterio del §1: la frase
+> ya estaba escrita y el código no la cumplía. El README promete desde el capítulo 20
+> «exportación y supresión del titular comprobadas tabla por tabla», y lo que no decía era
+> **quién** podía usarlas: hasta este capítulo, un derecho de acceso y supresión que solo se
+> ejerce construyendo una petición HTTP con un token de líder comercial no era un derecho de
+> la persona, era un derecho de quien sabe usar `curl`.
+>
+> No se añadió ni un endpoint, ni una tabla, ni una migración, ni un campo de esquema: **el
+> servidor del capítulo 38 es el del 37 más un archivo de pruebas**. Lo que entró fue el
+> alrededor que faltaba, y es donde están todas las decisiones (R36).
+>
+> §6.2 pasa de **siete entradas abiertas de ocho a cinco de nueve**: se cierran la 11, la 14
+> y la 16, y entra la **35**, que el propio capítulo encontró al enlazar el contador del
+> tablero con la matriz. De las cinco que quedan, cuatro —9, 10, 12 y 15— piden que el
+> servidor haga algo que hoy no hace, y eso es funcionalidad: es la misma distinción que
+> dejó entrar a estos tres.
+>
+> **Lo que el capítulo encontró por ejecutar y no por leer, esta vez dentro de su propio
+> trabajo**, y son dos:
+>
+> * Un **recuento que habría mentido**. El bloque de confirmación del borrado decía «se
+>   borran la ficha y los N registros», sumando la tabla de secciones. Entre esas secciones
+>   están los asientos de la bitácora, que **no se borran**: se les retiran los datos
+>   personales y se quedan. El número se quitó, porque un total que no es el que ocurre acaba
+>   en la constancia de la persona (R36 §38.5).
+> * Una **fila que no era una sección**. `fuera_de_la_base` también es una lista del documento
+>   de exportación, y lleva dentro tres párrafos de texto: salió en la pantalla como «fuera de
+>   la base — 3», que no dice que haya tres registros de nadie. Arreglado por la forma del
+>   contenido y no por una excepción con nombre.
+>
+> **Y lo que apareció con un teléfono en la mano, que es lo más grave de todo el capítulo.**
+> §6.3 punto 17 decía «el código QR no se ha escaneado con un teléfono… es lo primero que
+> habría que hacer antes de repartir material impreso». Se escaneó. **No lo detectaba
+> ningún lector, y llevaba así desde el capítulo 27.** La información de formato —los quince
+> bits que dicen con qué máscara está hecho el código, y sin los cuales no se puede leer un
+> solo dato— iba escrita con la fila y la columna cambiadas de sitio. El dibujo, los datos,
+> la corrección Reed-Solomon y el zigzag estaban bien.
+>
+> Lo que lo hace una lección y no un descuido: **las diecinueve pruebas del QR son todas
+> simétricas respecto de la diagonal** —localizadores en esquinas simétricas, dos patrones
+> de sincronismo que son uno el reflejo del otro, dos bandas de formato reservadas a la
+> vez—, así que transponer no rompía ninguna. Y la única que podría haberlo visto —el módulo
+> siempre oscuro, que el bucle pisaba— **pasaba por casualidad**. Una familia entera de
+> pruebas puede estar ciega a un error concreto sin que nada lo señale; lo que faltaba era
+> **leer el código**, y ahora la suite lo lee. §6.3 pasa de cuatro comprobaciones a mano a
+> tres: el punto 17 queda cerrado (R36 §38.10a).
+>
+> Con el mismo teléfono salieron otras dos, menores y de la misma familia —lo que el sistema
+> **no dice**—: el botón desactivado de la vista previa no explicaba por qué a quien llegaba
+> hasta él, y el panel de compartir no avisaba de que la dirección pública estaba caída justo
+> donde alguien copia e imprime ese enlace. Las dos corregidas (R36 §38.10b y §38.10c).
+>
+> Y una tercera, sobre el método: **la primera pasada del arnés de reintroducción dijo 13 de
+> 13 y era mentira**. Lanzaba el control con una ruta relativa desde otro directorio, Python
+> salía con código 1 por no encontrar el archivo, y el arnés leía ese 1 como «el control
+> disparó». Un arnés que verifica guardas es código sin verificar; lo destapó mirar **qué
+> mensaje** daba cada disparo en vez de contar los que disparaban (R36 §38.9).
 
 > **Revisión del capítulo 37.** La congelación se mantiene, y esta revisión corrige el
 > **documento** además del código, que es la primera vez que pasa.
@@ -499,6 +561,13 @@ datos. La **oposición al tratamiento** no está modelada.
 Se registra si llega. Qué hacer cuando no llega —rechazar la ficha, crearla marcada, crearla
 y no contactar— es una decisión de quien responde del tratamiento, no del código.
 
+**Sigue abierta tras el capítulo 38**, y conviene decirlo porque ese capítulo tocó justo al
+lado. El punto 14 de §6.2 cerró que el alta del panel **ofreciera** la casilla; esta entrada
+es si **exigirla**, y ahí no se tocó nada: la casilla no es obligatoria. La diferencia con la
+página pública, donde sí lo es, es deliberada —allí la marca la persona, aquí la marcaría el
+asesor por ella—, y obligarla garantizaría que se marque siempre, que es lo contrario de que
+signifique algo (R36 §38.7).
+
 ### 5.3. Suprimir aquí no suprime en el CRM
 
 **(R20 §20.8)**
@@ -507,6 +576,14 @@ Una entrega posterior del CRM vuelve a crear a la persona. La huella con clave p
 reconocerla y **rechazar la ingesta**, pero bloquear una entrada de negocio es una decisión
 que nadie ha tomado. Las copias de seguridad conservan a la persona suprimida hasta 14 días;
 no se editan volcados, y está dicho en la propia exportación.
+
+**Tras el capítulo 38 la advertencia está donde se ve, que es todo lo que puede hacer el
+software.** Hasta entonces vivía en este documento y en el campo `fuera_de_la_base` del JSON
+de exportación, y ninguno de los dos lo lee quien atiende una petición de borrado. La
+pantalla de derechos lo dice dos veces —en el bloque de confirmación y en el mensaje de
+éxito— y dice además la mitad que no es obvia y que cambia lo que hay que hacer: no es solo
+que los datos sigan allí, es que **volverán** con la siguiente entrega. Lo que falta es un
+procedimiento para el otro lado, y eso sigue sin decidirse aquí.
 
 ### 5.4. «¿Qué necesitas?» no tiene peso
 
@@ -632,22 +709,56 @@ cambiados, sin copiar valores.
 
 ### 6.2. Huecos de la historia que se enseña
 
+> **Estado tras el capítulo 38 (cerrado el 01-10-2026).** De los ocho puntos, **cuatro
+> cerrados**: 11, 13, 14 y 16. Quedan abiertos el **9**, el **10**, el **12** y el **15**, y
+> los cuatro por el mismo motivo, escrito debajo de la tabla: exigen decidir comportamiento
+> **nuevo** del servidor, y eso es funcionalidad, no corrección.
+>
+> El capítulo 38 abrió la congelación para los tres que eran lo mismo con tres caras —una
+> capacidad que existe, está probada y **no se puede usar desde donde hay que usarla**— y
+> para ninguno más. No añadió ni un endpoint, ni una tabla, ni una migración: el servidor
+> del capítulo 38 es el del 37 más un archivo de pruebas.
+>
+> Entra además un punto nuevo, el **35**, que el propio capítulo encontró al enlazar el
+> contador del tablero con la matriz. No se cerró porque el arreglo honrado exige un
+> parámetro nuevo en el listado, y hacerlo en el cliente sobre una página de cincuenta
+> habría reproducido la discrepancia del capítulo 27.
+
 | # | Qué | Estado | Origen |
 | :---: | :--- | :--- | :---: |
 | 9 | **Las integraciones no atribuyen la ficha a una campaña** | `formulario_web`, `linkedin_lead_gen`, Calendly y WhatsApp no leen el UTM. **Solo la página de interés atribuye.** H-4 está cerrado para ese camino y abierto para los demás | R25 §25.10 |
 | 10 | **La asignación automática es solo para las fichas `HOT`** | H-6, a medias: hay dónde repartir, pero nada reparte solo. Una ficha `WARM` o `COLD` espera a que el líder la asigne | R25 §25.10 |
-| 11 | **El contador de «sin asesor» vive en «Publicaciones»** | No en el tablero, que es donde el líder mira primero. Es la nota de usabilidad que el capítulo 28 dio por cerrada sin estarlo | R25 §25.10 · R28 §28.13 |
+| 11 | ~~**El contador de «sin asesor» vive en «Publicaciones»**~~ | No en el tablero, que es donde el líder mira primero. Es la nota de usabilidad que el capítulo 28 dio por cerrada sin estarlo. **Cerrado** en el capítulo 38: el bloque se sacó a `ContadorSinAsesor` y se monta en los dos sitios —el mismo componente, no una copia del texto—, con enlace a la matriz, pedido solo a quien dirige la cartera y distinguiendo «no se preguntó» de cero (R36 §38.8) | R25 §25.10 · R28 §28.13 |
 | 12 | **El reparto de la cartera de una baja es todo o nada** | A un solo destino. Repartir entre varias personas exige hacerlo prospecto a prospecto, y no hay aviso fuera del panel de administración | R19 §19.9 |
 | 13 | ~~**El teléfono de los asesores no se normaliza**~~ | `users.phone`. El capítulo 21 se ocupó del de los prospectos. **Cerrado** en el capítulo 32: mismo E.164 y mismo módulo (`app.core.telefono`), con migración de los que ya estaban escritos de otra forma (R32 §32.4) | R21 §21.12 |
-| 14 | **El alta del panel no ofrece la casilla del aviso de privacidad** | La API la admite (`privacy_notice_accepted`); la pantalla, no | R21 §21.12 |
+| 14 | ~~**El alta del panel no ofrece la casilla del aviso de privacidad**~~ | La API la admite (`privacy_notice_accepted`); la pantalla, no. **Cerrado** en el capítulo 38, y lo delicado no era que existiera: nace **sin marcar** —una aceptación por omisión es una suposición con fecha, indistinguible de las de verdad—, se envía siempre y **no** es obligatoria, que sigue siendo el §5.2 (R36 §38.7) | R21 §21.12 |
 | 15 | **No hay pantalla para configurar integraciones** | Se encienden y se revocan por variables de entorno | R21 §21.12 |
-| 16 | **No hay interfaz para exportar ni para explicar la supresión** | Los derechos del titular son API. Funcionan y están comprobados; no tienen pantalla | R20 §20.8 |
+| 16 | ~~**No hay interfaz para exportar ni para explicar la supresión**~~ | Los derechos del titular son API. Funcionan y están comprobados; no tienen pantalla. **Cerrado** en el capítulo 38: pantalla en administración que busca por correo, enseña qué consta y de dónde llegó, exporta el documento del servidor y suprime exigiendo que el correo se **escriba**, con su constancia. Sin lógica de supresión nueva (R36 §38.2–§38.6) | R20 §20.8 |
+| 35 | **El listado no se puede filtrar por «sin asesor»** | El contador del tablero lleva a la matriz, donde las fichas que esperan llevan su marca, pero la lista no se acota a ellas. Filtrarla exige un parámetro nuevo en el servidor; hacerlo en el cliente sobre una página de cincuenta reproduciría la discrepancia del capítulo 27 —un número que dice siete y una lista con dos marcas— | R36 §38.10 |
+
+**Por qué 9, 10, 12 y 15 siguen abiertos.** Los cuatro piden que el servidor **haga algo que
+hoy no hace**: leer el UTM en cuatro conectores y decidir qué gana cuando hay dos
+atribuciones posibles; repartir sin que nadie decida; partir una cartera entre varias
+personas; y encender integraciones desde una pantalla, lo que significa guardar y rotar sus
+secretos en la base en vez de en el entorno. Ninguno es «la frase ya está escrita y el
+código no la cumple»; los cuatro son frases nuevas. Es la distinción del §1, y es la que
+dejó entrar a los tres de este capítulo y detuvo a estos cuatro.
+
+**16, 14 y 11 — qué se cerró exactamente.** Lo que faltaba no era la capacidad, era el
+alrededor. En el 16: encontrar a la persona por su correo comparando la **igualdad** y no la
+coincidencia parcial del buscador —quedarse con la primera fila del `LIKE` entrega o
+destruye los datos de otra persona—; decir qué hace cada acción **antes** de ofrecerla;
+contestar **lo mismo** para una dirección que nunca entró y para una cuya ficha ya no está,
+para no ser el oráculo de pertenencia que la huella con clave de la bitácora evita; y avisar
+de que suprimir aquí no suprime en el CRM (§5.3), dos veces y donde se ve. En el 14 y el 11,
+lo que está en la tabla. Los tres quedan vigilados por los controles 46 y 47 del CI, con 22
+defectos reintroducidos y 22 detectados.
 
 ### 6.3. Comprobaciones que nadie ha hecho a mano
 
 | # | Qué | Por qué no se hizo | Origen |
 | :---: | :--- | :--- | :---: |
-| 17 | **El código QR no se ha escaneado con un teléfono** | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso** | R27 §27.13 |
+| 17 | ~~**El código QR no se ha escaneado con un teléfono**~~ | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso**. **Hecho el 01-10-2026, y no lo leyó**: la información de formato iba transpuesta desde el capítulo 27, así que ningún lector podía empezar a decodificar. Las diecinueve pruebas del QR estaban verdes porque todas miden propiedades **simétricas respecto de la diagonal**. Corregido, con un lector escrito dentro de la suite y el control 48 del CI (R36 §38.10a) | R27 §27.13 · R36 §38.10 |
 | 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable**: las ocho pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36). Lo que sigue sin responder es si **lo que ese lector dice se entiende**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 |
 | 19 | **Nadie ha visto una solicitud de Dependabot en este repositorio** | `.github/dependabot.yml` está bien formado y el control 45 comprueba que cubre los seis ecosistemas y que la renovación a mano sigue mandando. Lo que ninguna prueba sustituye es el **primer lunes** que abra solicitudes de verdad: qué propone, si el CI las deja verdes y si alguna choca con la guarda `--solo-fijacion` | R37 §37.10 |
 | 20 | **La comprobación de contraseñas filtradas no se ha ejecutado nunca contra el servicio real** | La suite usa una sonda simulada a propósito: una suite que depende de un tercero se pone roja los días que ese tercero tiene un mal día. Lo que falta por saber es si el contexto TLS del sistema basta desde la máquina del despliegue — y si no bastara, **el síntoma sería silencioso**: la política ante «no se pudo preguntar» es seguir adelante, así que la comprobación estaría apagada de hecho mientras el código afirma tenerla. **Es lo primero que hay que mirar en la bitácora el día del despliegue**, buscando el `WARNING` de `app.core.filtradas_remotas` | R37 §37.4 · §37.10 |
@@ -666,7 +777,7 @@ cambiados, sin copiar valores.
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
 | 29 | Un administrador **no puede quitarle el segundo factor a otro** desde el panel: la salida (b) de la guía existe en el diseño pero no tiene botón, porque la gestión de cuentas no ganó esa operación. Hoy se resuelve por la vía (c), que es la misma sentencia SQL | R35 §35.9 |
-| 30 | **`CompartirEnRedes` se dibuja sin ningún estilo.** El componente no usa ni un estilo en línea: se apoya entero en **catorce clases que la hoja no define**, así que el panel de difusión y el del QR salen con el estilo por omisión del navegador. Escribirlas no es corregir un nombre —eso fue el caso de `input`, ya arreglado—, es **diseñar** el panel: colores, espaciados y estados. Está inventariado en `frontend/src/pruebas/clases.test.js`, que además impide que la lista crezca | R36 §36.6 |
+| 30 | **`CompartirEnRedes` se dibuja sin ningún estilo.** El componente no usa ni un estilo en línea: se apoya entero en **catorce clases que la hoja no define**, así que el panel de difusión y el del QR salen con el estilo por omisión del navegador. Escribirlas no es corregir un nombre —eso fue el caso de `input`, ya arreglado—, es **diseñar** el panel: colores, espaciados y estados. Está inventariado en `frontend/src/pruebas/clases.test.js`, que además impide que la lista crezca. **Sigue abierto tras el capítulo 38**, con una excepción de una línea: el aviso de «la dirección pública no contesta» que entró ahí lleva estilo en línea, porque un aviso que se ve igual que el cuerpo del texto no lo lee nadie, y darle borde y color a uno no es diseñar el panel (R36 §38.10c) | R36 §36.6 |
 | 31 | **`btn-danger` no existe.** «Cerrar sesión» pide un aspecto de acción destructiva que la paleta no tiene, así que se dibuja como un `.btn` a secas —borde transparente, sin fondo— y no parece un botón. Darle uno exige un color nuevo en la paleta | R36 §36.6 |
 | 32 | **El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control. Subirlo es una decisión de paleta con efecto en todas las pantallas, no una corrección puntual | R36 §36.8 |
 | 33 | **`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición | R36 §36.8 |

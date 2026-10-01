@@ -702,3 +702,69 @@ export function fetchPanelDeDesenlaces({ desde = '', hasta = '' } = {}) {
     'Error al cargar el panel de desenlaces',
   );
 }
+
+// ============================================================================
+// Derechos del titular (capítulo 38)
+// ============================================================================
+// Las tres llamadas que necesita la pantalla de derechos, y ni una más. Los dos
+// endpoints que hacen el trabajo —la exportación y la supresión— existen desde la
+// Fase 14 y están comprobados tabla por tabla (R-11); aquí no se añade ninguna
+// lógica de supresión, solo la forma de pedirla desde el panel.
+
+/**
+ * La ficha que corresponde EXACTAMENTE a este correo, o `null`.
+ *
+ * Se apoya en el listado, que es el único sitio que sabe buscar y el único que aplica el
+ * alcance de cartera. Dos cosas que no son adorno:
+ *
+ * 1. **La igualdad la comprueba esta función, no el servidor.** `search` es un `LIKE`
+ *    sobre nombre, apellido, correo, empresa y cargo: buscar «ana@x.com» trae también a
+ *    «diana@x.com», y una pantalla de derechos que exporte o suprima por coincidencia
+ *    parcial entrega —o borra— los datos de otra persona. Es el mismo cuidado que el
+ *    servicio tiene al rastrear el correo dentro de las cargas del CRM.
+ * 2. **`null` significa «no consta», y nada más.** No distingue entre un correo que nunca
+ *    entró y uno cuya ficha ya se suprimió, porque la pantalla tampoco debe distinguirlos:
+ *    si dijera «esta persona fue suprimida», sería el oráculo de pertenencia que
+ *    `huella_del_titular` existe para no ser.
+ */
+export async function buscarTitularPorCorreo(correo) {
+  const buscado = (correo || '').trim().toLowerCase();
+  if (!buscado) return null;
+  // El tope de página del servidor. Un `LIKE` sobre un dominio corriente puede traer
+  // muchas filas, y la que interesa no tiene por qué venir primera: se pide el máximo
+  // que el endpoint admite y se busca la igualdad dentro.
+  const pagina = await fetchLeads({ search: buscado, limit: 200 });
+  const fichas = (pagina && pagina.items) || [];
+  return fichas.find((ficha) => (ficha.email || '').trim().toLowerCase() === buscado) || null;
+}
+
+/**
+ * Todo lo que el sistema guarda de una persona, en el documento que define el servidor.
+ *
+ * Se devuelve tal cual llega. La pantalla enseña un resumen y ofrece el archivo, pero el
+ * archivo es este documento sin tocar: recomponerlo en el cliente habría creado una
+ * segunda versión de «qué datos tiene el sistema», y la buena es la que el servidor
+ * construye recorriendo el mapa de tablas.
+ */
+export function exportarDatosDelTitular(leadId) {
+  return apiFetch(
+    `/leads/${leadId}/exportar`,
+    {},
+    'Error al reunir los datos del titular',
+  );
+}
+
+/**
+ * Suprime a la persona y todo lo que cuelga de ella. No tiene vuelta atrás.
+ *
+ * Responde 204 sin cuerpo: lo que se fue de cada tabla queda en la bitácora, en el asiento
+ * `lead.eliminar`, junto a una huella con clave del correo. Por eso la pantalla pide la
+ * exportación ANTES de suprimir: es la única manera de poder decir qué había.
+ */
+export function suprimirTitular(leadId) {
+  return apiFetch(
+    `/leads/${leadId}`,
+    { method: 'DELETE' },
+    'Error al suprimir los datos del titular',
+  );
+}

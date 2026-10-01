@@ -45,6 +45,7 @@ import Publicaciones from '../components/Publicaciones.jsx';
 import BandejaDeHoy from '../components/BandejaDeHoy.jsx';
 import InformeDePublicacion from '../components/InformeDePublicacion.jsx';
 import PanelDeDesenlaces from '../components/PanelDeDesenlaces.jsx';
+import DerechosDelTitular from '../components/DerechosDelTitular.jsx';
 import App from '../App.jsx';
 
 // ---------------------------------------------------------------------------
@@ -375,6 +376,67 @@ describe('el panel de desenlaces', () => {
   it('cumple el nivel AA', async () => {
     render(<PanelDeDesenlaces />);
     await screen.findByText(/Precio/);
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+// La novena pantalla, desde el capítulo 38. Se audita en sus tres estados porque los tres
+// llevan marcado distinto: el formulario solo, el resultado con su tabla, y el bloque de
+// confirmación del borrado, que es el único con un campo que no está dentro de un `<form>`.
+describe('los derechos del titular', () => {
+  const DOCUMENTO = {
+    formato: 'plurione.titular/1',
+    prospecto_id: 42,
+    datos_del_prospecto: {
+      first_name: 'Ana', last_name: 'Titular', email: 'ana.titular@ejemplo.test',
+      phone: '+525512345678', company: 'Conservas Titular', job_title: 'CTO',
+      source: 'WhatsApp', privacy_notice_accepted_at: '2026-09-20T09:30:00+00:00',
+      privacy_notice_source: 'pagina_de_interes',
+    },
+    campana: { id: 5, name: 'Post · Talento TI septiembre', channel: 'LinkedIn' },
+    actividades: [{ id: 1 }, { id: 2 }],
+    historial_de_puntuacion: [{ id: 1 }],
+    tareas: [],
+    tratamientos_registrados: [{ accion: 'lead.crear' }],
+    conservacion: { resto_de_datos: 'Mientras el prospecto exista.' },
+    fuera_de_la_base: ['Copias de seguridad: los volcados diarios conservan los datos.'],
+  };
+
+  beforeEach(() => {
+    api.buscarTitularPorCorreo.mockResolvedValue({ id: 42, email: 'ana.titular@ejemplo.test' });
+    api.exportarDatosDelTitular.mockResolvedValue(DOCUMENTO);
+  });
+
+  it('cumple el nivel AA con el formulario recién abierto', async () => {
+    render(<DerechosDelTitular />);
+    await screen.findByLabelText('Correo de la persona');
+
+    await noDebeTenerInfracciones();
+  });
+
+  it('y con el resultado de una consulta en pantalla', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    render(<DerechosDelTitular />);
+
+    await usuario.type(await screen.findByLabelText('Correo de la persona'), 'ana.titular@ejemplo.test');
+    await usuario.click(screen.getByRole('button', { name: 'Consultar qué consta' }));
+    await screen.findByText('Ana Titular');
+
+    await noDebeTenerInfracciones();
+  });
+
+  it('y con el bloque de confirmación del borrado abierto', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    render(<DerechosDelTitular />);
+
+    await usuario.type(await screen.findByLabelText('Correo de la persona'), 'ana.titular@ejemplo.test');
+    await usuario.click(screen.getByRole('button', { name: 'Consultar qué consta' }));
+    await screen.findByText('Ana Titular');
+    await usuario.click(screen.getByRole('button', { name: 'Suprimir estos datos…' }));
+    await screen.findByLabelText(/Escriba el correo completo/);
 
     await noDebeTenerInfracciones();
   });

@@ -83,6 +83,11 @@ REPORT_FILES = [
     # ninguna necesitaba la cuenta externa que decían necesitar. Es el primer capítulo que
     # corrige el documento de trabajo futuro y no solo el código.
     ("Reporte_35_La_Cadena_de_Suministro_se_Mantiene_Sola_Cinco_Caracteres_que_Salen_el_Tercero_que_no_Puede_Bloquear_y_el_Aviso_que_no_Decide.md", "Capítulo 37: La Cadena de Suministro se Mantiene Sola — Cinco Caracteres que Salen, el Tercero que no Puede Bloquear y el Aviso que no Decide"),
+    # Abre la congelación para tres puntos de §6.2 y para ninguno más: los tres eran una
+    # capacidad que existe, está probada y no se puede usar desde donde hay que usarla. Y,
+    # usando el panel con un teléfono en la mano, encuentra que el código QR no lo leía
+    # ningún lector desde el capítulo 27.
+    ("Reporte_36_Un_Derecho_sin_Pantalla_La_Respuesta_que_no_Distingue_el_Borrado_que_se_Escribe_y_el_Numero_que_Llego_al_Tablero.md", "Capítulo 38: Un Derecho sin Pantalla — La Respuesta que no Distingue, el Borrado que se Escribe y el Número que Llegó al Tablero"),
 ]
 
 
@@ -211,7 +216,7 @@ Una plataforma integral bajo **Clean Architecture (Puertos y Adaptadores)**, ope
 10. **Bucle de realimentación sin fuga de información.** Cada puntuación guarda una **instantánea del vector tal como estaba al puntuar**, y el dataset se etiqueta sobre esa instantánea: un prospecto ganado lleva propuesta enviada y reunión agendada, y entrenar sobre su estado actual enseñaría que enviar propuestas causa cierres. Los prospectos aún en el embudo se **excluyen**, no se cuentan como perdidos.
 11. **Observabilidad del modelo.** Monitor de deriva por índice PSI con perfil de referencia atado por huella a su artefacto, registro versionado de modelos con procedencia de los datos, y verificación de la huella SHA-256 del artefacto antes de deserializarlo —si no coincide, el artefacto **no se carga** y el sistema sigue con el heurístico en lugar de ejecutar un `pickle` sustituido—.
 12. **Fiabilidad operativa.** Registro estructurado con `request_id`, métricas de Prometheus, copias de seguridad con **prueba de restauración**, imágenes de terceros fijadas por huella con renovación explícita —y actualizaciones automáticas que **avisan** de lo que se quedó atrás sin decidir nada—, y un lanzador único para toda la pila.
-13. **Aseguramiento de calidad.** **1519 pruebas** de backend en Pytest con **93 % de cobertura** y **472 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **45 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa. Las **ocho pantallas** del cliente se revisan además contra el nivel **AA de WCAG 2.1** desde la propia suite, se recorren con teclado y miden su contraste sobre la paleta declarada.
+13. **Aseguramiento de calidad.** **1530 pruebas** de backend en Pytest con **93 % de cobertura** y **544 pruebas** de cliente en Vitest con suelos de cobertura que fallan si bajan; **10 trabajos** de integración continua con análisis estático, auditoría de dependencias, detección de secretos, verificación de migraciones en PostgreSQL, umbrales de precisión y de aporte del modelo, **48 controles de regresión** sobre configuración peligrosa y **cuatro guardas de propiedades** que fallan en cuanto el sistema pierde una defensa, aunque ninguna prueba existente se rompa. Las **nueve pantallas** del cliente se revisan además contra el nivel **AA de WCAG 2.1** desde la propia suite, se recorren con teclado y miden su contraste sobre la paleta declarada. Y el código QR **se lee**: desde el capítulo 38 la suite lo decodifica como lo haría una cámara, que es lo único que distingue un código correcto de uno que solo lo parece.
 
 ### Lo que este trabajo se negó a hacer
 

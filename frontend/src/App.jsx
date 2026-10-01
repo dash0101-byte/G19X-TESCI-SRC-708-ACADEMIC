@@ -9,6 +9,8 @@ import LeadDetailModal from './components/LeadDetailModal';
 import ScoringSimulator from './components/ScoringSimulator';
 import AdminPanel from './components/AdminPanel';
 import BandejaSinAsociar from './components/BandejaSinAsociar';
+import ContadorSinAsesor from './components/ContadorSinAsesor';
+import DerechosDelTitular from './components/DerechosDelTitular';
 import Publicaciones from './components/Publicaciones';
 import PanelDeDesenlaces from './components/PanelDeDesenlaces';
 import SessionModal from './components/SessionModal';
@@ -20,6 +22,7 @@ import {
   fetchCampaigns,
   fetchLeads,
   fetchLeadDetail,
+  fetchNuevosSinAsesor,
   getRecalculationJob,
   recalculateAllScores,
   restoreSession,
@@ -51,8 +54,17 @@ export default function App() {
   // caducidad: que la contraseña se acaba de cambiar y hay que entrar con la nueva.
   const [avisoDeAcceso, setAvisoDeAcceso] = useState(null);
   const currentRole = user?.role ?? null;
+  // Quién dirige la cartera completa, escrito una vez. Era la misma comparación repetida
+  // en tres sitios de este archivo y ahora en cuatro, y de las cuatro cuelga qué se pide
+  // al servidor: una que se quedara atrás pediría datos que el servidor niega con un 403.
+  const esDireccion = currentRole === 'Sales_Lead' || currentRole === 'System_Admin';
   const [summary, setSummary] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
+  // Cuántos prospectos de publicaciones esperan a que alguien los reparta. `null` es «no
+  // se ha preguntado», que es lo que vale para un asesor: no se le pide, porque el
+  // servidor se lo negaría y el intento llenaría la bitácora de accesos denegados que no
+  // provocó nadie. Es el mismo criterio que sigue «Publicaciones».
+  const [sinAsesor, setSinAsesor] = useState(null);
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -72,6 +84,7 @@ export default function App() {
     setSummary(null);
     setCampaigns([]);
     setLeads([]);
+    setSinAsesor(null);
   };
 
   // `useCallback` no está aquí por rendimiento: sin él, estas funciones se recrean en
@@ -89,7 +102,17 @@ export default function App() {
     } catch (err) {
       console.error('Error cargando analíticas:', err);
     }
-  }, []);
+    // Aparte y con su propio `catch`: el contador es un aviso, no el tablero. Si el
+    // servidor no lo contesta, el tablero se dibuja igual y el aviso no aparece —lo que
+    // deja un contador ausente, no un cero, que diría que no hay nada esperando—.
+    if (!esDireccion) return;
+    try {
+      const pendientes = await fetchNuevosSinAsesor();
+      setSinAsesor(pendientes ? pendientes.total : null);
+    } catch (err) {
+      console.error('Error contando los nuevos sin asesor:', err);
+    }
+  }, [esDireccion]);
 
   const loadLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -332,7 +355,7 @@ export default function App() {
         {activeTab === 'hoy' && (
           <BandejaDeHoy
             onSelectLead={handleSelectLead}
-            esDireccion={currentRole === 'Sales_Lead' || currentRole === 'System_Admin'}
+            esDireccion={esDireccion}
           />
         )}
 
@@ -350,6 +373,12 @@ export default function App() {
         {/* Tab 1: Dashboard Analítico */}
         {activeTab === 'dashboard' && (
           <div>
+            {/* Lo que hay sin repartir, antes de las gráficas (§6.2, punto 11). El mismo
+                componente y el mismo número que en «Publicaciones», donde sigue estando;
+                aquí además lleva a la matriz, que es donde se abre la ficha y se asigna. */}
+            {esDireccion && (
+              <ContadorSinAsesor total={sinAsesor} onIrARepartir={() => setActiveTab('leads')} />
+            )}
             <AnalyticsCharts summary={summary} campaigns={campaigns} />
             <LeadsTable
               leads={leads.slice(0, 8)}
@@ -390,7 +419,7 @@ export default function App() {
         {/* Publicaciones de LinkedIn: gestionan el líder y el administrador, el asesor consulta */}
         {activeTab === 'publicaciones' && (
           <Publicaciones
-            puedeGestionar={currentRole === 'Sales_Lead' || currentRole === 'System_Admin'}
+            puedeGestionar={esDireccion}
             onSelectLead={handleSelectLead}
           />
         )}
@@ -406,6 +435,11 @@ export default function App() {
               onBatchRecalculate={handleBatchRecalculate}
               isRecalculating={isRecalculating}
             />
+            {/* Los derechos de la persona cuyos datos guarda el sistema (§6.2, punto 16).
+                Va en administración y no en la ficha de un prospecto a propósito: la
+                petición la trae alguien de fuera por su correo, y quien la atiende no tiene
+                por qué saber si esa persona está en la base ni en qué ficha. */}
+            <DerechosDelTitular />
             <BandejaSinAsociar />
           </div>
         )}

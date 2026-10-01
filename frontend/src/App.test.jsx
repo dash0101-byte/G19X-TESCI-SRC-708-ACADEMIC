@@ -29,7 +29,7 @@
 // `CambioDeContrasenaObligatorio` sí son los de verdad, porque son el destino de la
 // decisión y la prueba no diría gran cosa si el destino fuera también un marcador.
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,6 +46,9 @@ import {
   fetchAnalyticsSummary,
   fetchCampaigns,
   fetchLeads,
+  fetchNuevosSinAsesor,
+  getCurrentUser,
+  getCurrentUserRole,
   logout,
   restoreSession,
   setSessionExpiredHandler,
@@ -55,7 +58,23 @@ import {
 // El panel, reducido a lo que esta prueba necesita saber de él: si apareció. Cada fábrica
 // va escrita entera y no a través de un ayudante: `vi.mock` se eleva a la cabecera del
 // archivo, así que una función declarada aquí arriba todavía no existe cuando se ejecuta.
-vi.mock('./components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
+//
+// La barra lleva botones desde el capítulo 38, y es el único marcador que los tiene. El
+// motivo: a partir de ese capítulo hay dos pestañas cuyo CONTENIDO depende del rol —el
+// contador del tablero y los derechos del titular en administración—, y sin poder cambiar
+// de pestaña no se puede comprobar ninguna de las dos. Siguen siendo botones pelados: no
+// deciden qué se ve, solo piden el cambio, que es lo que hace la barra de verdad.
+vi.mock('./components/Navbar', () => ({
+  default: ({ setActiveTab }) => (
+    <nav data-testid="navbar">
+      {['hoy', 'dashboard', 'leads', 'publicaciones', 'admin'].map((pestana) => (
+        <button key={pestana} type="button" onClick={() => setActiveTab(pestana)}>
+          {pestana}
+        </button>
+      ))}
+    </nav>
+  ),
+}));
 vi.mock('./components/BandejaDeHoy', () => ({ default: () => <div data-testid="bandeja-de-hoy" /> }));
 vi.mock('./components/KPICards', () => ({ default: () => <div data-testid="kpis" /> }));
 vi.mock('./components/AnalyticsCharts', () => ({ default: () => <div data-testid="graficas" /> }));
@@ -94,6 +113,12 @@ beforeEach(() => {
   fetchAnalyticsSummary.mockResolvedValue({ total_leads: 0 });
   fetchCampaigns.mockResolvedValue([]);
   fetchLeads.mockResolvedValue({ items: [], total: 0 });
+  fetchNuevosSinAsesor.mockResolvedValue({ total: 4 });
+  // `DerechosDelTitular` es el componente de verdad —no un marcador— porque lo que se
+  // mide de él es justo lo que un marcador taparía: que a un asesor no se le dibuje.
+  // Pregunta el rol al módulo de sesión, que está simulado entero.
+  getCurrentUserRole.mockReturnValue(null);
+  getCurrentUser.mockReturnValue(null);
 });
 
 describe('mientras se comprueba la sesión', () => {
@@ -255,5 +280,113 @@ describe('el segundo factor obligatorio', () => {
 
     expect(await screen.findByRole('heading', { name: /contraseña/i })).toBeInTheDocument();
     expect(screen.queryByTestId('alta-del-segundo-factor')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Capítulo 38: lo que el rol decide DENTRO de una pestaña
+// ============================================================================
+//
+// Hasta aquí este archivo medía a qué pantalla lleva cada estado de sesión. Las dos cosas
+// que entran en el capítulo 38 son distintas: no cambian de pantalla, cambian qué hay
+// dentro de una. El contador del tablero y los derechos del titular en administración los
+// ve quien dirige la cartera y no los ve un asesor, y las dos decisiones viven en `App`.
+
+const LIDER = {
+  ...ASESOR,
+  id: 3,
+  email: 'lider@plurione.test',
+  full_name: 'Laura Líder',
+  role: 'Sales_Lead',
+};
+
+/** Deja la sesión abierta con ese usuario, incluido el rol que leen los componentes. */
+function conSesionDe(usuario) {
+  conSesion(usuario);
+  getCurrentUserRole.mockReturnValue(usuario.role);
+  getCurrentUser.mockReturnValue(usuario);
+}
+
+async function irA(pestana) {
+  const usuario = userEvent.setup();
+  await usuario.click(within(await screen.findByTestId('navbar')).getByRole('button', { name: pestana }));
+  return usuario;
+}
+
+describe('el contador de «nuevos sin asesor» en el tablero (§6.2, punto 11)', () => {
+  it('el líder lo ve, con el número que da el servidor', async () => {
+    conSesionDe(LIDER);
+    render(<App />);
+
+    await irA('dashboard');
+
+    expect(await screen.findByText(/Nuevos de publicaciones, sin asesor/)).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+  });
+
+  it('y lleva a la matriz, que es donde se abre la ficha y se asigna', async () => {
+    conSesionDe(LIDER);
+    render(<App />);
+
+    const usuario = await irA('dashboard');
+    await usuario.click(await screen.findByRole('button', { name: 'Ver y repartir' }));
+
+    // El tablero enseña ocho filas; la matriz, la lista entera. Que haya cambiado de
+    // pestaña se ve en que el simulador y la bandeja ya no están y la tabla sí.
+    expect(screen.getByTestId('tabla-de-prospectos')).toBeInTheDocument();
+    expect(screen.queryByTestId('graficas')).not.toBeInTheDocument();
+  });
+
+  it('a un asesor no se le enseña ni se le pide al servidor', async () => {
+    // Las dos mitades cuentan. Pedirlo y tragarse el 403 llenaría la bitácora de accesos
+    // denegados que no provocó nadie, que es el mismo criterio que sigue «Publicaciones».
+    conSesionDe(ASESOR);
+    render(<App />);
+
+    await irA('dashboard');
+    await waitFor(() => expect(fetchLeads).toHaveBeenCalled());
+
+    expect(screen.queryByText(/Nuevos de publicaciones, sin asesor/)).not.toBeInTheDocument();
+    expect(fetchNuevosSinAsesor).not.toHaveBeenCalled();
+  });
+
+  it('si el servidor no lo contesta, el tablero se dibuja sin el aviso y no inventa un cero', async () => {
+    fetchNuevosSinAsesor.mockRejectedValue(new Error('503'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    conSesionDe(LIDER);
+    render(<App />);
+
+    await irA('dashboard');
+    await waitFor(() => expect(screen.getByTestId('graficas')).toBeInTheDocument());
+
+    expect(screen.queryByText(/Nuevos de publicaciones, sin asesor/)).not.toBeInTheDocument();
+  });
+});
+
+describe('la pantalla de derechos del titular (§6.2, punto 16)', () => {
+  it('el líder la alcanza desde administración', async () => {
+    conSesionDe(LIDER);
+    render(<App />);
+
+    await irA('admin');
+
+    expect(await screen.findByRole('heading', { name: 'Derechos del titular' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo de la persona')).toBeInTheDocument();
+  });
+
+  it('un asesor no la alcanza ni forzando la pestaña', async () => {
+    // La pestaña no se le ofrece en la barra de verdad, así que esto fuerza la única vía
+    // que quedaría: pedir «admin» directamente. `App` lo devuelve a la matriz, y además el
+    // propio componente no se dibujaría —el servidor, por su parte, responde 403 a los dos
+    // endpoints (`test_un_asesor_no_exporta_ni_suprime`)—.
+    conSesionDe(ASESOR);
+    render(<App />);
+
+    await irA('admin');
+
+    expect(screen.queryByRole('heading', { name: 'Derechos del titular' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Correo de la persona')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('administracion')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tabla-de-prospectos')).toBeInTheDocument();
   });
 });
