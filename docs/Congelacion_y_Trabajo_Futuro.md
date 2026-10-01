@@ -3,7 +3,42 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 29 de septiembre de 2026 (apéndice del capítulo 36)
+**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 37)
+
+> **Revisión del capítulo 37.** La congelación se mantiene, y esta revisión corrige el
+> **documento** además del código, que es la primera vez que pasa.
+>
+> El capítulo 37 cerró **§3.7** y **§3.8**, y los cerró demostrando que su premisa era falsa:
+> ninguno de los dos necesitaba una cuenta externa. El servicio de comprobación de
+> contraseñas filtradas por rango —*k-anonymity*, el modelo que la propia entrada nombraba—
+> es una petición anónima sin registro ni clave, y Dependabot es parte de GitHub, donde el
+> repositorio vive desde el capítulo 11. §3 pasa de **nueve entradas abiertas a siete**: de
+> las diez que tiene, tres están ya cerradas —§3.6 en el capítulo 35, y estas dos—.
+>
+> Las siete que quedan sí necesitan lo que dicen necesitar, y conviene decirlo para que esta
+> revisión no se lea como una sospecha general sobre §3: LinkedIn, Calendly, WhatsApp y la
+> publicación automática piden credenciales de una plataforma; la tarjeta de vista previa
+> pide un dominio público; las copias fuera de la máquina piden almacenamiento; y el
+> `event_id` lo tiene que mandar un CRM que todavía no existe. El error no estaba en el
+> criterio de §3, estaba en dos entradas que nadie volvió a comprobar.
+>
+> **La diferencia entre los dos errores importa.** §3.8 fue correcto el día que se escribió:
+> en el capítulo 22 no estaba decidido dónde viviría el repositorio, y dejó de ser cierto sin
+> que nadie volviera a mirarlo. §3.7 **nunca** lo fue: el capítulo 23 escribió «haría falta
+> una cuenta» por analogía con el resto de §3 y no fue a comprobarlo, y así estuvo catorce
+> capítulos.
+>
+> Es la cuarta vez que algo aparece por **ejecutar y no por leer** —el volumen `deriva` del
+> capítulo 32, el suelo de cobertura del 36, el `target` ausente del Compose— y la primera en
+> que lo que falla no es el código sino **el inventario de lo que falta**. Una lista de
+> trabajo futuro es también código que envejece, y nadie le corre pruebas. De aquí sale una
+> costumbre nueva: **una entrada de §3 no se da por buena sin haber comprobado que la cuenta
+> hace falta de verdad**, porque «depende de alguien» es la clasificación que nadie revisa.
+>
+> §6.3 pasa de dos comprobaciones a mano a **cuatro** y §6.4 de quince restos a **dieciséis**.
+> Las dos nuevas de §6.3 son del mismo tipo y conviene leerlas: lo que el capítulo 37 añadió
+> solo se puede ver funcionando **fuera** de la suite, a propósito, porque meter un tercero
+> dentro de la suite la pondría roja los días que ese tercero tenga un mal día.
 
 > **Revisión del capítulo 36.** La congelación se mantiene. El capítulo 36 fue calidad del
 > cliente, no funcionalidad: ninguna pantalla nueva, ningún campo nuevo, ninguna frase nueva
@@ -238,25 +273,64 @@ Tampoco hizo falta una biblioteca de criptografía. El secreto **no se guarda**:
 está escrito: rotar esa clave invalida todas las altas
 (`docs/Guia_del_Segundo_Factor.md` §5).
 
-### 3.7. La lista de contraseñas filtradas no se actualiza sola ni es exhaustiva
+### 3.7. ~~La lista de contraseñas filtradas no se actualiza sola ni es exhaustiva~~ — **cerrado en el capítulo 37**
 
-**(R23 §23.7)**
+**(R23 §23.7 · cerrado en R37 §37.2)**
 
-Es una foto de dos listas públicas, con manifiesto de cuáles salió. Cubre las filtradas más
-frecuentes de 12 caracteres o más. Comprobar contra cientos de millones de huellas sin un
-servicio externo pediría un archivo de decenas de gigabytes dentro de la imagen.
+~~Es una foto de dos listas públicas, con manifiesto de cuáles salió. Cubre las filtradas
+más frecuentes de 12 caracteres o más. Comprobar contra cientos de millones de huellas sin
+un servicio externo pediría un archivo de decenas de gigabytes dentro de la imagen.~~
 
-**Qué haría falta:** una cuenta en un servicio de comprobación de contraseñas
+~~**Qué haría falta:** una cuenta en un servicio de comprobación de contraseñas
 comprometidas —con el modelo de *k-anonymity*, que no envía la contraseña— o aceptar el
-tamaño.
+tamaño.~~
 
-### 3.8. Nadie avisa de que una huella de imagen se quedó atrás
+**Lo que hacía falta no era una cuenta, y por eso esta entrada estaba mal clasificada desde
+el día que se escribió.** El servicio de rango que implementa *k-anonymity* —el modelo que
+esta misma entrada nombraba— es una petición `GET` anónima: sin registro, sin clave de API,
+sin identificarse. El capítulo 23 escribió «haría falta una cuenta» por analogía con el
+resto de §3, donde sí hace falta, y nadie volvió a comprobarlo en catorce capítulos.
 
-**(R22 §22.9)**
+Desde el capítulo 37, al alta de usuario y al cambio de contraseña se les pregunta por
+rango: **salen los cinco primeros caracteres del resumen SHA-1 y nada más**, nunca la
+contraseña ni el resumen completo. Si el servicio no contesta, no se bloquea a nadie y el
+resultado es idéntico al de antes del capítulo 37 —hay una prueba que compara las dos
+listas de motivos carácter a carácter—, porque la lista local sigue decidiendo primero.
 
-Todas las imágenes de terceros van fijadas por huella y se renuevan con
+**Lo que sigue abierto, y es la mitad que no se cerró:** la lista **local** sigue sin
+actualizarse sola. Se regenera a mano con `scripts/generar_lista_de_contrasenas.py`, y
+sigue importando porque es exactamente lo que queda cuando no hay internet. No depende de
+ninguna cuenta: depende de que alguien la corra, así que su sitio ya no es §3 sino §6. Está
+anotada como resto **34** en §6.4.
+
+### 3.8. ~~Nadie avisa de que una huella de imagen se quedó atrás~~ — **cerrado en el capítulo 37**
+
+**(R22 §22.9 · cerrado en R37 §37.7)**
+
+~~Todas las imágenes de terceros van fijadas por huella y se renuevan con
 `scripts/renovar_imagenes.py`. Que alguien **tenga que correr el guion** es deliberado.
-Automatizarlo con un servicio que abra solicitudes de cambio exige una cuenta.
+Automatizarlo con un servicio que abra solicitudes de cambio exige una cuenta.~~
+
+**Tampoco exigía una cuenta.** Dependabot es parte de GitHub y el repositorio está en
+GitHub desde el capítulo 11; lo único que faltaba era `.github/dependabot.yml`. Esta
+entrada sí fue correcta el día que se escribió —en el capítulo 22 no estaba decidido dónde
+viviría el repositorio— y dejó de serlo sin que nadie volviera a mirarla.
+
+Desde el capítulo 37 hay seis ecosistemas vigilados: las acciones del CI, las dependencias
+de Python y de npm, las dos imágenes base de los Dockerfile y las imágenes de la pila.
+
+**Lo que NO cambia, y está escrito en la cabecera del propio archivo:** Dependabot
+**avisa**; `scripts/renovar_imagenes.py` sigue siendo la fuente de verdad. El guion es quien
+conoce las reglas de este proyecto —una etiqueta no puede llevar dos huellas, nada de
+`apt-get upgrade`, paquetes con versión, acciones por huella de commit— y una solicitud
+automática puede dejar el repositorio en un estado que su guarda `--solo-fijacion` rechaza.
+Y al revés: que no haya solicitudes abiertas no significa que todo esté al día, significa
+que Dependabot no ha visto nada.
+
+El archivo documenta además qué se acepta con el CI verde y qué exige repetir la
+comprobación de la imagen entera —construir, Trivy, syft y los paquetes con versión fijada
+de los dos Dockerfile—, y el control **45** del CI comprueba que esa cobertura y ese
+criterio sigan ahí.
 
 ### 3.9. Las copias de seguridad no salen de la máquina
 
@@ -575,6 +649,8 @@ cambiados, sin copiar valores.
 | :---: | :--- | :--- | :---: |
 | 17 | **El código QR no se ha escaneado con un teléfono** | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso** | R27 §27.13 |
 | 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable**: las ocho pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36). Lo que sigue sin responder es si **lo que ese lector dice se entiende**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 |
+| 19 | **Nadie ha visto una solicitud de Dependabot en este repositorio** | `.github/dependabot.yml` está bien formado y el control 45 comprueba que cubre los seis ecosistemas y que la renovación a mano sigue mandando. Lo que ninguna prueba sustituye es el **primer lunes** que abra solicitudes de verdad: qué propone, si el CI las deja verdes y si alguna choca con la guarda `--solo-fijacion` | R37 §37.10 |
+| 20 | **La comprobación de contraseñas filtradas no se ha ejecutado nunca contra el servicio real** | La suite usa una sonda simulada a propósito: una suite que depende de un tercero se pone roja los días que ese tercero tiene un mal día. Lo que falta por saber es si el contexto TLS del sistema basta desde la máquina del despliegue — y si no bastara, **el síntoma sería silencioso**: la política ante «no se pudo preguntar» es seguir adelante, así que la comprobación estaría apagada de hecho mientras el código afirma tenerla. **Es lo primero que hay que mirar en la bitácora el día del despliegue**, buscando el `WARNING` de `app.core.filtradas_remotas` | R37 §37.4 · §37.10 |
 
 ### 6.4. Restos menores
 
@@ -594,6 +670,7 @@ cambiados, sin copiar valores.
 | 31 | **`btn-danger` no existe.** «Cerrar sesión» pide un aspecto de acción destructiva que la paleta no tiene, así que se dibuja como un `.btn` a secas —borde transparente, sin fondo— y no parece un botón. Darle uno exige un color nuevo en la paleta | R36 §36.6 |
 | 32 | **El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control. Subirlo es una decisión de paleta con efecto en todas las pantallas, no una corrección puntual | R36 §36.8 |
 | 33 | **`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición | R36 §36.8 |
+| 34 | **La lista LOCAL de contraseñas filtradas no se actualiza sola.** Viene de §3.7, que el capítulo 37 cerró a medias: la comprobación contra el servicio público por rango añade cientos de millones de huellas, pero la lista de la imagen —la que decide cuando no hay internet— sigue siendo la foto del capítulo 23. Se regenera con `scripts/generar_lista_de_contrasenas.py`. No depende de ninguna cuenta; depende de que alguien lo corra, y por eso ya no vive en §3 | R23 §23.7 · R37 §37.10 |
 
 ---
 
@@ -650,4 +727,5 @@ Un orden sugerido, no un plan. Cada paso está construido y solo hay que ejecuta
 | El guion cronometrado y su ensayo | `docs/Guion_Cronometrado_de_la_Demo.md` |
 | Cómo sentar a cuatro personas delante | `docs/Prueba_Con_Personas.md` |
 | La defensa oral y las preguntas difíciles | `docs/GUIA_DEFENSA_ORAL.md` |
+| Qué actualiza un tercero y qué sigue decidiendo una persona | `.github/dependabot.yml` |
 | **Lo que queda por hacer** | **este documento** |

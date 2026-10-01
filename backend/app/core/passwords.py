@@ -17,12 +17,25 @@ Sobre los criterios, y por qué son estos y no la receta de siempre:
   suficiente para no necesitarla.
 * **Se rechaza lo que ya se sabe que se prueba primero.** Una lista corta de contraseñas
   del contexto de este sistema, el correo de la persona, su nombre y el nombre del producto.
-* **Se rechaza lo que ya se filtró (capítulo 23).** Una lista LOCAL de contraseñas reales
-  aparecidas en filtraciones públicas —solo las que la longitud mínima no rechazaría ya—,
-  dentro de la imagen. Comprobar una contraseña no manda nada a ningún servicio, ni siquiera
-  un prefijo de su huella. El archivo lo genera `scripts/generar_lista_de_contrasenas.py`, su
-  huella está en el manifiesto y se comprueba al cargarlo: una lista vaciada o sustituida no
-  se usa en silencio, falla.
+* **Se rechaza lo que ya se filtró (capítulos 23 y 37).** Hay DOS comprobaciones, y el orden
+  importa.
+
+  La primera es una lista **local** de contraseñas reales aparecidas en filtraciones
+  públicas —solo las que la longitud mínima no rechazaría ya—, dentro de la imagen. El
+  archivo lo genera `scripts/generar_lista_de_contrasenas.py`, su huella está en el
+  manifiesto y se comprueba al cargarlo: una lista vaciada o sustituida no se usa en
+  silencio, falla.
+
+  La segunda, añadida en el capítulo 37, pregunta **por rango** a un servicio público:
+  salen cinco caracteres del resumen SHA-1 y nada más, nunca la contraseña ni el resumen
+  completo. Está en `app/core/filtradas_remotas.py`, con el porqué entero.
+
+  **La local va primero y decide sola.** Si ya rechazó, no se pregunta fuera: no hay motivo
+  para mandar ni cinco caracteres de algo que ya está rechazado, y una salida a internet por
+  cada contraseña evidente es una salida a internet regalada. Y si el servicio no contesta,
+  el resultado de esta función es **exactamente el de antes del capítulo 37**: la lista
+  local, la longitud, las clases de carácter y los fragmentos personales siguen operando.
+  Sin red no se degrada a «todo vale»; se degrada a lo que había.
 * **El máximo son 72 bytes**, porque bcrypt trunca en silencio a partir de ahí. Una
   contraseña de 100 caracteres de la que solo cuentan 72 es peor que un rechazo: quien la
   eligió cree tener una protección que no tiene.
@@ -42,6 +55,8 @@ import pathlib
 import re
 import unicodedata
 from typing import FrozenSet, List, Optional
+
+from app.core import filtradas_remotas
 
 # bcrypt opera sobre 72 bytes; más allá trunca sin avisar.
 MAX_BYTES = 72
@@ -157,12 +172,20 @@ def evaluar(
     *,
     email: Optional[str] = None,
     nombre: Optional[str] = None,
+    preguntar_fuera: bool = False,
 ) -> List[str]:
     """
     Devuelve la lista de motivos por los que la contraseña no vale. Vacía si vale.
 
     Se expone además de `exigir` para que la interfaz pueda enseñar los requisitos que
     faltan mientras se escribe, sin provocar un error.
+
+    `preguntar_fuera` es **falso por defecto**, y es lo que mantiene a esta función
+    completamente local salvo que alguien pida lo contrario. Con ello: el generador de la
+    lista (`scripts/generar_lista_de_contrasenas.py`), que evalúa decenas de miles de
+    contraseñas para decidir cuáles merece guardar, no abre una conexión por cada una; y
+    una pantalla que quisiera enseñar los requisitos mientras se teclea no mandaría un
+    prefijo por pulsación. Quien decide que sí es `exigir`, que corre una vez, al guardar.
     """
     motivos: List[str] = []
 
@@ -208,6 +231,20 @@ def evaluar(
             "Esa contraseña aparece en filtraciones públicas: está en las listas que se "
             "prueban antes que cualquier otra. Elija una que no haya usado en otro sitio."
         )
+    elif preguntar_fuera:
+        # Solo si las dos listas locales la dejaron pasar. Se pregunta por la contraseña
+        # TAL CUAL se escribió, no por la normalizada: el servicio indexa contraseñas
+        # reales, y `Contraseña` y `contrasena` son dos entradas distintas allí. La
+        # normalización de arriba sirve para comparar contra NUESTRAS listas, que se
+        # generan ya normalizadas; aplicarla aquí preguntaría por una contraseña que nadie
+        # escribió nunca.
+        veredicto = filtradas_remotas.consultar(contrasena)
+        if veredicto.filtrada:
+            motivos.append(filtradas_remotas.MOTIVO_FILTRADA_FUERA)
+        # Y si `filtrada` es None —el servicio no contestó— no se añade nada. No es un
+        # descuido: es la política, y está razonada en la cabecera de `filtradas_remotas`.
+        # Lo que se devuelve entonces son los motivos locales, que es lo que este sistema
+        # devolvía antes del capítulo 37.
 
     for fragmento in FRAGMENTOS_PROHIBIDOS:
         if fragmento in sin_espacios:
@@ -236,8 +273,19 @@ def exigir(
     *,
     email: Optional[str] = None,
     nombre: Optional[str] = None,
+    preguntar_fuera: bool = True,
 ) -> None:
-    """Lanza `ContrasenaDebil` con todos los motivos si la contraseña no cumple."""
-    motivos = evaluar(contrasena, email=email, nombre=nombre)
+    """
+    Lanza `ContrasenaDebil` con todos los motivos si la contraseña no cumple.
+
+    Esta es la puerta por la que pasan los **tres** sitios que fijan una contraseña —el alta
+    de usuario, el restablecimiento del administrador y el cambio que hace uno mismo—, que es
+    toda la razón de que este módulo exista. Por eso la comprobación contra el servicio
+    externo se enciende aquí y no en cada endpoint: encenderla tres veces es olvidarla una.
+
+    El sembrado de demostración no pasa por aquí y tampoco debe: `seed_data.py` corre sin
+    red garantizada y fija contraseñas conocidas a propósito.
+    """
+    motivos = evaluar(contrasena, email=email, nombre=nombre, preguntar_fuera=preguntar_fuera)
     if motivos:
         raise ContrasenaDebil(motivos)

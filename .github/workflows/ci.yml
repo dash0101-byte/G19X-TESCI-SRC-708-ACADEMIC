@@ -2839,6 +2839,229 @@ jobs:
           print(f"Los {con_build} servicios que se construyen nombran una etapa a proposito.")
           PY
 
+      # Capitulo 37. La comprobacion de contrasenas filtradas sale a un tercero, y toda su
+      # aceptabilidad descansa en una sola propiedad: que lo unico que sale son CINCO
+      # caracteres del resumen. Si eso se rompe, se rompe en silencio -el sistema seguiria
+      # funcionando igual de bien mientras las contrasenas viajan por el cable-, y por eso
+      # tiene control propio ademas de las pruebas.
+      #
+      # La suite comprueba el COMPORTAMIENTO (captura el argumento que recibe la sonda y lo
+      # mide). Esto comprueba la ESTRUCTURA: las lineas que, borradas por descuido, dejarian
+      # la prueba pasando y la propiedad perdida.
+      - name: La contrasena no sale de esta maquina
+        run: |
+          set -euo pipefail
+          MODULO=backend/app/core/filtradas_remotas.py
+          codigo=$(grep -vE '^\s*#' "$MODULO")
+
+          # 1. Cinco caracteres, y la constante no es configurable. Mas estrecharia el
+          #    conjunto en el que la contrasena se esconde; menos devolveria megabytes.
+          printf '%s\n' "$codigo" | grep -qE '^PREFIJO = 5$' || {
+            echo "FALLO: PREFIJO ya no es 5 en $MODULO, o se volvio configurable."
+            echo "Cinco caracteres hexadecimales son los 20 bits de k-anonymity que hacen"
+            echo "aceptable preguntar a un tercero. No es un ajuste."
+            exit 1
+          }
+
+          # 2. La peticion lleva el prefijo y nada mas. Lo que se vigila es que a `httpx` no
+          #    le llegue nunca la contrasena ni el resumen entero: `huella_partida` devuelve
+          #    el resumen YA partido para que ninguna funcion lo tenga a mano completo.
+          printf '%s\n' "$codigo" | grep -q 'URL_DE_RANGO + prefijo' || {
+            echo "FALLO: la peticion ya no se construye con el prefijo solo."
+            exit 1
+          }
+          [ "$(printf '%s\n' "$codigo" | grep -c 'hexdigest()')" -eq 1 ] || {
+            echo "FALLO: hay mas de un sitio que calcula el resumen completo en $MODULO."
+            echo "El resumen entero solo debe existir dentro de huella_partida(), que lo"
+            echo "devuelve ya partido precisamente para que nadie lo mande por descuido."
+            exit 1
+          }
+          printf '%s\n' "$codigo" | grep -q 'def huella_partida' || {
+            echo "FALLO: desaparecio huella_partida(); el resumen vuelve a existir entero."
+            exit 1
+          }
+
+          # 3. HTTPS, el almacen del sistema, y sin seguir redirecciones. Una redireccion en
+          #    este servicio es un intermediario, y seguirla manda el prefijo a donde nadie
+          #    decidio mandarlo. `certifi` rechaza los certificados de una salida TLS
+          #    interceptada y convierte un servicio sano en un falso «no contesta».
+          printf '%s\n' "$codigo" | grep -q 'URL_DE_RANGO = "https://' || {
+            echo "FALLO: la URL del servicio ya no es https."
+            exit 1
+          }
+          printf '%s\n' "$codigo" | grep -q 'ssl.create_default_context()' || {
+            echo "FALLO: la salida ya no usa el contexto TLS del sistema."
+            echo "Con el paquete certifi, una maquina con el TLS interceptado recibe un"
+            echo "«no contesta» de un servicio que contesta perfectamente (capitulo 34)."
+            exit 1
+          }
+          printf '%s\n' "$codigo" | grep -q 'follow_redirects=False' || {
+            echo "FALLO: la peticion volvio a seguir redirecciones."
+            exit 1
+          }
+          # Se ancla a la FORMA que tendria el defecto y no a la palabra suelta: la cabecera
+          # del modulo explica por extenso por que NO se usa certifi, y un `grep certifi` a
+          # secas disparaba con su propia explicacion. Es el disparo en falso que convierte
+          # un control en algo que la gente desactiva.
+          if printf '%s\n' "$codigo" | grep -nE 'verify=False|verify=None|^import certifi|certifi\.where'; then
+            echo "FALLO: o se dejo de verificar el certificado, o se volvio a certifi."
+            exit 1
+          fi
+
+          # 4. Sin reintentos. Un reintento con espera multiplica el tope por un numero que
+          #    nadie fijo, y convierte un tercero caido en un alta que parece colgada.
+          # Otra vez anclado a la forma y no a la palabra: el modulo explica en su cabecera
+          # por que NO reintenta, y buscar «reintent» disparaba con esa explicacion.
+          if printf '%s\n' "$codigo" | grep -nE 'for [a-z_]+ in range\(|time\.sleep|while True|Retry\(|transport=|max_retries'; then
+            echo "FALLO: aparecio un reintento o una espera en la consulta a un tercero."
+            echo "El tope corto existe para que un servicio caido no retenga a nadie."
+            exit 1
+          fi
+
+          # 5. La bitacora no escribe el secreto. Un registro con el resumen completo seria
+          #    el diccionario que no se quiso mandar, y encima guardado en disco.
+          if printf '%s\n' "$codigo" | grep -nE 'logger\.[a-z]+\([^)]*(sufijo|contrasena|resumen)'; then
+            echo "FALLO: la bitacora recibe la contrasena, su sufijo o su resumen."
+            echo "Solo puede registrarse el prefijo, que es lo que de todas formas ya viajo."
+            exit 1
+          fi
+
+          # 6. La politica ante el fallo: `None` NO bloquea. Se mira que la decision se tome
+          #    con una comprobacion de verdad -`if veredicto.filtrada:`, que es falsa tanto
+          #    con False como con None- y no con `is not None`, que rechazaria a quien tuvo
+          #    la mala suerte de darse de alta durante un corte de internet.
+          politica=$(grep -vE '^\s*#' backend/app/core/passwords.py)
+          printf '%s\n' "$politica" | grep -q 'if veredicto.filtrada:' || {
+            echo "FALLO: la politica ante el veredicto cambio de forma (capitulo 37)."
+            echo "Debe ser «if veredicto.filtrada:», que trata «no se pudo preguntar» igual"
+            echo "que «no esta filtrada»: sin servicio, el sistema se comporta como ayer."
+            exit 1
+          }
+          if printf '%s\n' "$politica" | grep -nE 'veredicto\.filtrada is not None|not veredicto\.se_pudo_preguntar'; then
+            echo "FALLO: el fallo del servicio volvio a tener consecuencias para el usuario."
+            echo "Un tercero caido no puede impedir que nadie fije su contrasena: la lista"
+            echo "local del capitulo 23 ya ha decidido antes de llegar ahi."
+            exit 1
+          fi
+          # Y que se pregunte DESPUES de las listas locales, no antes: no hay motivo para
+          # mandar ni cinco caracteres de algo que ya esta rechazado.
+          printf '%s\n' "$politica" | grep -q 'elif preguntar_fuera:' || {
+            echo "FALLO: la consulta al servicio dejo de ir detras de las listas locales."
+            exit 1
+          }
+
+          # 7. Las dos guardas que impiden que la suite salga a internet.
+          printf '%s\n' "$codigo" | grep -q 'settings.ENVIRONMENT == "test"' || {
+            echo "FALLO: desaparecio la guarda que impide abrir sockets con ENVIRONMENT=test."
+            exit 1
+          }
+          grep -q 'COMPROBAR_CONTRASENAS_FILTRADAS"\] = "false"' backend/tests/conftest.py || {
+            echo "FALLO: la suite dejo de apagar la comprobacion contra el servicio publico."
+            echo "Una suite que depende de un tercero se pone roja los dias que ese tercero"
+            echo "tiene un mal dia, y entonces el rojo deja de significar nada."
+            exit 1
+          }
+
+          # 8. Y que la comprobacion siga ENCENDIDA en el producto. Una defensa que solo
+          #    protege a quien se acordo de activarla protege a muy poca gente.
+          grep -q 'COMPROBAR_CONTRASENAS_FILTRADAS: bool = True' backend/app/core/config.py || {
+            echo "FALLO: la comprobacion de contrasenas filtradas ya no viene encendida."
+            exit 1
+          }
+          test -s backend/tests/test_contrasenas_filtradas_fuera.py || {
+            echo "FALLO: falta la suite del servicio simulado (capitulo 37)."
+            exit 1
+          }
+          echo "Cinco caracteres, https contra el almacen del sistema, sin reintentos, sin"
+          echo "secretos en la bitacora, y un tercero caido no bloquea a nadie."
+
+      # Capitulo 37, §3.8. Las huellas de las imagenes no cambian solas -esa es la propiedad
+      # que las hace seguras- y por eso nadie se entera de que se quedaron atras. Dependabot
+      # avisa; `scripts/renovar_imagenes.py` sigue siendo la fuente de verdad.
+      #
+      # Lo que este control impide es la version a medias: un dependabot.yml que cubre npm y
+      # se olvida de las imagenes base, que es justo lo que §3.8 echaba en falta y lo que
+      # nadie notaria, porque la ausencia de solicitudes se lee igual que «todo al dia».
+      - name: Las actualizaciones automaticas cubren todo lo que esta fijado
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re, sys
+          try:
+              import yaml
+          except ImportError:
+              sys.exit("Falta PyYAML; este control lee el dependabot.yml como YAML.")
+
+          RAIZ = pathlib.Path(".")
+          config = RAIZ / ".github/dependabot.yml"
+          if not config.is_file():
+              sys.exit("FALLO: no hay .github/dependabot.yml. Nadie avisa de que una huella "
+                       "de imagen se quedo atras (§3.8).")
+
+          updates = yaml.safe_load(config.read_text(encoding="utf-8")).get("updates") or []
+          cubierto = {(u.get("package-ecosystem"), u.get("directory")) for u in updates}
+          fallos = []
+
+          # 1. Lo que TIENE que estar vigilado, y de donde sale cada exigencia.
+          exigidos = {
+              ("github-actions", "/"): "las acciones del CI corren con el token del trabajo",
+              ("pip", "/backend"): "las dependencias de Python del backend",
+              ("npm", "/frontend"): "las dependencias del cliente",
+              # Las imagenes se nombran SIN los dos puntos de la etiqueta a proposito: la
+              # guarda de fijacion (`renovar_imagenes.py --solo-fijacion`) recorre este
+              # workflow buscando referencias `nombre:etiqueta` sin huella, y no distingue
+              # una referencia de verdad de un nombre citado dentro de un texto. Escribir
+              # aqui la forma con dos puntos pone esa guarda en rojo sobre una cadena que
+              # no descarga nada. Encontrado al correr la suite (01-10-2026).
+              ("docker", "/backend"): "la imagen base del backend (python 3.13-slim)",
+              ("docker", "/frontend"): "las imagenes del cliente (node 20-alpine, nginx alpine)",
+              ("docker-compose", "/devops"): "las imagenes de la pila (postgres, redis)",
+          }
+          for clave, porque in sorted(exigidos.items()):
+              if clave not in cubierto:
+                  fallos.append(f"sin vigilar {clave[0]} en {clave[1]}: {porque}")
+
+          # 2. Ningun directorio con imagenes fijadas puede quedarse fuera. Esto es lo que
+          #    convierte la lista de arriba en una propiedad y no en una copia a mano: un
+          #    Dockerfile nuevo manana aparece aqui sin que nadie se acuerde de anadirlo.
+          HUELLA = re.compile(r"(?m)^\s*(FROM|image:)\s+\S+@sha256:[0-9a-f]{64}")
+          for ruta in sorted(RAIZ.glob("**/Dockerfile")) + sorted(RAIZ.glob("devops/*.yml")):
+              if any(p in ruta.parts for p in ("node_modules", ".git")):
+                  continue
+              if not HUELLA.search(ruta.read_text(encoding="utf-8")):
+                  continue
+              directorio = "/" + ruta.parent.as_posix().lstrip("./")
+              directorio = directorio.replace("//", "/")
+              if not any(d == directorio for (_, d) in cubierto):
+                  fallos.append(
+                      f"{ruta.as_posix()} fija imagenes por huella y {directorio} no esta "
+                      f"en dependabot.yml: nadie avisara de que se quedaron atras")
+
+          # 3. Y lo automatico solo avisa: la renovacion a mano sigue existiendo y sigue
+          #    siendo quien decide. Sin esto, la siguiente persona lee «hay dependabot» y
+          #    deja de correr el guion, que es el unico que conoce las reglas del proyecto.
+          guion = RAIZ / "scripts/renovar_imagenes.py"
+          if not guion.is_file():
+              fallos.append("desaparecio scripts/renovar_imagenes.py, que es la fuente de verdad")
+          elif "--solo-fijacion" not in guion.read_text(encoding="utf-8"):
+              fallos.append("renovar_imagenes.py perdio --solo-fijacion, que es su guarda")
+
+          # 4. Y que el criterio este escrito donde se mira. Un dependabot.yml sin esto deja
+          #    la decision -«¿esto lo mezclo o reviso la imagen entera?»- a la memoria de
+          #    quien pase por ahi un martes.
+          texto = config.read_text(encoding="utf-8")
+          for frase in ("SE ACEPTA SIN PENSAR", "EXIGE REPETIR LA COMPROBACI", "renovar_imagenes.py"):
+              if frase not in texto:
+                  fallos.append(f"dependabot.yml no documenta «{frase}»")
+
+          if fallos:
+              print("FALLO: las actualizaciones automaticas no cubren lo que dicen cubrir.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Vigilados {len(cubierto)} ecosistemas; la renovacion a mano sigue mandando.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

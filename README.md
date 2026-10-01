@@ -416,10 +416,26 @@ Los JWT se firman y verifican con **PyJWT**, solo HMAC, exigiendo `exp`, `iat`, 
 aviso sin arreglo que `pip-audit` tenía que ignorar; ahora la auditoría no ignora ninguno.
 
 **Contraseñas filtradas.** La política rechaza, además, las que aparecen en filtraciones
-públicas, con una lista **local** de 46 825 entradas dentro de la imagen
-(`backend/app/core/datos/`). No se consulta ningún servicio externo. Se comprueba en el
-alta, en el cambio propio y en el restablecimiento; la huella del archivo está en su
-manifiesto, y una lista vaciada o sustituida no se usa en silencio.
+públicas. Se comprueba en el alta, en el cambio propio y en el restablecimiento, y hay dos
+comprobaciones, en este orden:
+
+1. Una lista **local** de 46 825 entradas dentro de la imagen (`backend/app/core/datos/`).
+   La huella del archivo está en su manifiesto, y una lista vaciada o sustituida no se usa
+   en silencio: falla.
+2. Si la local la deja pasar, **se pregunta por rango** al servicio público (capítulo 37).
+   **Salen los cinco primeros caracteres del resumen SHA-1 y nada más** —nunca la contraseña
+   ni el resumen completo—; el servicio devuelve los cientos de sufijos que empiezan por ese
+   prefijo y la comparación se hace aquí, así que no puede saber cuál era el nuestro ni si
+   alguno lo era. La petición pide relleno (`Add-Padding`) para que el tamaño de la
+   respuesta tampoco delate el prefijo.
+
+**Si el servicio no contesta, no se bloquea a nadie.** Dos segundos de espera, sin
+reintentos, y el resultado es idéntico al que daba el sistema antes del capítulo 37: decide
+la lista local. El fallo queda en la bitácora con el prefijo —lo único que ya había
+salido—, nunca con la contraseña ni con su resumen. La salida verifica el certificado
+contra el **almacén del sistema**, no contra el paquete de la biblioteca, porque en una
+máquina con el TLS interceptado lo segundo produce un «el servicio no contesta» silencioso
+sobre un servicio que funciona.
 
 ### Cuentas sembradas
 
@@ -1053,6 +1069,19 @@ python scripts/renovar_imagenes.py                   # pregunta al registro qué
 python scripts/renovar_imagenes.py --aplicar         # reescribe las huellas; se revisa el diff
 ```
 
+Desde el capítulo 37, **`.github/dependabot.yml` avisa** de lo que se queda atrás: las
+acciones del CI, las dependencias de Python y de npm, las dos imágenes base de los
+Dockerfile y las imágenes de la pila. Abre solicitudes de cambio y no mezcla nada.
+
+**El guion de arriba sigue siendo la fuente de verdad**, y la distinción importa: es el
+único que conoce las reglas de este proyecto —una etiqueta no puede llevar dos huellas,
+nada de `apt-get upgrade`, paquetes del sistema con versión, acciones por huella de
+commit—, así que una solicitud automática puede dejar el repositorio en un estado que
+`--solo-fijacion` rechaza. Y al revés: que no haya solicitudes abiertas no significa que
+todo esté al día, significa que Dependabot no ha visto nada. El propio `dependabot.yml`
+documenta qué se acepta con el CI verde y qué exige repetir la comprobación de la imagen
+entera —cualquier huella de imagen base la exige—.
+
 `pip-audit` ya no audita los rangos de `requirements.txt`, que resolvía en el momento de
 auditar y no tenían por qué coincidir con lo que llevaba la imagen construida una hora
 antes. El CI instala cada lock en un entorno limpio, comprueba con
@@ -1339,6 +1368,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos que sigue la demostración, 16 preguntas técnicas de sínodo y **8 preguntas incómodas** con su respuesta honesta: por qué no se lee LinkedIn, por qué el modelo no conoce los canales nuevos y por qué no hay desenlaces sintéticos. |
 | **33** | [Reporte 33](docs/reportes/Reporte_33_Segundo_Factor_para_Administracion_El_Secreto_que_no_se_Guarda_y_la_Cuenta_que_no_se_Bloquea_Sola.md) | Segundo factor para administración (capítulo 35): TOTP obligatorio para `System_Admin` y opcional para el resto, con QR y diez códigos de recuperación de un solo uso. El secreto **no se guarda**: se deriva de `SECRET_KEY` y una sal por alta, así que la base no contiene nada que cifrar. El alta no activa hasta comprobar un código, el desafío del login es de tipo propio y no sirve como sesión, un código no vale dos veces, y **la última administración no puede quitarse el suyo**. TOTP escrito sobre la biblioteca estándar y comprobado contra los 18 vectores oficiales del RFC 6238. 10 defectos reintroducidos, 10 detectados. |
 | **34** | [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md) | Accesibilidad comprobada (capítulo 36): las **ocho pantallas** pasan el nivel AA de WCAG 2.1, medido por `axe-core` desde la propia suite —la biblioteca ya estaba instalada desde el capítulo 17 y nadie la llamaba: declararla costó **una línea** del lock—. La ficha 360 **no era una ventana** para el teclado ni para un lector de pantalla: sin rol, sin nombre, sin atrapado del foco, sin `Escape` y sin devolverlo al cerrar. Cuatro controles del panel solo se podían pulsar con el ratón, y uno era la única puerta a **cerrar sesión**. El contraste se calcula leyendo la paleta de `index.css`, porque `jsdom` no dibuja pero los colores están escritos: un token no llegaba al mínimo y pintaba las etiquetas de todos los formularios. Y midiendo con **300 prospectos y 5 000 actividades** apareció un N+1: la bandeja «Hoy» hacía una consulta por tarea. 20 defectos reintroducidos, 20 detectados. |
+| **35** | [Reporte 35](docs/reportes/Reporte_35_La_Cadena_de_Suministro_se_Mantiene_Sola_Cinco_Caracteres_que_Salen_el_Tercero_que_no_Puede_Bloquear_y_el_Aviso_que_no_Decide.md) | La cadena de suministro se mantiene sola (capítulo 37): cierra **§3.7 y §3.8** de la congelación demostrando que la premisa de las dos era falsa —ninguna necesitaba la cuenta externa que decían necesitar—. Las contraseñas se comprueban ahora contra el servicio público **por rango**: salen **cinco caracteres** del resumen SHA-1 y nada más, con relleno para que el tamaño tampoco hable. Si el servicio cae o tarda, **no se bloquea a nadie** y el resultado es el de antes, carácter a carácter. La salida verifica contra el **almacén del sistema**, porque con el paquete de la biblioteca el fallo sería silencioso. Y `dependabot.yml` vigila seis ecosistemas **avisando**, mientras `renovar_imagenes.py` sigue decidiendo. 17 defectos reintroducidos, 17 detectados — y tres disparos en falso destapados de paso, los tres por buscar una palabra en vez de una forma. |
 | **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
 | **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
 | **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |

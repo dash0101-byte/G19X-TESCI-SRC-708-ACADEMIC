@@ -1,0 +1,155 @@
+# Actualizaciones automáticas: quién avisa de que algo se quedó atrás (capítulo 37)
+# =================================================================================
+#
+# Cierra el §3.8 de la congelación —«nadie avisa de que una huella de imagen se quedó
+# atrás»—, que daba por hecho que automatizarlo «exige una cuenta». No la exige: Dependabot
+# es parte de GitHub, el repositorio ya está ahí, y lo único que hace falta es este archivo.
+# Coste cero y ninguna cuenta nueva, que era la condición.
+#
+#
+# LO QUE ESTO ES, Y SOBRE TODO LO QUE NO ES
+# -----------------------------------------
+# Esto AVISA. No decide, no mezcla y no renueva nada por su cuenta: abre una solicitud de
+# cambio y ahí se queda hasta que una persona la lea.
+#
+# **La fuente de verdad sigue siendo `scripts/renovar_imagenes.py`** (capítulo 22). El guion
+# es quien sabe de este proyecto: que la misma `nombre:etiqueta` no puede aparecer con dos
+# huellas distintas, que un Dockerfile no puede volver a `apt-get upgrade`, que un paquete
+# del sistema va con versión, que una acción de GitHub va por la huella de su commit. Nada de
+# eso lo sabe Dependabot, y su solicitud puede dejar el repositorio en un estado que la
+# guarda `--solo-fijacion` rechaza. Cuando eso pase, manda el guion.
+#
+# Dicho al revés, porque es la confusión que esto podría crear: que no haya solicitudes
+# abiertas NO significa que todo esté al día. Significa que Dependabot no ha visto nada. Lo
+# que significa «al día» sigue siendo `python scripts/renovar_imagenes.py` sin salida.
+#
+#
+# QUÉ SE ACEPTA SIN PENSAR Y QUÉ EXIGE REPETIR LA COMPROBACIÓN DE LA IMAGEN
+# ------------------------------------------------------------------------
+# Esta es la parte que hay que leer antes de pulsar «mezclar», y la razón de que este archivo
+# lleve más comentario que configuración.
+#
+# SE ACEPTA SIN PENSAR —basta con que el CI esté verde—:
+#
+#   * Un parche de una dependencia de Python o de npm (`1.2.3` -> `1.2.4`) que no sea del
+#     grupo de seguridad. Si rompe algo, lo rompe en la suite, y la suite corre en la propia
+#     solicitud.
+#   * Una acción de GitHub que sube de huella DENTRO de la misma versión mayor, con su
+#     comentario `# vX.Y` al lado intacto. El CI reescribe esa huella en cada ejecución y la
+#     guarda del capítulo 32 comprueba que no vuelva a ir por etiqueta.
+#
+# EXIGE REPETIR LA COMPROBACIÓN DE LA IMAGEN —es decir, construir, escanear con Trivy, mirar
+# el inventario de syft y comprobar que los paquetes con versión fijada de los dos Dockerfile
+# siguen existiendo en la base nueva—:
+#
+#   * CUALQUIER cambio de huella de una imagen base: `python:3.13-slim`, `node:20-alpine`,
+#     `nginx:alpine`, `postgres:16-alpine`, `redis:7-alpine`. Una huella nueva de la misma
+#     etiqueta es un sistema operativo distinto por dentro. Puede traer ya el paquete que el
+#     Dockerfile instala con versión —y entonces esa línea sobra—, o puede no tener esa
+#     versión —y entonces la construcción falla—, o puede traer una vulnerabilidad que el
+#     escaneo tiene que ver antes de que llegue a producción. Es exactamente lo que el
+#     capítulo 22 decidió no arrastrar.
+#   * Cualquier subida de versión MAYOR, de lo que sea. Una mayor es una decisión, no una
+#     actualización, y se lee entera.
+#   * Cualquier cosa del grupo `seguridad`: se mira ya, aunque sea un parche, porque el
+#     motivo de que exista la solicitud es que hay un aviso publicado.
+#   * `backend/requirements.lock`. Dependabot propone sobre `requirements.txt`; el lock lleva
+#     hashes y `--require-hashes`, y se REGENERA, no se edita. Una solicitud que toque el
+#     lock a mano se cierra y se vuelve a generar en local.
+#
+#
+# POR QUÉ LOS LÍMITES SON TAN BAJOS
+# ---------------------------------
+# `open-pull-requests-limit` va entre 3 y 5 en todas partes. Un repositorio congelado con
+# veinte solicitudes abiertas no es un repositorio vigilado: es un repositorio con veinte
+# avisos que nadie lee, y el día que llegue el aviso que importa estará en la página dos.
+# Pocas y leídas vale más que todas y acumuladas.
+version: 2
+
+updates:
+  # --- Acciones del CI ---------------------------------------------------------------
+  # Van por la huella del commit, no por etiqueta (capítulo 32): una acción por etiqueta es
+  # código de terceros que puede cambiar sin que cambie el repositorio, ejecutándose con el
+  # token del trabajo. Dependabot entiende esa forma y propone huella y comentario juntos.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencias", "revisar-a-mano"]
+
+  # --- Python del backend ------------------------------------------------------------
+  # Sobre `requirements.txt`. El `.lock` con hashes NO se edita en una solicitud: se
+  # regenera. Está dicho arriba y repetido aquí porque es donde se mira.
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencias"]
+    groups:
+      # Los parches, juntos en una sola solicitud. Son los que se aceptan con el CI verde,
+      # y cinco solicitudes para cinco parches es cómo se deja de leerlas.
+      parches:
+        update-types: ["patch"]
+
+  # --- Cliente -----------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencias"]
+    groups:
+      parches:
+        update-types: ["patch"]
+
+  # --- Imágenes base: las dos del proyecto -------------------------------------------
+  # `backend/Dockerfile` y `frontend/Dockerfile`. Van en entradas separadas porque Dependabot
+  # vigila un directorio, y los dos Dockerfile viven en directorios distintos.
+  #
+  # Aquí es donde §3.8 dolía: una huella de `python:3.13-slim` puede quedarse meses atrás sin
+  # que nada del repositorio cambie, porque la huella es precisamente lo que impide que
+  # cambie sola. Ese es el precio de fijar por huella, y este archivo es quien lo paga.
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "imagen"
+    labels: ["dependencias", "imagen-base", "revisar-a-mano"]
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "imagen"
+    labels: ["dependencias", "imagen-base", "revisar-a-mano"]
+
+  # --- Imágenes de la pila -----------------------------------------------------------
+  # `devops/docker-compose.yml` y el overlay de desarrollo: Postgres, Redis, y las dos
+  # herramientas del overlay. Son las que el proyecto no construye pero sí ejecuta, y hasta
+  # aquí nadie avisaba de ellas en absoluto.
+  - package-ecosystem: "docker-compose"
+    directory: "/devops"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "imagen"
+    labels: ["dependencias", "imagen-base", "revisar-a-mano"]

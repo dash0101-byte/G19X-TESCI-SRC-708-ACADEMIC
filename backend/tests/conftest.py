@@ -37,6 +37,16 @@ os.environ["ENVIRONMENT"] = "test"
 # las pruebas de seguridad no serían reproducibles entre ejecuciones.
 os.environ["SECRET_KEY"] = "clave-exclusiva-de-la-suite-de-pruebas-no-usada-en-ningun-despliegue"
 os.environ["REFRESH_COOKIE_SECURE"] = "false"
+# La comprobación de contraseñas filtradas contra el servicio público (capítulo 37) va
+# ENCENDIDA por defecto en el producto y APAGADA aquí. No es que la suite no la pruebe —hay
+# un archivo entero para ella—: es que no debe probarla saliendo a internet. Una suite que
+# depende de un tercero falla los días que ese tercero tiene un mal día, y entonces el rojo
+# del CI deja de significar «el código está mal».
+#
+# `filtradas_remotas.consultar` lleva además una segunda guarda, para el caso de que alguien
+# encienda esto en una prueba: con ENVIRONMENT=test se niega a abrir un socket si no se le
+# ha inyectado una sonda.
+os.environ["COMPROBAR_CONTRASENAS_FILTRADAS"] = "false"
 
 from app.core.config import settings  # noqa: E402  (requiere el entorno de arriba)
 from app.core.database import Base, SessionLocal, engine, get_db  # noqa: E402

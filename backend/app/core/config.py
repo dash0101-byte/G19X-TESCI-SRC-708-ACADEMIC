@@ -163,6 +163,43 @@ class Settings(BaseSettings):
     # código muchas veces es un ataque contra una cuenta concreta cuya contraseña ya cayó.
     SEGUNDO_FACTOR_LIMITE_POR_IP: str = "20/minute"
 
+    # --- Contraseñas filtradas, comprobadas fuera (capítulo 37) ---
+    # La lista local del capítulo 23 es una foto de dos listas públicas: no se actualiza
+    # sola y cubre lo frecuente, no lo exhaustivo (§3.7 de la congelación). Preguntar por
+    # rango —k-anonymity— añade cientos de millones de huellas sin meter un gigabyte en la
+    # imagen y sin mandar la contraseña a ningún sitio: salen cinco caracteres del resumen.
+    #
+    # ENCENDIDO por defecto, al revés que COMPROBAR_DIRECCION_PUBLICA, y la diferencia es
+    # deliberada. Aquella comprobación sin red deja una alarma encendida en el panel; esta,
+    # sin red, no cambia nada: la lista local sigue rechazando y el veredicto remoto queda
+    # en «no se pudo preguntar». Una defensa que solo protege a quien se acordó de activarla
+    # protege a muy poca gente.
+    #
+    # La suite nunca sale a internet aunque esto esté encendido: `filtradas_remotas.consultar`
+    # se niega a abrir un socket con ENVIRONMENT=test si no se le inyecta una sonda.
+    COMPROBAR_CONTRASENAS_FILTRADAS: bool = True
+    # Dos segundos. El alta de usuario espera a esto, así que el tope no es «cuánto aguanto
+    # que tarde» sino «cuánto puede un tercero retener a quien está dándose de alta». No hay
+    # reintentos: un reintento con espera multiplica este número por el que nadie fijó.
+    CONTRASENAS_FILTRADAS_TIMEOUT_SEGUNDOS: float = 2.0
+
+    @field_validator("CONTRASENAS_FILTRADAS_TIMEOUT_SEGUNDOS")
+    @classmethod
+    def _validar_espera_de_filtradas(cls, valor: float) -> float:
+        """
+        Un tope largo es peor que no tener la comprobación: convierte un servicio ajeno
+        caído en un formulario que parece colgado, y quien lo sufre no tiene forma de saber
+        que la culpa es de un tercero. Diez segundos es ya un abuso; medio segundo no da
+        tiempo ni al apretón de manos TLS.
+        """
+        if not 0.5 <= valor <= 10:
+            raise ValueError(
+                "CONTRASENAS_FILTRADAS_TIMEOUT_SEGUNDOS debe estar entre 0.5 y 10: por "
+                "debajo no cabe el apretón de manos TLS y por encima el alta se queda "
+                "colgada esperando a un tercero."
+            )
+        return valor
+
     # --- Webhook CRM (HMAC-SHA256) ---
     # Secreto compartido con el CRM emisor. Sin él, el webhook queda deshabilitado (503).
     CRM_WEBHOOK_SECRET: str = ""
