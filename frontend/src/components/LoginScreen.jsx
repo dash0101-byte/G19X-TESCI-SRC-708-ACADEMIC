@@ -77,8 +77,8 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
             width: '44px',
             height: '44px',
             borderRadius: 'var(--radius-sm)',
-            background: '#ffffff',
-            color: '#0b0f19',
+            background: 'var(--color-primary)',
+            color: 'var(--color-primary-text)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -97,29 +97,13 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
         </div>
 
         {expiredNotice && (
-          <div role="status" style={{
-            background: 'rgba(234, 179, 8, 0.12)',
-            border: '1px solid rgba(234, 179, 8, 0.35)',
-            color: '#eab308',
-            borderRadius: 'var(--radius-sm)',
-            padding: '10px 12px',
-            fontSize: '0.78rem',
-            marginBottom: '16px',
-          }}>
+          <div role="status" className="alert alert-warn" style={{ marginBottom: '16px' }}>
             Su sesión expiró por inactividad. Vuelva a iniciar sesión.
           </div>
         )}
 
         {notice && (
-          <div role="status" style={{
-            background: 'rgba(34, 197, 94, 0.12)',
-            border: '1px solid rgba(34, 197, 94, 0.35)',
-            color: '#22c55e',
-            borderRadius: 'var(--radius-sm)',
-            padding: '10px 12px',
-            fontSize: '0.78rem',
-            marginBottom: '16px',
-          }}>
+          <div role="status" className="alert alert-ok" style={{ marginBottom: '16px' }}>
             {notice}
           </div>
         )}
@@ -163,16 +147,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
             )}
 
             {error && (
-              <div role="alert" style={{
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                color: '#ef4444',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 12px',
-                fontSize: '0.78rem',
-                marginBottom: '14px',
-                whiteSpace: 'pre-line',
-              }}>
+              <div role="alert" className="alert alert-error" style={{ marginBottom: '14px' }}>
                 {error}
               </div>
             )}
@@ -232,16 +207,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
               incorrectos» aparecía en pantalla y no lo anunciaba nadie: quien no ve la
               pantalla se quedaba esperando a que pasara algo. */}
           {error && (
-            <div role="alert" style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#ef4444',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 12px',
-              fontSize: '0.78rem',
-              marginBottom: '14px',
-              whiteSpace: 'pre-line',
-            }}>
+            <div role="alert" className="alert alert-error" style={{ marginBottom: '14px' }}>
               {error}
             </div>
           )}

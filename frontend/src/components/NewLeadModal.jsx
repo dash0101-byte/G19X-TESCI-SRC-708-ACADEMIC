@@ -1,6 +1,39 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createLead } from '../services/api';
+import MensajeDeCampo from './MensajeDeCampo.jsx';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDelServidor,
+  propiedadesDeCampo,
+  resumenDeCampos,
+  sinElCampo,
+} from './erroresDeFormulario';
 import { useVentanaModal } from './ventanaModal';
+
+// Los campos que esta pantalla pinta y que el servidor valida uno por uno. Un error de
+// cualquier otro campo no se puede señalar aquí —no hay dónde ponerlo—, así que
+// `erroresDelServidor` lo saca aparte y acaba en el aviso de arriba en vez de perderse.
+const CAMPOS = ['first_name', 'last_name', 'email', 'phone', 'company', 'job_title'];
+
+// La etiqueta con la que esta pantalla llama a cada campo. El 422 trae el nombre de la
+// columna —`first_name`—, y el resumen de arriba tiene que decir «Nombre», que es lo que
+// la persona está viendo. Sale de aquí y no del `<label>` porque el resumen se escribe
+// antes de que el navegador haya pintado nada.
+const ETIQUETAS = {
+  first_name: 'Nombre',
+  last_name: 'Apellido',
+  email: 'Correo electrónico',
+  phone: 'Teléfono',
+  company: 'Empresa / Institución',
+  job_title: 'Cargo',
+};
+
+// Lo que dice esta pantalla cuando el correo no vale. El mensaje de Pydantic para un correo
+// viene de la biblioteca que lo valida y está en inglés —«value is not a valid email
+// address: An email address must have an @-sign»—; el del teléfono lo escribió este
+// repositorio y ya explica qué forma espera, así que ese no se toca.
+const PROPIOS = { email: 'Escriba un correo con la forma nombre@empresa.com.' };
 
 export default function NewLeadModal({ onClose, onLeadCreated }) {
   // Nombre, atrapado del foco, `Escape` y devolución del foco al cerrar (capítulo 36).
@@ -32,11 +65,16 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
   const [showCustomFields, setShowCustomFields] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Lo que el servidor dijo de cada campo. Hasta el capítulo 40 esto no existía: el 422
+  // entero se volcaba en el aviso de arriba, con el nombre de la columna y en inglés.
+  const [errores, setErrores] = useState({});
+  const formularioRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setErrores({});
     try {
       const customMetadata = {};
       if (formData.profiles_needed) customMetadata.profiles_needed = formData.profiles_needed;
@@ -69,7 +107,24 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
       onLeadCreated();
       onClose();
     } catch (err) {
-      setError(err.message);
+      const repartidos = err.status === 422
+        ? erroresDelServidor(err.detalle, { propios: PROPIOS, campos: CAMPOS })
+        : null;
+      if (repartidos && Object.keys(repartidos.porCampo).length) {
+        setErrores(repartidos.porCampo);
+        // El aviso de arriba deja de repetir los mensajes y pasa a decir **cuáles** son,
+        // con la etiqueta que la pantalla usa. Los que no caben junto a un campo —un error
+        // de un campo que esta pantalla no pinta— se dicen enteros.
+        setError(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(formularioRef, repartidos.porCampo, CAMPOS);
+      } else if (repartidos && repartidos.sueltos.length) {
+        setError(comoAviso(repartidos.sueltos));
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -77,7 +132,15 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
 
   const handleChange = (field, val) => {
     setFormData((prev) => ({ ...prev, [field]: val }));
+    // Al corregir el campo se le quita la marca: si no, el borde rojo y el mensaje se
+    // quedan puestos mientras se escribe la corrección, diciendo algo que ya no es verdad.
+    setErrores((prev) => sinElCampo(prev, field));
   };
+
+  const conError = (nombre) => propiedadesDeCampo(nombre, errores, 'new-lead');
+  const mensaje = (nombre) => (
+    <MensajeDeCampo nombre={nombre} errores={errores} prefijo="new-lead" />
+  );
 
   // Velo con `role="presentation"` y cierre según dónde se pulsó; `Escape` para el teclado.
   // El detalle está explicado en LeadDetailModal.jsx.
@@ -101,12 +164,12 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
 
         {/* `role="alert"`, como en el resto de los formularios del panel. */}
         {error && (
-          <div role="alert" style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--hot-border)', padding: '10px 14px', borderRadius: '8px', color: 'var(--hot-text)', fontSize: '0.85rem', marginBottom: '16px' }}>
+          <div role="alert" className="alert alert-error" style={{ marginBottom: '16px' }}>
             ⚠️ {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} ref={formularioRef}>
           {/* Nombre y Apellido */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div>
@@ -120,7 +183,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.first_name}
                 onChange={(e) => handleChange('first_name', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('first_name')}
               />
+              {mensaje('first_name')}
             </div>
             <div>
               <label htmlFor="new-lead-last-name" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Apellido *</label>
@@ -133,7 +198,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.last_name}
                 onChange={(e) => handleChange('last_name', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('last_name')}
               />
+              {mensaje('last_name')}
             </div>
           </div>
 
@@ -150,7 +217,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('email')}
               />
+              {mensaje('email')}
             </div>
             <div>
               <label htmlFor="new-lead-phone" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Teléfono</label>
@@ -162,7 +231,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.phone}
                 onChange={(e) => handleChange('phone', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('phone')}
               />
+              {mensaje('phone')}
             </div>
           </div>
 
@@ -178,7 +249,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.company}
                 onChange={(e) => handleChange('company', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('company')}
               />
+              {mensaje('company')}
             </div>
             <div>
               <label htmlFor="new-lead-job-title" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>Cargo / Rol</label>
@@ -190,7 +263,9 @@ export default function NewLeadModal({ onClose, onLeadCreated }) {
                 value={formData.job_title}
                 onChange={(e) => handleChange('job_title', e.target.value)}
                 style={{ marginTop: '4px' }}
+                {...conError('job_title')}
               />
+              {mensaje('job_title')}
             </div>
           </div>
 

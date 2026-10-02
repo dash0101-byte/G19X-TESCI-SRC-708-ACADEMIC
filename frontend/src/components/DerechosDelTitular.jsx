@@ -249,7 +249,7 @@ export default function DerechosDelTitular() {
           anuncian lo que cambia dentro de una región que ya estaba. */}
       <div role="alert" style={{ marginBottom: error ? '12px' : 0 }}>
         {error && (
-          <div style={{ ...bloque, borderColor: 'var(--hot-text)', color: 'var(--hot-text)', fontSize: '0.82rem' }}>
+          <div style={{ ...bloque, borderColor: 'var(--error-text)', color: 'var(--error-text)', fontSize: '0.82rem' }}>
             ⚠️ {error}
           </div>
         )}

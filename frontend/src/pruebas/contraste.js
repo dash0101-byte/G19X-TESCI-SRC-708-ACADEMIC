@@ -197,7 +197,8 @@ export const PARES = [
   // `--bg-surface`, que es el panel donde viven: las filas de la tabla y las tarjetas.
   {
     texto: '--hot-text', fondo: { sobre: '--hot-bg', encima_de: '--bg-surface' },
-    donde: '.badge-hot, y el mismo color en .interes-error y .interes-aviso',
+    donde: '.badge-hot y los demás sitios donde el color dice «este prospecto está '
+      + 'caliente»: la muestra de la leyenda, el score por encima del umbral y el KPI',
   },
   {
     texto: '--warm-text', fondo: { sobre: '--warm-bg', encima_de: '--bg-surface' },
@@ -211,12 +212,22 @@ export const PARES = [
     texto: '--success-text', fondo: { sobre: '--success-bg', encima_de: '--bg-surface' },
     donde: 'los avisos de que algo salió bien',
   },
-  // El rojo de los errores también se escribe directamente sobre el panel, sin su fondo
-  // translúcido: es el caso de `.interes-error`, que es el texto que hay que poder leer
-  // cuando el formulario dice qué falta.
+
+  // --- El estado de error (capítulo 40) ---
+  //
+  // Hasta este capítulo el rojo de los errores era `--hot-text`, el de la temperatura de
+  // un prospecto, y en cuatro avisos de tres pantallas no era ningún token: era #ef4444
+  // escrito a mano en un `style` del JSX, que es el único sitio de esta aplicación donde
+  // un color no pasa por aquí. Daba 4.43 sobre el panel y 4.17 sobre el elevado.
   {
-    texto: '--hot-text', fondo: ['--bg-surface'],
-    donde: '.interes-error — el mensaje de «falta este campo», sin fondo propio',
+    texto: '--error-text',
+    fondo: { sobre: '--error-bg', encima_de: ['--bg-base', '--bg-surface', '--bg-surface-elevated'] },
+    donde: '.alert-error — el aviso de una pantalla, sobre su propio fondo translúcido',
+  },
+  // Y el mismo color sin fondo propio: el mensaje que va pegado a un campo.
+  {
+    texto: '--error-text', fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated'],
+    donde: '.form-error y .interes-error — «falta este campo», junto al campo que falta',
   },
 
   // --- El botón principal: texto oscuro sobre blanco ---
@@ -270,6 +281,35 @@ export const PARES = [
       + 'y los :focus-visible del panel de difusión',
   },
   {
+    texto: '--border-error',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover', '--bg-field'],
+    minimo: MINIMO_NO_TEXTO,
+    donde: 'el contorno de un campo cuyo valor no vale: .input-field[aria-invalid="true"] '
+      + '(§6.4 punto 36). No baja a la primera parada que pasa porque este borde no cambia '
+      + 'con el foco, y cuanto más claro sea menos sitio queda para que el foco se note',
+  },
+  // Las tres etapas de la barra del embudo. Llevan información —el ancho dice cuántas
+  // fichas hay en cada etapa—, así que §1.4.11 les pide 3.0, y se miden contra la pista
+  // sobre la que se dibujan y no contra el panel, que es lo que hay detrás de verdad.
+  {
+    texto: '--funnel-won',
+    fondo: { sobre: '--bg-chip', encima_de: ['--bg-surface', '--bg-surface-elevated'] },
+    minimo: MINIMO_NO_TEXTO,
+    donde: 'el segmento de las fichas ganadas en el embudo de AnalyticsCharts',
+  },
+  {
+    texto: '--funnel-qualified',
+    fondo: { sobre: '--bg-chip', encima_de: ['--bg-surface', '--bg-surface-elevated'] },
+    minimo: MINIMO_NO_TEXTO,
+    donde: 'el segmento de las cualificadas — el más justo de los tres, 3.56',
+  },
+  {
+    texto: '--funnel-rest',
+    fondo: { sobre: '--bg-chip', encima_de: ['--bg-surface', '--bg-surface-elevated'] },
+    minimo: MINIMO_NO_TEXTO,
+    donde: 'el segmento de las demás etapas, que es el punto de WARM escrito una vez',
+  },
+  {
     texto: '--danger-border',
     fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
     minimo: MINIMO_NO_TEXTO,
@@ -300,6 +340,20 @@ export const CAMBIOS_DE_ESTADO = [
     donde: 'un botón secundario: .btn-secondary:hover pasa a --bg-surface-hover',
     reposo: { borde: '--border-control', fondo: '--bg-surface-elevated' },
     foco: { borde: '--border-focus', fondo: '--bg-surface-hover' },
+  },
+  // El tercero es de otra clase, y por eso está escrito con el fondo en los dos lados.
+  //
+  // En un campo inválido el borde rojo **no cambia** al recibir el foco: el error no se
+  // va porque se esté escribiendo en el campo. Lo que aparece es un aro por fuera, y lo
+  // que hay que medir es ese aro contra **lo que había en ese sitio antes**, que es el
+  // panel. No es una elección estética: no existe ningún rojo que llegue a 3.0 por encima
+  // de --border-error —el blanco puro da 1.96—, así que señalar el foco cambiando el color
+  // del borde dejaría §2.4.7 incumplido en todos los campos inválidos de la aplicación.
+  // `contraste.test.js` recalcula esa imposibilidad para que quede escrita y no se olvide.
+  {
+    donde: 'un campo inválido: el aro de foco aparece por fuera, sobre el panel',
+    reposo: { borde: '--bg-surface', fondo: '--bg-surface' },
+    foco: { borde: '--border-focus', fondo: '--bg-surface' },
   },
 ];
 
@@ -334,12 +388,17 @@ export function medir(par, variables) {
 
   const texto = aRgb(resolver(par.texto));
 
+  // `encima_de` admite una lista: el mismo fondo translúcido se compone sobre cada una de
+  // las superficies donde el elemento aparece de verdad. El aviso de error vive en tres
+  // —el panel, el modal y el fondo de las pantallas de credenciales—, y medirlo solo
+  // sobre una elegiría el color con la medida más cómoda de las tres.
+  const debajoDe = (par.fondo && par.fondo.encima_de) || [];
   const fondos = Array.isArray(par.fondo)
     ? par.fondo.map((token) => ({ nombre: token, color: aRgb(resolver(token)) }))
-    : [{
-      nombre: `${par.fondo.sobre} sobre ${par.fondo.encima_de}`,
-      color: componer(resolver(par.fondo.sobre), resolver(par.fondo.encima_de)),
-    }];
+    : (Array.isArray(debajoDe) ? debajoDe : [debajoDe]).map((debajo) => ({
+      nombre: `${par.fondo.sobre} sobre ${debajo}`,
+      color: componer(resolver(par.fondo.sobre), resolver(debajo)),
+    }));
 
   // Un color translúcido que se mezcla con cada fondo, y no con uno fijo: es lo que pasa
   // de verdad con un borde, que no es el mismo color sobre un campo que sobre un panel.

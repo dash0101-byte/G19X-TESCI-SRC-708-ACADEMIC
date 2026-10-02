@@ -1,0 +1,55 @@
+// ============================================================================
+// Los archivos del cliente, leídos del disco una sola vez y de la misma forma
+// ============================================================================
+//
+// Tres comprobaciones de este directorio recorren el código fuente buscando lo que el
+// marcado nombra: `clases.test.js` las clases de CSS, `tokens.test.js` las variables de la
+// paleta y `colores.test.js` los colores escritos a mano. Las tres tenían su propia copia
+// de «qué archivos son el cliente» y de «qué es un comentario».
+//
+// Eso no es duplicación de tres líneas: es el riesgo de que dos guardas no estén mirando
+// el mismo sitio. El día que una de las copias deje fuera un directorio nuevo, su barrido
+// seguirá verde sin haber mirado nada de lo que hay dentro, y nada lo dirá. Está aquí una
+// vez, y las tres lo importan.
+
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+/**
+ * Los archivos del cliente que pueden nombrar una clase, un token o un color.
+ *
+ * Las pruebas se excluyen por el nombre: hablan de clases y de colores para comprobarlos,
+ * y contarlas sería preguntarle a la guarda por su propio texto.
+ */
+export function fuentes(directorio = 'src') {
+  const encontrados = [];
+  for (const entrada of readdirSync(directorio)) {
+    const ruta = join(directorio, entrada);
+    if (statSync(ruta).isDirectory()) encontrados.push(...fuentes(ruta));
+    else if (/\.(jsx|js|css)$/.test(ruta) && !ruta.includes('.test.')) encontrados.push(ruta);
+  }
+  // Las rutas salen con la barra del sistema: en Windows, `src\components\x.jsx`. Se
+  // normalizan aquí para que un inventario escrito con barras normales valga en las dos
+  // plataformas, y para que el mensaje de un fallo se pueda pegar en un editor.
+  return encontrados.map((ruta) => ruta.split('\\').join('/'));
+}
+
+/**
+ * Se quitan los comentarios antes de buscar.
+ *
+ * Es la lección del capítulo 37 aplicada aquí: una guarda que busca un texto en un archivo
+ * se satisface con su propia documentación. Las cabeceras de estos archivos nombran
+ * `var(--accent-primary)` y `#ef4444` para explicar de dónde vienen, y una cabecera no es
+ * código.
+ *
+ * Las de línea se quitan solo cuando empiezan la línea: `//` en medio de una es casi
+ * siempre el de un `https://`.
+ */
+export function sinComentarios(codigo) {
+  return codigo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+/** El número de línea de una posición dentro de un texto, para que un fallo se pueda abrir. */
+export function lineaDe(texto, posicion) {
+  return texto.slice(0, posicion).split('\n').length;
+}

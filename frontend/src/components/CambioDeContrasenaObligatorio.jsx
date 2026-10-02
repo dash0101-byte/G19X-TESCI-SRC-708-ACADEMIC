@@ -100,16 +100,7 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
           </p>
 
           {error && (
-            <div role="alert" style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#ef4444',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 12px',
-              fontSize: '0.78rem',
-              marginBottom: '14px',
-              whiteSpace: 'pre-line',
-            }}>
+            <div role="alert" className="alert alert-error" style={{ marginBottom: '14px' }}>
               {error}
             </div>
           )}

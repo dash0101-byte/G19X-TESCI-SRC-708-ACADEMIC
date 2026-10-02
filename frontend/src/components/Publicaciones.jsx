@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   cambiarEstadoDePublicacion,
   createCampaign,
@@ -16,12 +16,39 @@ import ContadorSinAsesor from './ContadorSinAsesor';
 import InformeDePublicacion from './InformeDePublicacion';
 import PaginaDeInteres from './PaginaDeInteres';
 import VistaPreviaDelPost from './VistaPreviaDelPost';
+import MensajeDeCampo from './MensajeDeCampo.jsx';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDelServidor,
+  propiedadesDeCampo,
+  resumenDeCampos,
+  sinElCampo,
+} from './erroresDeFormulario';
 
 // Una publicación es una campaña con canal LinkedIn, no una entidad aparte: se crea, se
 // lee y se edita por las mismas rutas que cualquier campaña. El enlace público y el texto
 // que se copia los arma el servidor, que es quien genera el identificador del enlace; aquí
 // solo se enseñan y se copian.
 export const CANAL_LINKEDIN = 'LinkedIn';
+
+// Los campos de este formulario que el servidor valida uno por uno.
+const CAMPOS_DEL_FORMULARIO = [
+  'name', 'description', 'target_audience', 'fecha_de_cierre', 'url_del_post',
+];
+
+// El nombre que viaja no es siempre el que la pantalla usa: la «fecha de cierre» del
+// formulario es `end_date` para el servidor. Sin esta traducción, el error de esa fecha no
+// encontraría su campo y acabaría en el aviso de arriba.
+const RENOMBRES = { end_date: 'fecha_de_cierre' };
+
+const ETIQUETAS_DEL_FORMULARIO = {
+  name: 'Título interno',
+  description: 'Texto de la publicación',
+  target_audience: 'A quién va dirigida',
+  fecha_de_cierre: 'Fecha de cierre',
+  url_del_post: 'Dirección del post publicado',
+};
 // Mismo tope que el servidor (`MAX_DESCRIPCION`): con él, descripción y enlace caben en un
 // post de LinkedIn, que admite 3 000 caracteres.
 export const MAX_DESCRIPCION = 2800;
@@ -108,6 +135,9 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
   const [compartiendo, setCompartiendo] = useState(null);
   // Si la dirección pública sigue llevando aquí (capítulo 34). `null` mientras no se sabe.
   const [direccion, setDireccion] = useState(null);
+  // Lo que el servidor dijo de cada campo del formulario de la publicación.
+  const [erroresDelFormulario, setErroresDelFormulario] = useState({});
+  const formularioRef = useRef(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -168,7 +198,18 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
     setError('');
   };
 
-  const cambiar = (campo, valor) => setFormulario((previo) => ({ ...previo, [campo]: valor }));
+  const cambiar = (campo, valor) => {
+    setFormulario((previo) => ({ ...previo, [campo]: valor }));
+    // Al corregir el campo se le quita la marca.
+    setErroresDelFormulario((previo) => sinElCampo(previo, campo));
+  };
+
+  const conError = (nombre, ademasDescritoPor = null) => propiedadesDeCampo(
+    nombre, erroresDelFormulario, 'publicacion', ademasDescritoPor,
+  );
+  const mensaje = (nombre) => (
+    <MensajeDeCampo nombre={nombre} errores={erroresDelFormulario} prefijo="publicacion" />
+  );
 
   const cambiarNecesidad = (indice, valor) =>
     setFormulario((previo) => ({
@@ -180,6 +221,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
     e.preventDefault();
     setTrabajando(true);
     setError('');
+    setErroresDelFormulario({});
     const datos = {
       name: formulario.name.trim(),
       description: formulario.description.trim(),
@@ -209,7 +251,23 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       setEnEdicion(null);
       await cargar();
     } catch (err) {
-      setError(err.message);
+      const repartidos = err.status === 422
+        ? erroresDelServidor(err.detalle, {
+          campos: CAMPOS_DEL_FORMULARIO, renombres: RENOMBRES,
+        })
+        : null;
+      if (repartidos && Object.keys(repartidos.porCampo).length) {
+        setErroresDelFormulario(repartidos.porCampo);
+        setError(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS_DEL_FORMULARIO),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(formularioRef, repartidos.porCampo, CAMPOS_DEL_FORMULARIO);
+      } else if (repartidos && repartidos.sueltos.length) {
+        setError(comoAviso(repartidos.sueltos));
+      } else {
+        setError(err.message);
+      }
     } finally {
       setTrabajando(false);
     }
@@ -337,7 +395,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
         </div>
       )}
       {error && (
-        <div role="alert" style={{ padding: '8px 12px', margin: '12px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--hot-text)', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>
+        <div role="alert" className="alert alert-error" style={{ margin: '12px 0' }}>
           {error}
         </div>
       )}
@@ -350,7 +408,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       {puedeGestionar && direccion && direccion.responde === false && (
         <div
           role="alert"
-          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--hot-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
+          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--error-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
         >
           <strong>La dirección pública no responde.</strong>{' '}
           Quien abra un enlace de estas publicaciones no llega a ninguna parte. Si el túnel
@@ -430,6 +488,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       {puedeGestionar && enEdicion !== null && (
         <form
           onSubmit={guardar}
+          ref={formularioRef}
           aria-label={enEdicion === 'nueva' ? 'Nueva publicación' : 'Editar publicación'}
           style={{ margin: '14px 0', padding: '14px', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '10px' }}
         >
@@ -444,7 +503,9 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
               value={formulario.name}
               onChange={(e) => cambiar('name', e.target.value)}
               placeholder="Ej. Post · Talento TI septiembre"
+              {...conError('name')}
             />
+            {mensaje('name')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
             <div>
@@ -455,10 +516,11 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                 required
                 rows={8}
                 maxLength={MAX_DESCRIPCION}
-                aria-describedby="publicacion-descripcion-restantes"
                 value={formulario.description}
                 onChange={(e) => cambiar('description', e.target.value)}
+                {...conError('description', 'publicacion-descripcion-restantes')}
               />
+              {mensaje('description')}
               <div id="publicacion-descripcion-restantes" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right' }}>
                 Quedan {restantes} caracteres. El enlace se añade al final al copiar.
               </div>
@@ -477,7 +539,9 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
               value={formulario.target_audience}
               onChange={(e) => cambiar('target_audience', e.target.value)}
               placeholder="Ej. Directores de TI de empresas de 200 a 1000 empleados"
+              {...conError('target_audience')}
             />
+            {mensaje('target_audience')}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
@@ -500,10 +564,11 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                 id="publicacion-cierre"
                 type="date"
                 className="input-field"
-                aria-describedby="publicacion-cierre-ayuda"
                 value={formulario.fecha_de_cierre}
                 onChange={(e) => cambiar('fecha_de_cierre', e.target.value)}
+                {...conError('fecha_de_cierre', 'publicacion-cierre-ayuda')}
               />
+              {mensaje('fecha_de_cierre')}
               <div id="publicacion-cierre-ayuda" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                 Al terminar ese día se cierra sola y la página deja de recibir perfiles.
               </div>
@@ -541,7 +606,9 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
               value={formulario.url_del_post}
               onChange={(e) => cambiar('url_del_post', e.target.value)}
               placeholder="https://www.linkedin.com/posts/..."
+              {...conError('url_del_post')}
             />
+            {mensaje('url_del_post')}
           </div>
 
           <RedesDelFormulario

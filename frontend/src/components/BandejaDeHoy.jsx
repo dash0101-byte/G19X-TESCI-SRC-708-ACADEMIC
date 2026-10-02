@@ -207,7 +207,7 @@ export default function BandejaDeHoy({ onSelectLead, esDireccion = false }) {
             margin: '12px 0',
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-sm)',
-            color: 'var(--hot-text)',
+            color: 'var(--error-text)',
             fontSize: '0.8rem',
           }}
         >

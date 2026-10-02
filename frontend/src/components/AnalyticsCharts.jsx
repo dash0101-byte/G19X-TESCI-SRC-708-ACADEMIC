@@ -18,7 +18,7 @@ export default function AnalyticsCharts({ summary, campaigns }) {
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Segmentación de Calidad de Leads</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Proporción por umbrales algorítmicos dinámicos</p>
           </div>
-          <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '6px' }}>
+          <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', padding: '4px 8px', borderRadius: '6px' }}>
             Analítica Avanzada
           </span>
         </div>
@@ -83,12 +83,12 @@ export default function AnalyticsCharts({ summary, campaigns }) {
                   <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{stage}</span>
                   <span style={{ color: 'var(--text-primary)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{count} leads ({pct}%)</span>
                 </div>
-                <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '8px', background: 'var(--bg-chip)', borderRadius: '4px', overflow: 'hidden' }}>
                   <div
                     style={{
                       height: '100%',
                       width: `${pct}%`,
-                      background: stage === 'WON' ? '#10b981' : (stage === 'QUALIFIED' ? '#6366f1' : '#f59e0b'),
+                      background: stage === 'WON' ? 'var(--funnel-won)' : (stage === 'QUALIFIED' ? 'var(--funnel-qualified)' : 'var(--funnel-rest)'),
                       borderRadius: '4px',
                       transition: 'width 0.5s ease-out'
                     }}
@@ -111,7 +111,7 @@ export default function AnalyticsCharts({ summary, campaigns }) {
               <div style={{ width: '140px', fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {ind.industry}
               </div>
-              <div style={{ flex: 1, margin: '0 16px', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ flex: 1, margin: '0 16px', height: '8px', background: 'var(--bg-chip)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div
                   style={{
                     height: '100%',
@@ -154,7 +154,7 @@ export default function AnalyticsCharts({ summary, campaigns }) {
                   <td style={{ fontFamily: 'var(--font-mono)', color: c.avg_score >= 70 ? 'var(--hot-text)' : 'var(--text-secondary)' }}>
                     {c.avg_score}
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', color: '#34d399', fontWeight: '700' }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--success-text)', fontWeight: '700' }}>
                     {c.conversion_rate}%
                   </td>
                 </tr>

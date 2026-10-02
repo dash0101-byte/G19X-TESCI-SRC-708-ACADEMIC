@@ -201,7 +201,7 @@ export default function ScoringSimulator() {
           </div>
 
           {/* Temporal Decay Slider */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: formData.days_since_last_activity > 14 ? 'var(--warm-text)' : 'var(--text-primary)' }}>
               <span>⏱️ Días de Inactividad (Decaimiento):</span>
               <strong style={{ fontFamily: 'var(--font-mono)' }}>{formData.days_since_last_activity} días</strong>
@@ -271,7 +271,7 @@ export default function ScoringSimulator() {
               style={{
                 background: 'var(--hot-bg)',
                 border: '1px solid var(--hot-border)',
-                color: 'var(--hot-text)',
+                color: 'var(--error-text)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '10px 12px',
                 marginBottom: '14px',

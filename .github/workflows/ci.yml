@@ -3865,6 +3865,435 @@ jobs:
           print(f"Las {len(definidas)} clases de la hoja cubren {len(componentes)} componentes, sin excepciones.")
           PY
 
+      # ------------------------------------------------------------------ control 52
+      # Ningun color se escribe a mano: todos salen de la paleta, donde se miden.
+      #
+      # El hueco que esto cierra esta entre dos guardas que estan bien escritas:
+      # `accesibilidad.test.jsx` dice que NO mide contraste porque jsdom no dibuja y manda a
+      # `contraste.test.js`; `contraste.test.js` dice que lee los colores del `:root`. Las
+      # dos frases son verdad, y entre las dos queda un sitio: un color escrito en un
+      # `style` del JSX no esta en ninguna de las dos. Trece archivos del cliente tenian
+      # colores ahi, y cuatro de ellos no llegaban al minimo de §1.4.3.
+      #
+      # El inventario de abajo no es una lista de excepciones comodas: son colores que NO
+      # DEBEN seguir esta paleta. Un QR tiene que ser negro sobre blanco para que una camara
+      # lo lea y la vista previa imita la tarjeta de LinkedIn; tematizar cualquiera de los
+      # dos seria el defecto, no el arreglo.
+      #
+      # Repite el barrido en Python en vez de comprobar que exista una prueba.
+      - name: Ningun color del cliente se escribe a mano
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          CLIENTE = pathlib.Path("frontend/src")
+          COLOR = re.compile(r"#[0-9a-fA-F]{3,8}\b|rgba?\([0-9.,\s]+\)")
+
+          # archivo -> colores que pueden estar escritos a mano, y por que.
+          ACEPTADOS = {
+              "frontend/src/components/VistaPreviaDelPost.jsx": {
+                  "#191919", "#666", "#555", "#b42318", "#7a4b00", "#ffffff", "#e0dfdc",
+                  "#0a66c2", "#fff",
+              },
+              "frontend/src/components/qr.js": {"#ffffff", "#000000"},
+              "frontend/src/components/AltaDelSegundoFactor.jsx": {"#fff"},
+              "frontend/src/index.css": {"#ffffff"},
+          }
+
+          def sin_comentarios(ruta, texto):
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              if ruta.suffix == ".css":
+                  return texto
+              return "\n".join(re.sub(r"^\s*//.*$", "", l) for l in texto.splitlines())
+
+          archivos = [
+              r for r in sorted(CLIENTE.rglob("*"))
+              if r.suffix in {".js", ".jsx", ".css"} and ".test." not in r.name
+          ]
+          if len(archivos) < 30:
+              sys.exit(f"FALLO: solo se encontraron {len(archivos)} archivos de cliente.")
+
+          fallos = []
+          encontrados = 0
+          en_la_hoja = 0
+          for ruta in archivos:
+              texto = ruta.read_text(encoding="utf-8")
+              if ruta.name == "index.css":
+                  raiz = re.search(r":root\s*\{.*?\n\}", texto, re.S)
+                  if not raiz:
+                      sys.exit("FALLO: no se encontro el bloque :root de index.css.")
+                  texto = texto[: raiz.start()] + texto[raiz.end() :]
+              limpio = sin_comentarios(ruta, texto)
+              permitidos = ACEPTADOS.get(ruta.as_posix(), set())
+              for linea_n, linea in enumerate(limpio.splitlines(), 1):
+                  for valor in COLOR.findall(linea):
+                      encontrados += 1
+                      if ruta.name == "index.css":
+                          en_la_hoja += 1
+                      if valor not in permitidos:
+                          fallos.append(f"{ruta.as_posix()}:{linea_n} escribe {valor} a mano")
+
+          # Si el barrido no encuentra nada, no esta midiendo: los del inventario tienen que
+          # aparecer. Y si encuentra decenas en la hoja, `:root` no se recorto.
+          if encontrados < 12:
+              sys.exit(f"FALLO: solo se encontraron {encontrados} colores; el barrido no mide nada.")
+          if en_la_hoja > 4:
+              sys.exit(f"FALLO: {en_la_hoja} colores en index.css; el bloque :root no se recorto.")
+
+          # Un color escondido en el respaldo de un `var()` no lo mide nadie: si el token
+          # existe no se aplica nunca -habia tres `var(--hot-text, #b42318)`, el rojo de un
+          # tema claro que no existe- y si no existe se aplica sin pasar por la paleta.
+          for ruta in archivos:
+              limpio = sin_comentarios(ruta, ruta.read_text(encoding="utf-8"))
+              for linea_n, linea in enumerate(limpio.splitlines(), 1):
+                  if re.search(r"var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()", linea):
+                      fallos.append(f"{ruta.as_posix()}:{linea_n} esconde un color en el respaldo de un var()")
+
+          # Y la prueba de la suite tiene que seguir sacando la lista del codigo y teniendo
+          # sus guardas contra leer en vacio.
+          prueba = CLIENTE / "pruebas" / "colores.test.js"
+          if not prueba.exists():
+              fallos.append("desaparecio frontend/src/pruebas/colores.test.js")
+          else:
+              codigo = sin_comentarios(prueba, prueba.read_text(encoding="utf-8"))
+              for simbolo, porque in [
+                  # Se buscan USOS y no nombres: un simbolo presente no es un simbolo
+                  # usado, y una guarda que se contenta con el nombre se satisface con una
+                  # funcion que ya no llama nadie.
+                  ("fuentes('src')", "recorre los archivos en vez de llevar una lista escrita"),
+                  ("sinLaPaleta(bruto)", "recorta el :root, el unico sitio donde un color vive"),
+                  ("ACEPTADOS[ruta]", "inventaria con su motivo lo que no sigue la paleta"),
+                  ("toBeGreaterThanOrEqual(12)", "comprueba que encontro colores de verdad"),
+                  (r",\s*(#[0-9a-fA-F]{3,8}", "mira tambien los colores escondidos en un respaldo"),
+              ]:
+                  if simbolo not in codigo:
+                      fallos.append(f"colores.test.js perdio «{simbolo}»: {porque}")
+
+          if fallos:
+              print("FALLO: hay colores del cliente que no pasan por la paleta.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Los {encontrados} colores escritos a mano de {len(archivos)} archivos estan inventariados.")
+          PY
+
+      # ------------------------------------------------------------------ control 53
+      # El estado de error se dibuja, se lee y no deja el foco invisible.
+      #
+      # Tres cosas, y la tercera es la que importa:
+      #
+      # 1. §6.4 punto 36: un campo con un valor invalido se veia igual que uno correcto.
+      # 2. El rojo de los avisos era #ef4444 escrito a mano en cuatro pantallas: 4.43:1
+      #    sobre el panel y 4.17:1 sobre el elevado, por debajo de los 4.5 de §1.4.3.
+      # 3. El borde rojo de un campo invalido NO cambia al recibir el foco, y no por gusto:
+      #    el aro de foco de la paleta solo da 1.96 sobre ese rojo y el rojo mas claro que
+      #    sigue siendo rojo, 2.60. Senalar el foco cambiando ese color dejaria §2.4.7
+      #    incumplido en todos los campos invalidos. La salida es un aro anadido, y esta
+      #    guarda recalcula la imposibilidad: el dia que deje de ser imposible, lo dice.
+      #
+      # La formula se reimplementa aqui en vez de importar nada del cliente. Empieza
+      # comprobandose a si misma contra el valor que todo el mundo conoce: blanco sobre
+      # negro es 21.
+      - name: El estado de error llega a los minimos, y el foco sigue visible
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          HOJA = pathlib.Path("frontend/src/index.css")
+          hoja = HOJA.read_text(encoding="utf-8")
+          raiz = re.search(r":root\s*\{(.*?)\n\}", hoja, re.S)
+          if not raiz:
+              sys.exit("FALLO: no se encontro el bloque :root de index.css.")
+          cuerpo = re.sub(r"/\*.*?\*/", "", raiz.group(1), flags=re.S)
+          paleta = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", cuerpo))
+          if len(paleta) < 40:
+              sys.exit(f"FALLO: solo se leyeron {len(paleta)} tokens de :root.")
+
+          def a_rgba(valor):
+              valor = valor.strip()
+              alias = re.fullmatch(r"var\(\s*(--[\w-]+)\s*\)", valor)
+              saltos = 0
+              while alias and saltos < 8:
+                  valor = paleta[alias.group(1)].strip()
+                  alias = re.fullmatch(r"var\(\s*(--[\w-]+)\s*\)", valor)
+                  saltos += 1
+              hexa = re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", valor)
+              if hexa:
+                  d = hexa.group(1)
+                  if len(d) == 3:
+                      d = "".join(c * 2 for c in d)
+                  return (int(d[0:2], 16), int(d[2:4], 16), int(d[4:6], 16), 1.0)
+              rgba = re.fullmatch(r"rgba?\(([^)]+)\)", valor)
+              if rgba:
+                  partes = [float(p) for p in rgba.group(1).split(",")]
+                  return (partes[0], partes[1], partes[2], partes[3] if len(partes) > 3 else 1.0)
+              sys.exit(f"FALLO: color que no se sabe leer: {valor}")
+
+          def componer(encima, debajo):
+              r1, g1, b1, a = encima
+              r2, g2, b2, _ = debajo
+              if a >= 1:
+                  return (r1, g1, b1, 1.0)
+              return (r1 * a + r2 * (1 - a), g1 * a + g2 * (1 - a), b1 * a + b2 * (1 - a), 1.0)
+
+          def luminancia(color):
+              def canal(v):
+                  s = v / 255
+                  return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
+              r, g, b, _ = color
+              return 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(b)
+
+          def razon(uno, otro):
+              a, b = luminancia(uno), luminancia(otro)
+              claro, oscuro = max(a, b), min(a, b)
+              return (claro + 0.05) / (oscuro + 0.05)
+
+          # La guarda se comprueba a si misma antes de medir nada.
+          control = razon(a_rgba("#ffffff"), a_rgba("#000000"))
+          if abs(control - 21) > 0.01:
+              sys.exit(f"FALLO: la formula da {control:.2f} para blanco sobre negro; deberia dar 21.")
+
+          fallos = []
+          SUPERFICIES = ("--bg-base", "--bg-surface", "--bg-surface-elevated")
+          CON_CONTROLES = SUPERFICIES + ("--bg-surface-hover", "--bg-field")
+
+          for token in ("--error-bg", "--error-border", "--error-text", "--border-error"):
+              if token not in paleta:
+                  sys.exit(f"FALLO: desaparecio {token} de la paleta.")
+
+          # 1. El texto del aviso, sobre su propio fondo translucido ya compuesto.
+          for fondo in SUPERFICIES:
+              banda = componer(a_rgba(paleta["--error-bg"]), a_rgba(paleta[fondo]))
+              medida = razon(a_rgba(paleta["--error-text"]), banda)
+              if medida < 4.5:
+                  fallos.append(f"--error-text da {medida:.2f}:1 sobre --error-bg en {fondo}; §1.4.3 pide 4.5")
+              # Y el rojo de la accion destructiva NO sirve para esto, que es justo la
+              # confusion que este capitulo deshizo: son dos rojos muy parecidos.
+              si_fuera_danger = razon(a_rgba(paleta["--danger-border"]), banda)
+              if fondo == "--bg-surface-elevated" and si_fuera_danger >= 4.5:
+                  fallos.append(
+                      "--danger-border ya pasaria como texto de aviso: revise si siguen "
+                      "haciendo falta dos rojos distintos"
+                  )
+
+          # 2. El contorno de un campo invalido, contra los cinco fondos donde hay controles.
+          for fondo in CON_CONTROLES:
+              medida = razon(a_rgba(paleta["--border-error"]), a_rgba(paleta[fondo]))
+              if medida < 3.0:
+                  fallos.append(f"--border-error da {medida:.2f}:1 sobre {fondo}; §1.4.11 pide 3.0")
+
+          # 3. La imposibilidad que obliga a que el aro sea anadido y no un cambio de color.
+          invalido = componer(a_rgba(paleta["--border-error"]), a_rgba(paleta["--bg-field"]))
+          aro = componer(a_rgba(paleta["--border-focus"]), a_rgba(paleta["--bg-field-focus"]))
+          if razon(aro, invalido) >= 3.0:
+              fallos.append(
+                  f"el aro de foco ya da {razon(aro, invalido):.2f} sobre el borde de error: "
+                  "un cambio de color bastaria y hay que revisar la regla del campo invalido"
+              )
+          if razon(a_rgba("#fecaca"), invalido) >= 3.0:
+              fallos.append("un rojo claro ya alcanza 3.0 sobre --border-error: revise la decision")
+          if razon(a_rgba("#ffffff"), invalido) < 3.0:
+              fallos.append("ni el blanco puro alcanza 3.0 sobre --border-error: el borde es demasiado claro")
+
+          # 4. Las reglas que dibujan todo eso.
+          invalido_reposo = re.search(r"\.input-field\[aria-invalid='true'\]\s*\{(.*?)\}", hoja, re.S)
+          if not invalido_reposo:
+              fallos.append("desaparecio la regla del campo invalido (§6.4 punto 36)")
+          elif "var(--border-error)" not in invalido_reposo.group(1):
+              fallos.append("el campo invalido dejo de usar --border-error")
+          invalido_foco = re.search(r"\.input-field\[aria-invalid='true'\]:focus\s*\{(.*?)\}", hoja, re.S)
+          if not invalido_foco:
+              fallos.append("desaparecio la regla del campo invalido con foco")
+          else:
+              if "var(--border-error)" not in invalido_foco.group(1):
+                  fallos.append("el campo invalido con foco pierde el rojo: el error desaparece al escribir")
+              if not re.search(r"box-shadow:[^;]*var\(--border-focus\)", invalido_foco.group(1)):
+                  fallos.append("el campo invalido con foco perdio el aro anadido: §2.4.7")
+
+          regla_alert = re.search(r"\.alert\s*\{(.*?)\}", hoja, re.S)
+          if not regla_alert:
+              fallos.append("desaparecio la regla .alert")
+          elif not re.search(r"white-space:\s*pre-line", regla_alert.group(1)):
+              fallos.append(
+                  ".alert perdio white-space: pre-line; un 422 de tres campos vuelve a salir "
+                  "en un renglon corrido"
+              )
+          regla_error = re.search(r"\.alert-error\s*\{(.*?)\}", hoja, re.S)
+          if not regla_error:
+              fallos.append("desaparecio la regla .alert-error")
+          else:
+              for token in ("var(--error-bg)", "var(--error-border)", "var(--error-text)"):
+                  if token not in regla_error.group(1):
+                      fallos.append(f".alert-error dejo de usar {token}")
+
+          # 5. El rojo de una temperatura no vuelve a pintar errores, y sigue pintando
+          #    insignias: el token tenia dos oficios y solo uno tenia nombre.
+          for clase in (".form-error", ".interes-error"):
+              regla = re.search(re.escape(clase) + r"\s*\{(.*?)\}", hoja, re.S)
+              if not regla:
+                  fallos.append(f"desaparecio la regla {clase}")
+                  continue
+              if "var(--error-text)" not in regla.group(1):
+                  fallos.append(f"{clase} dejo de usar --error-text")
+              if "var(--hot-text)" in regla.group(1):
+                  fallos.append(f"{clase} volvio a pintarse con la temperatura de un prospecto")
+          insignia = re.search(r"\.badge-hot\s*\{(.*?)\}", hoja, re.S)
+          if insignia and "var(--hot-text)" not in insignia.group(1):
+              fallos.append(".badge-hot perdio --hot-text: ese si es el rojo de una temperatura")
+
+          # 6. Y la prueba de la suite sigue midiendo el cambio de estado en los tres sitios.
+          prueba = pathlib.Path("frontend/src/pruebas/contraste.test.js").read_text(encoding="utf-8")
+          prueba = re.sub(r"//.*$", "", prueba, flags=re.M)
+          for simbolo in ("--border-error", "medirCambios", "toHaveLength(3)"):
+              if simbolo not in prueba:
+                  fallos.append(f"contraste.test.js perdio «{simbolo}»")
+          modulo = pathlib.Path("frontend/src/pruebas/contraste.js").read_text(encoding="utf-8")
+          # Los `donde:` se cuentan DENTRO del bloque, no en todo el modulo: `PARES` tambien
+          # los usa, y contarlos todos daba de sobra con una entrada de menos.
+          bloque = re.search(r"CAMBIOS_DE_ESTADO = \[(.*?)\n\];", modulo, re.S)
+          if not bloque:
+              fallos.append("desaparecio CAMBIOS_DE_ESTADO de contraste.js")
+          elif bloque.group(1).count("donde:") < 3:
+              fallos.append(
+                  f"CAMBIOS_DE_ESTADO mide {bloque.group(1).count('donde:')} sitios y el "
+                  "estado cambia en tres: el que falte no se vigila"
+              )
+
+          if fallos:
+              print("FALLO: el estado de error dejo de cumplir lo que se midio.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("El aviso pasa 4.5, el contorno del campo invalido pasa 3.0 y el foco sigue siendo un aro anadido.")
+          PY
+
+      # ------------------------------------------------------------------ control 54
+      # Un 422 llega al campo que lo causo, y en castellano.
+      #
+      # El servidor dice QUE campo desde el capitulo 33: el 422 trae `loc`, y ese capitulo
+      # se tomo el trabajo de que nombrara el campo en vez de contestar un 200 mentiroso.
+      # Los cuatro formularios del panel tiraban ese nombre: volcaban el 422 entero en un
+      # aviso de arriba -con el nombre de la columna, en ingles y en un solo renglon- y el
+      # de la ficha 360 lo hacia en un `alert()` del navegador, que no se puede poner junto
+      # a un campo, no lo anuncia ningun lector y tapa el formulario que hay que corregir.
+      #
+      # Lo que esta guarda vigila no es que exista el modulo: es que los formularios no
+      # vuelvan a construir el `aria-describedby` a mano. Es el fallo silencioso de este
+      # mecanismo -el atributo sigue siendo valido apuntando a un `id` que no existe, el
+      # campo se pinta igual y el lector no lee nada-, y por eso el `id` tiene que salir de
+      # una sola funcion.
+      - name: El 422 llega al campo, con la etiqueta de la pantalla
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          COMPONENTES = pathlib.Path("frontend/src/components")
+          FORMULARIOS = [
+              "PaginaDeInteres.jsx", "NewLeadModal.jsx", "LeadDetailModal.jsx",
+              "AdminPanel.jsx", "Publicaciones.jsx",
+          ]
+
+          fallos = []
+          modulo = COMPONENTES / "erroresDeFormulario.js"
+          componente = COMPONENTES / "MensajeDeCampo.jsx"
+          if not modulo.exists():
+              sys.exit("FALLO: desaparecio frontend/src/components/erroresDeFormulario.js.")
+          if not componente.exists():
+              sys.exit("FALLO: desaparecio frontend/src/components/MensajeDeCampo.jsx.")
+
+          codigo = modulo.read_text(encoding="utf-8")
+          limpio = re.sub(r"/\*.*?\*/", "", codigo, flags=re.S)
+          limpio = "\n".join(re.sub(r"^\s*//.*$", "", l) for l in limpio.splitlines())
+
+          # El mensaje en ingles de Pydantic no puede acabar en la pantalla. La forma de que
+          # eso pase es devolver `item.msg` tal cual cuando el tipo no se conoce, asi que la
+          # guarda busca la salida generica y la ausencia de ese atajo.
+          if "'No se admite este valor.'" not in limpio:
+              fallos.append("erroresDeFormulario perdio la salida generica: un tipo nuevo volveria a enseñar ingles")
+          if re.search(r"return\s+String\(item\.msg", limpio) or re.search(r"return\s+item\.msg", limpio):
+              fallos.append("erroresDeFormulario devuelve el msg del servidor tal cual: volveria el ingles")
+          if "'Falta este campo.'" not in limpio:
+              fallos.append("erroresDeFormulario ya no traduce `missing`")
+          # Se buscan USOS y no nombres. Es la leccion del capitulo 37 -buscar una forma y
+          # no una palabra-, y aqui tiene una vuelta mas: renombrar solo la DEFINICION deja
+          # el nombre en los usos, asi que una guarda que busque el nombre sigue verde con
+          # el codigo roto. El arnes de reintroduccion encontro cuatro guardas asi en este
+          # mismo capitulo.
+          if "RUIDO_DE_PYDANTIC.test(" not in limpio or "replace(RUIDO_DE_PYDANTIC" not in limpio:
+              fallos.append("erroresDeFormulario dejo de distinguir nuestros mensajes de los de Pydantic")
+          if "export function idDelMensaje" not in limpio:
+              fallos.append("desaparecio idDelMensaje: los dos lados del aria-describedby volverian a escribirse a mano")
+          if "idDelMensaje(prefijo, nombre)" not in limpio:
+              fallos.append("propiedadesDeCampo dejo de sacar el id del mensaje de idDelMensaje")
+          # El renglon de debajo del campo usa esa misma funcion y no un id suyo.
+          if "id={idDelMensaje(" not in componente.read_text(encoding="utf-8"):
+              fallos.append("MensajeDeCampo dejo de usar idDelMensaje para su id")
+
+          for nombre in FORMULARIOS:
+              ruta = COMPONENTES / nombre
+              texto = ruta.read_text(encoding="utf-8")
+              sin_com = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              sin_com = "\n".join(re.sub(r"^\s*//.*$", "", l) for l in sin_com.splitlines())
+              if "erroresDeFormulario" not in sin_com:
+                  fallos.append(f"{nombre} dejo de usar el mecanismo compartido del 422")
+              if "erroresDelServidor(err.detalle" not in sin_com:
+                  fallos.append(f"{nombre} ya no reparte el 422 por campos")
+              if "enfocarPrimerCampoConError(" not in sin_com:
+                  fallos.append(f"{nombre} ya no lleva el foco al primer campo que falla")
+              # El `id` del mensaje no se escribe en el formulario: sale del modulo. Lo que
+              # se busca no es cualquier `aria-describedby` -hay varios legitimos, para la
+              # ayuda de un campo- sino uno que nombre un id de error, y cualquier cadena
+              # que acabe en `-error` que no sea un nombre de clase de la hoja.
+              for trozo in re.findall(r"aria-describedby=\{[^}]*\}", sin_com):
+                  if "-error" in trozo and "conError" not in trozo:
+                      fallos.append(f"{nombre} construye el id del mensaje de error a mano: puede dejar de coincidir")
+              CLASES = {"alert-error", "form-error", "interes-error"}
+              for cadena in re.findall(r"['\"`]([\w-]+-error)['\"`]", sin_com):
+                  if cadena not in CLASES:
+                      fallos.append(f"{nombre} escribe «{cadena}» a mano: ese id sale de idDelMensaje")
+              # Y ninguno vuelve al cuadro del navegador.
+              if re.search(r"(?<![\w.])alert\(", sin_com):
+                  fallos.append(f"{nombre} volvio a avisar con un alert() del navegador")
+
+          # Los dos extremos de la misma cuerda: el cliente une los renglones del 422 con
+          # saltos de linea y la hoja los respeta. Sin una de las dos mitades, un 422 de
+          # tres campos sale con los tres pegados en una linea.
+          api = pathlib.Path("frontend/src/services/api.js").read_text(encoding="utf-8")
+          if ".join('\\n')" not in api:
+              fallos.append("parseApiError dejo de separar los campos del 422 por renglones")
+          hoja = pathlib.Path("frontend/src/index.css").read_text(encoding="utf-8")
+          regla = re.search(r"\.alert\s*\{(.*?)\}", hoja, re.S)
+          if not regla or not re.search(r"white-space:\s*pre-line", regla.group(1)):
+              fallos.append(".alert no respeta los saltos de linea que el mensaje trae")
+
+          # Y la prueba del modulo parte de renglones de 422 reales, con su `type` y su
+          # `ctx`: con renglones inventados comprobaria que la funcion hace lo que hace.
+          prueba = COMPONENTES / "erroresDeFormulario.test.js"
+          if not prueba.exists():
+              fallos.append("desaparecio erroresDeFormulario.test.js")
+          else:
+              codigo_prueba = prueba.read_text(encoding="utf-8")
+              for simbolo in ("'missing'", "'value_error'", "Value error,", "aria-describedby", "renombres"):
+                  if simbolo not in codigo_prueba:
+                      fallos.append(f"erroresDeFormulario.test.js perdio «{simbolo}»")
+
+          if fallos:
+              print("FALLO: el 422 vuelve a no llegar al campo que lo causo.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Los {len(FORMULARIOS)} formularios reparten el 422 por campos con el mismo mecanismo.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

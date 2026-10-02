@@ -322,7 +322,7 @@ export default function App() {
       {/* Overlay de carga global para operaciones de red significativas */}
       {globalLoading && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          position: 'fixed', inset: 0, background: 'var(--overlay-loading)',
           zIndex: 9999, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '16px',
           backdropFilter: 'blur(4px)',
@@ -332,7 +332,7 @@ export default function App() {
             borderTop: '4px solid var(--accent-primary)', borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
-          <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: '500' }}>
+          <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: '500' }}>
             {globalLoadingMsg || 'Procesando...'}
           </span>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

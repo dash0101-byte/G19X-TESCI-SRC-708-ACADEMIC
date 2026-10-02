@@ -142,7 +142,7 @@ export default function PanelDeDesenlaces() {
       </div>
 
       {error && (
-        <div role="alert" style={{ padding: '8px 12px', margin: '12px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--hot-text)', fontSize: '0.8rem' }}>
+        <div role="alert" style={{ padding: '8px 12px', margin: '12px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--error-text)', fontSize: '0.8rem' }}>
           {error}
         </div>
       )}

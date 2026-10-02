@@ -46,6 +46,7 @@ import BandejaDeHoy from '../components/BandejaDeHoy.jsx';
 import InformeDePublicacion from '../components/InformeDePublicacion.jsx';
 import PanelDeDesenlaces from '../components/PanelDeDesenlaces.jsx';
 import DerechosDelTitular from '../components/DerechosDelTitular.jsx';
+import NewLeadModal from '../components/NewLeadModal.jsx';
 import App from '../App.jsx';
 
 // ---------------------------------------------------------------------------
@@ -437,6 +438,56 @@ describe('los derechos del titular', () => {
     await screen.findByText('Ana Titular');
     await usuario.click(screen.getByRole('button', { name: 'Suprimir estos datos…' }));
     await screen.findByLabelText(/Escriba el correo completo/);
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+// ============================================================================
+// Un formulario con los campos marcados por el servidor (capítulo 40)
+// ============================================================================
+//
+// Las nueve pantallas de arriba se revisan en su estado de reposo, que es el que tienen al
+// abrirlas. Un formulario con errores es **otro estado del marcado** —aparecen
+// `aria-invalid`, `aria-describedby` y un `role="alert"`—, y es justo el estado que el
+// capítulo 40 añadió a cuatro pantallas.
+//
+// Lo que esto caza y ninguna otra prueba del capítulo caza: un `aria-describedby` que
+// apunte a un `id` que no existe. Es la forma en que este mecanismo se puede romper en
+// silencio —el atributo sigue siendo válido, el campo se pinta igual, y el lector de
+// pantalla no lee nada—, y `axe` lo marca como infracción.
+
+describe('el alta de un prospecto con el servidor quejándose', () => {
+  it('no tiene infracciones con los campos marcados', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    const err = new Error('Error de validación');
+    err.status = 422;
+    err.detalle = [
+      { type: 'missing', loc: ['body', 'company'], msg: 'Field required' },
+      {
+        type: 'value_error',
+        loc: ['body', 'phone'],
+        msg: 'Value error, El teléfono no es un número válido: revise la lada y el número de dígitos.',
+      },
+    ];
+    api.createLead.mockRejectedValue(err);
+    render(<NewLeadModal onClose={() => {}} onLeadCreated={() => {}} />);
+
+    await usuario.type(screen.getByLabelText('Nombre *'), 'Ana');
+    await usuario.type(screen.getByLabelText('Apellido *'), 'Titular');
+    await usuario.type(screen.getByLabelText('Correo Electrónico *'), 'ana@ejemplo.test');
+    await usuario.click(screen.getByRole('button', { name: /Guardar y Calificar/ }));
+    await waitFor(() => expect(screen.getByLabelText('Empresa / Institución'))
+      .toHaveAttribute('aria-invalid', 'true'));
+
+    // Y los dos `id` que el marcado promete existen de verdad en el documento.
+    for (const campo of ['Empresa / Institución', 'Teléfono']) {
+      const nodo = screen.getByLabelText(campo);
+      const id = nodo.getAttribute('aria-describedby');
+      expect(id, `${campo} quedó marcado sin decir dónde está su explicación`).not.toBeNull();
+      expect(document.getElementById(id), `${campo} apunta a un id que no existe`).not.toBeNull();
+    }
 
     await noDebeTenerInfracciones();
   });

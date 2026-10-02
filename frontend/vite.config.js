@@ -57,6 +57,10 @@ export default defineConfig({
         'src/components/ScoringSimulator.jsx',
         'src/components/SessionModal.jsx',
         'src/components/CambioDeContrasenaObligatorio.jsx',
+        // Capítulo 40: el reparto de un 422 por campos. Entra en la lista porque es
+        // justo lo que esta tabla dice que mide —código que decide cosas— y porque lo
+        // usan las cinco pantallas con formulario: un fallo aquí sale en las cinco.
+        'src/components/erroresDeFormulario.js',
       ],
       // El suelo va justo por debajo de lo medido, no en un número redondo y cómodo: un
       // suelo del 80 % con la cobertura real en el 95 % deja pasar una regresión de quince
@@ -70,10 +74,14 @@ export default defineConfig({
       // antes de empezar el capítulo 36. Se corrigió ahí, probando las cinco y de paso las
       // cinco de la agenda, que tampoco estaban en la tabla de rutas.
       //
-      // Lo medido ahora es 95.7 / 89.4 / 98.3 / 98.3, y el suelo sube con ello.
+      // Lo medido ahora es 96.3 / 90.6 / 98.6 / 98.5, y el suelo sube con ello.
+      //
+      // **Capítulo 40.** Entra `erroresDeFormulario.js` en la lista de arriba y la medida
+      // sube, no baja: el módulo está al 98.5 / 94.5 / 100 / 100. Que un archivo nuevo
+      // suba la media solo pasa si llega probado; si no, el suelo se encarga de decirlo.
       thresholds: {
-        statements: 95,
-        branches: 89,
+        statements: 96,
+        branches: 90,
         functions: 98,
         lines: 98,
       },

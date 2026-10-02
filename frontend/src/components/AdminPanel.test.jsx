@@ -24,7 +24,9 @@ vi.mock('../services/api', () => ({
   getCurrentUserRole: vi.fn(),
 }));
 
-import { fetchSalesReps, getCurrentUserRole, transferPortfolio } from '../services/api';
+import {
+  createUser, fetchSalesReps, fetchUsers, getCurrentUserRole, transferPortfolio,
+} from '../services/api';
 import AdminPanel from './AdminPanel.jsx';
 
 function asesor(id, nombre, { activo = true, asignados = 0 } = {}) {
@@ -112,5 +114,80 @@ describe('la cartera de las cuentas dadas de baja', () => {
 
     expect(await screen.findByText('Vicente Sin Cartera')).toBeInTheDocument();
     expect(screen.queryByLabelText(/recibe la cartera de Vicente/)).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Capítulo 40: el 422 del alta de una cuenta
+// ============================================================================
+
+describe('un 422 al dar de alta una cuenta', () => {
+  async function altaQueFalla(detalle) {
+    const usuario = userEvent.setup();
+    getCurrentUserRole.mockReturnValue('System_Admin');
+    fetchSalesReps.mockResolvedValue({ items: [ANA], prospectos_en_cuentas_de_baja: 0 });
+    fetchUsers.mockResolvedValue({ items: [ANA] });
+    const err = new Error('Error de validación');
+    err.status = 422;
+    err.detalle = detalle;
+    createUser.mockRejectedValue(err);
+
+    montar();
+    await screen.findByRole('heading', { name: 'Alta de cuenta' });
+    await usuario.type(screen.getByLabelText('Nombre completo'), 'A');
+    await usuario.type(screen.getByLabelText('Correo institucional'), 'nueva@plurione.test');
+    await usuario.type(screen.getByLabelText('Contraseña inicial (mín. 12)'), 'unafraselargaybuena');
+    await usuario.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    await waitFor(() => expect(createUser).toHaveBeenCalled());
+    return usuario;
+  }
+
+  it('señala el campo y lo explica en castellano', async () => {
+    await altaQueFalla([{
+      type: 'string_too_short',
+      loc: ['body', 'full_name'],
+      msg: 'String should have at least 2 characters',
+      ctx: { min_length: 2 },
+    }]);
+
+    const nombre = screen.getByLabelText('Nombre completo');
+    await waitFor(() => expect(nombre).toHaveAttribute('aria-invalid', 'true'));
+    const explicacion = document.getElementById(nombre.getAttribute('aria-describedby'));
+    expect(explicacion.textContent).toBe('Tiene que tener al menos 2 caracteres.');
+    // Ni el nombre de la columna ni el inglés de Pydantic.
+    expect(document.body.textContent).not.toMatch(/full_name/);
+    expect(document.body.textContent).not.toMatch(/String should have/);
+  });
+
+  it('el aviso de un fallo se anuncia como alerta y no como estado', async () => {
+    // Este aviso servía para las dos cosas con `role="status"`. Un error anunciado como
+    // estado espera a que el lector de pantalla acabe lo que esté diciendo, y lo que avisa
+    // de que una operación no se hizo no puede esperar.
+    await altaQueFalla([{ type: 'missing', loc: ['body', 'email'], msg: 'Field required' }]);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toMatch(/Revise el campo Correo institucional/);
+    expect(aviso.className).toContain('alert-error');
+  });
+
+  it('un error que no es de un campo sigue yendo al aviso general', async () => {
+    const usuario = userEvent.setup();
+    getCurrentUserRole.mockReturnValue('System_Admin');
+    fetchSalesReps.mockResolvedValue({ items: [ANA], prospectos_en_cuentas_de_baja: 0 });
+    fetchUsers.mockResolvedValue({ items: [ANA] });
+    const conflicto = new Error('Ese correo ya tiene cuenta.');
+    conflicto.status = 409;
+    createUser.mockRejectedValue(conflicto);
+
+    montar();
+    await screen.findByRole('heading', { name: 'Alta de cuenta' });
+    await usuario.type(screen.getByLabelText('Nombre completo'), 'Ana Nueva');
+    await usuario.type(screen.getByLabelText('Correo institucional'), 'ana@plurione.test');
+    await usuario.type(screen.getByLabelText('Contraseña inicial (mín. 12)'), 'unafraselargaybuena');
+    await usuario.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toMatch(/Ese correo ya tiene cuenta/);
+    expect(screen.getByLabelText('Correo institucional')).not.toHaveAttribute('aria-invalid');
   });
 });

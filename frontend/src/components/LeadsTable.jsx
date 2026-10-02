@@ -160,7 +160,7 @@ export default function LeadsTable({
 
                     {/* Sector */}
                     <td>
-                      <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.8rem', background: 'var(--bg-chip)', padding: '2px 8px', borderRadius: '4px' }}>
                         {lead.industry || 'General'}
                       </span>
                     </td>

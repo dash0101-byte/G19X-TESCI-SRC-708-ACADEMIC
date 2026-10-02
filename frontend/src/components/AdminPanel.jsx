@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchSalesReps,
   fetchUsers,
@@ -10,6 +10,30 @@ import {
   transferPortfolio,
   getCurrentUserRole,
 } from '../services/api';
+import MensajeDeCampo from './MensajeDeCampo.jsx';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDelServidor,
+  propiedadesDeCampo,
+  resumenDeCampos,
+} from './erroresDeFormulario';
+
+// Los campos del alta de una cuenta que el servidor valida uno por uno. El nombre completo
+// y el teléfono tienen validador propio —el teléfono es el mismo E.164 del capítulo 32—, y
+// el correo repetido contesta 409, no 422: ese sigue yendo al aviso de arriba, porque no es
+// un campo mal escrito sino una cuenta que ya existe.
+const CAMPOS_DEL_ALTA = ['full_name', 'email', 'password', 'phone', 'capacity'];
+
+const ETIQUETAS_DEL_ALTA = {
+  full_name: 'Nombre completo',
+  email: 'Correo institucional',
+  password: 'Contraseña inicial',
+  phone: 'Teléfono',
+  capacity: 'Capacidad de cartera',
+};
+
+const PROPIOS_DEL_ALTA = { email: 'Escriba un correo con la forma nombre@plurione.com.' };
 
 // Roles del sistema, con el nombre que se enseña. Coinciden uno a uno con `UserRole` del
 // backend; no hay etiquetas inventadas como las que tenía antes este componente
@@ -61,6 +85,8 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
   const [ocupado, setOcupado] = useState(null);
   const [enBajas, setEnBajas] = useState(0);
   const [destinoDe, setDestinoDe] = useState({});
+  const [erroresDelAlta, setErroresDelAlta] = useState({});
+  const formularioDelAltaRef = useRef(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -93,7 +119,10 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
     cargar();
   }, [cargar]);
 
-  const conAviso = async (accion, mensajeExito) => {
+  // `alFallar` deja que quien llama se quede con el error si sabe hacer algo mejor que
+  // volcarlo en el aviso de arriba —repartirlo por campos, por ejemplo—. Devuelve `true` si
+  // lo ha hecho; si no, el aviso general sigue siendo la salida.
+  const conAviso = async (accion, mensajeExito, alFallar = null) => {
     setError(null);
     setAviso(null);
     try {
@@ -101,15 +130,41 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
       setAviso(mensajeExito);
       await cargar();
     } catch (err) {
-      setError(err.message || 'La operación no se pudo completar.');
+      if (!(alFallar && alFallar(err))) {
+        setError(err.message || 'La operación no se pudo completar.');
+      }
     } finally {
       setOcupado(null);
     }
   };
 
+  const conErrorDelAlta = (nombre) => propiedadesDeCampo(nombre, erroresDelAlta, 'alta');
+  const mensajeDelAlta = (nombre) => (
+    <MensajeDeCampo nombre={nombre} errores={erroresDelAlta} prefijo="alta" />
+  );
+
+  // El 422 del alta, repartido por campos. Antes se volcaba entero en el aviso de arriba,
+  // que decía «full_name: String should have at least 2 characters»: el nombre de la
+  // columna y el idioma de Pydantic, en una pantalla escrita en castellano.
+  const repartirErrorDelAlta = (err) => {
+    if (err.status !== 422) return false;
+    const repartidos = erroresDelServidor(err.detalle, {
+      propios: PROPIOS_DEL_ALTA, campos: CAMPOS_DEL_ALTA,
+    });
+    if (!repartidos || !Object.keys(repartidos.porCampo).length) return false;
+    setErroresDelAlta(repartidos.porCampo);
+    setError(comoAviso([
+      resumenDeCampos(repartidos.porCampo, ETIQUETAS_DEL_ALTA),
+      ...repartidos.sueltos,
+    ]));
+    enfocarPrimerCampoConError(formularioDelAltaRef, repartidos.porCampo, CAMPOS_DEL_ALTA);
+    return true;
+  };
+
   const enviarAlta = async (evento) => {
     evento.preventDefault();
     setCreando(true);
+    setErroresDelAlta({});
     await conAviso(async () => {
       const datos = {
         email: alta.email.trim(),
@@ -122,7 +177,9 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
       };
       await createUser(datos);
       setAlta(ALTA_VACIA);
-    }, 'Cuenta creada. La persona deberá cambiar la contraseña en su primer acceso.');
+    },
+    'Cuenta creada. La persona deberá cambiar la contraseña en su primer acceso.',
+    repartirErrorDelAlta);
     setCreando(false);
   };
 
@@ -216,18 +273,14 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
         </span>
       </div>
 
+      {/* `role="alert"` cuando es un fallo y `role="status"` cuando no: un error anunciado
+          como estado espera a que el lector de pantalla acabe lo que esté diciendo, y lo
+          que avisa de que una operación no se hizo no puede esperar. Y la clase de la hoja
+          en vez de seis propiedades en línea, como el resto de los avisos. */}
       {(error || aviso) && (
         <div
-          role="status"
-          style={{
-            padding: '12px 16px',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.82rem',
-            border: '1px solid',
-            borderColor: error ? 'var(--hot-text, #b42318)' : 'var(--success-border)',
-            color: error ? 'var(--hot-text, #b42318)' : 'var(--success-text)',
-            background: error ? 'transparent' : 'var(--success-bg)',
-          }}
+          role={error ? 'alert' : 'status'}
+          className={`alert ${error ? 'alert-error' : 'alert-ok'}`}
         >
           {error || aviso}
         </div>
@@ -422,16 +475,20 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
               La persona tendrá que cambiar esta contraseña en su primer acceso: mientras la
               conozca alguien más, la cuenta no identifica a nadie.
             </p>
-            <form onSubmit={enviarAlta} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', alignItems: 'end' }}>
+            <form onSubmit={enviarAlta} ref={formularioDelAltaRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', alignItems: 'end' }}>
               <div>
                 <label style={etiqueta} htmlFor="alta-nombre">Nombre completo</label>
                 <input id="alta-nombre" style={campo} required minLength={2} value={alta.full_name}
-                  onChange={(e) => setAlta({ ...alta, full_name: e.target.value })} />
+                  onChange={(e) => setAlta({ ...alta, full_name: e.target.value })}
+                  {...conErrorDelAlta('full_name')} />
+                {mensajeDelAlta('full_name')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-email">Correo institucional</label>
                 <input id="alta-email" type="email" style={campo} required value={alta.email}
-                  onChange={(e) => setAlta({ ...alta, email: e.target.value })} />
+                  onChange={(e) => setAlta({ ...alta, email: e.target.value })}
+                  {...conErrorDelAlta('email')} />
+                {mensajeDelAlta('email')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-rol">Rol</label>
@@ -443,17 +500,23 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
               <div>
                 <label style={etiqueta} htmlFor="alta-pass">Contraseña inicial (mín. 12)</label>
                 <input id="alta-pass" type="password" style={campo} required minLength={12} value={alta.password}
-                  onChange={(e) => setAlta({ ...alta, password: e.target.value })} />
+                  onChange={(e) => setAlta({ ...alta, password: e.target.value })}
+                  {...conErrorDelAlta('password')} />
+                {mensajeDelAlta('password')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-tel">Teléfono (opcional)</label>
                 <input id="alta-tel" style={campo} value={alta.phone}
-                  onChange={(e) => setAlta({ ...alta, phone: e.target.value })} />
+                  onChange={(e) => setAlta({ ...alta, phone: e.target.value })}
+                  {...conErrorDelAlta('phone')} />
+                {mensajeDelAlta('phone')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-cap">Capacidad de cartera</label>
                 <input id="alta-cap" type="number" min={1} max={1000} style={campo} disabled={!alta.is_sales_rep}
-                  value={alta.capacity} onChange={(e) => setAlta({ ...alta, capacity: e.target.value })} />
+                  value={alta.capacity} onChange={(e) => setAlta({ ...alta, capacity: e.target.value })}
+                  {...conErrorDelAlta('capacity')} />
+                {mensajeDelAlta('capacity')}
               </div>
               <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" checked={alta.is_sales_rep}

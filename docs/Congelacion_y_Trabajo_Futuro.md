@@ -3,7 +3,52 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 39)
+**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 40)
+
+> **Revisión del capítulo 40.** La congelación se mantiene, y este capítulo la abrió **para
+> un punto de §6.4 y para ninguno más**: el **36**, que el 39 encontró y no pagó.
+>
+> Lo que se fue a arreglar era que un campo con un valor inválido se viera igual que uno
+> correcto. Al medirlo aparecieron tres cosas que no estaban en ningún punto, y las tres
+> pasan el criterio del §1 con el mismo argumento incómodo del capítulo anterior: **el
+> README promete el nivel AA de WCAG 2.1 para las nueve pantallas**.
+>
+> **La primera es un hueco entre dos comprobaciones que están bien escritas**, y es lo que
+> conviene recordar de este capítulo. `accesibilidad.test.jsx` dice en su cabecera que no
+> mide contraste porque jsdom no dibuja y manda a `contraste.test.js`; `contraste.test.js`
+> dice que lee los colores del `:root`. Las dos frases son verdad, y entre las dos queda un
+> sitio: **un color escrito en un `style` del JSX no está en ninguna de las dos**. Trece
+> archivos tenían colores ahí, y el rojo de cuatro avisos daba 4.43:1 sobre el panel y
+> 4.17:1 sobre el elevado, por debajo de los 4.5 de §1.4.3. Y el token que la paleta ya
+> tenía para ese sitio daba 6.02: **el color no estaba mal elegido, estaba elegido donde no
+> se mide** (R38 §40.2).
+>
+> **La segunda es que el servidor ya decía qué campo y la pantalla lo tiraba.** El 422 trae
+> `loc`, y el capítulo 33 se tomó el trabajo de que nombrara el campo en vez de contestar un
+> 200 mentiroso. Los cuatro formularios del panel volcaban ese 422 entero en un aviso de
+> arriba —con el nombre de la columna, en inglés y en un solo renglón, porque el salto de
+> línea que el cliente pone no es un salto en HTML—, y el de la ficha 360 lo hacía en un
+> `alert()` del navegador, que no se puede poner junto a un campo, no lo anuncia ningún
+> lector y tapa el formulario que hay que corregir. El trabajo del 33 llegaba hasta el
+> servidor y se perdía en la última pulgada (R38 §40.7).
+>
+> **El hallazgo del capítulo es el del 39 un piso más abajo, y esta vez sin salida.** El
+> borde rojo de un campo inválido no puede cambiar al recibir el foco —el error
+> desaparecería justo mientras se escribe la corrección— y **ningún color llega a los 3.0
+> por encima de ese rojo**: el aro de foco de la paleta da 1.96 y el rojo más claro que
+> sigue siendo rojo, 2.60. Lo único que pasaría es el blanco puro, que no es un rojo. Cuando
+> no hay salida cromática, la salida es geométrica: el foco es un aro **añadido** por fuera,
+> y hay una prueba que recalcula esa imposibilidad para que la decisión no sobreviva a su
+> motivo (R38 §40.6).
+>
+> §6.4 pasa de **once entradas abiertas de dieciséis a diez de diecinueve**: se cierra la 36
+> y entran la **37**, la **38** y la **39**, que son lo que este capítulo encontró y no
+> pagó. Y hay una cosa más que conviene dejar escrita, porque no es del código sino de cómo
+> se comprueba: de los veintiocho defectos reintroducidos, **cuatro no se detectaron en la
+> primera pasada**, y los cuatro porque la guarda buscaba un **nombre** y no un **uso** —un
+> `import` sigue ahí aunque la llamada no—. Es la lección del capítulo 37 con una vuelta
+> más, y la encontró el arnés sobre guardas recién escritas por quien acababa de escribir el
+> código que vigilan (R38 §40.9).
 
 > **Revisión del capítulo 39.** La congelación se mantiene, y este capítulo la abrió **para
 > cuatro puntos de §6.4 y para ninguno más**: el 33, el 30, el 31 y el 32.
@@ -803,7 +848,7 @@ defectos reintroducidos y 22 detectados.
 | # | Qué | Por qué no se hizo | Origen |
 | :---: | :--- | :--- | :---: |
 | 17 | ~~**El código QR no se ha escaneado con un teléfono**~~ | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso**. **Hecho el 01-10-2026, y no lo leyó**: la información de formato iba transpuesta desde el capítulo 27, así que ningún lector podía empezar a decodificar. Las diecinueve pruebas del QR estaban verdes porque todas miden propiedades **simétricas respecto de la diagonal**. Corregido, con un lector escrito dentro de la suite y el control 48 del CI (R36 §38.10a) | R27 §27.13 · R36 §38.10 |
-| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable** —las nueve pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36)— y **el 39 la acercó más**: todo lo que el marcado nombra, clases y variables de la paleta, existe ahora en la hoja, y el contorno de los controles llega al mínimo de §1.4.11 sin que el foco deje de distinguirse (R37). Lo que sigue sin responder es si **lo que se ve y lo que ese lector dice se entienden**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 · R37 §39.14 |
+| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable** —las nueve pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36)—, **el 39 la acercó más** —todo lo que el marcado nombra, clases y variables de la paleta, existe ahora en la hoja, y el contorno de los controles llega al mínimo de §1.4.11 sin que el foco deje de distinguirse (R37)— y **el 40 cerró el último hueco medible**: ningún color del cliente se escribe fuera de la paleta, que es el único sitio donde se mide, y cuando el servidor rechaza un campo la pantalla lo señala, lo explica en castellano y lleva el foco hasta él (R38). Lo que sigue sin responder es si **lo que se ve y lo que ese lector dice se entienden**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 · R37 §39.14 |
 | 19 | **Nadie ha visto una solicitud de Dependabot en este repositorio** | `.github/dependabot.yml` está bien formado y el control 45 comprueba que cubre los seis ecosistemas y que la renovación a mano sigue mandando. Lo que ninguna prueba sustituye es el **primer lunes** que abra solicitudes de verdad: qué propone, si el CI las deja verdes y si alguna choca con la guarda `--solo-fijacion` | R37 §37.10 |
 | 20 | **La comprobación de contraseñas filtradas no se ha ejecutado nunca contra el servicio real** | La suite usa una sonda simulada a propósito: una suite que depende de un tercero se pone roja los días que ese tercero tiene un mal día. Lo que falta por saber es si el contexto TLS del sistema basta desde la máquina del despliegue — y si no bastara, **el síntoma sería silencioso**: la política ante «no se pudo preguntar» es seguir adelante, así que la comprobación estaría apagada de hecho mientras el código afirma tenerla. **Es lo primero que hay que mirar en la bitácora el día del despliegue**, buscando el `WARNING` de `app.core.filtradas_remotas` | R37 §37.4 · §37.10 |
 
@@ -826,7 +871,10 @@ defectos reintroducidos y 22 detectados.
 | 32 | ~~**El borde de un campo sin foco tiene 1.12:1** contra lo que lo rodea: el contorno es prácticamente invisible hasta que se le pone el foco. WCAG §1.4.11 pide 3.0 para lo que identifica un control~~ — **cerrado en el capítulo 39**, y no subiendo `--border-subtle`: ese token dibuja a la vez el contorno de un campo y la raya entre dos filas de una tabla, y §1.4.11 habla de **controles**, no de líneas. Hay ahora dos familias: `--border-subtle` y `--border-medium` para separar, y **`--border-control`** (3.02:1 en el peor de los cinco fondos) para delimitar un control. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: con el reposo en 0.34 y el aro de foco donde estaba, 0.35, los dos quedaban a 1.11:1 entre sí —§1.4.11 cumplido **incumpliendo §2.4.7**—, así que el foco sube a 0.71, la primera alfa en que el cambio de estado alcanza 3.0 **en los dos controles donde ocurre**. El que manda es el botón secundario: con 0.70 se queda en 2.99, y medir solo el campo lo habría dejado pasar (R37 §39.5, §39.6) | R36 §36.8 |
 | 33 | ~~**`var(--accent-primary)` no existe** en la paleta —el token se llama `--color-primary`—, así que el borde superior del girador de carga de `App.jsx` se queda sin color. Cosmético, y en un elemento que dura lo que una petición~~ — **cerrado en el capítulo 39, y estaba mal medido**: eran **cinco** tokens en nueve sitios, y dos no eran cosméticos. Un `var()` que no resuelve no deja la propiedad en su valor anterior, la deja en el **inicial**: `background: var(--hot-gradient)` dejaba la barra de distribución del tablero en `transparent` —el gráfico que dice cómo se reparte la cartera no pintaba nada— y el `border` de la opción elegida de la ficha 360 se caía entero a `border-style: none`. Los cinco están definidos, y lo que impide que vuelva a pasar no es haberlos escrito sino `frontend/src/pruebas/tokens.test.js`, que **saca la lista del código** como `clases.test.js` hace con las clases: un token nuevo sin definir nace en rojo. `var(--x, respaldo)` no cuenta como defecto —alguien dijo qué pasa si no está— y por eso los que lo llevan están inventariados: si no, bastaría una coma para silenciar la comprobación (R37 §39.2, §39.3, §39.4) | R36 §36.8 |
 | 34 | **La lista LOCAL de contraseñas filtradas no se actualiza sola.** Viene de §3.7, que el capítulo 37 cerró a medias: la comprobación contra el servicio público por rango añade cientos de millones de huellas, pero la lista de la imagen —la que decide cuando no hay internet— sigue siendo la foto del capítulo 23. Se regenera con `scripts/generar_lista_de_contrasenas.py`. No depende de ninguna cuenta; depende de que alguien lo corra, y por eso ya no vive en §3 | R23 §23.7 · R37 §37.10 |
-| 36 | **La hoja no tiene estado de error para los campos.** Un `.input-field` con un valor inválido se ve exactamente igual que uno correcto: lo que avisa es el `.form-error` de debajo. Cumple la norma —el error no se comunica solo por color— pero deja al ojo sin pista de **qué** campo, y en un formulario de ocho campos eso es leer ocho mensajes para encontrar uno. Es la misma familia que el punto 32: un estado que el marcado conoce y la hoja no dibuja | R37 §39.14 |
+| 36 | ~~**La hoja no tiene estado de error para los campos.** Un `.input-field` con un valor inválido se ve exactamente igual que uno correcto: lo que avisa es el `.form-error` de debajo~~ — **cerrado en el capítulo 40**, y dibujado sobre `[aria-invalid='true']` y no sobre una clase propia: así la hoja pinta **exactamente** lo que el lector de pantalla anuncia, y no hay dos verdades sobre el mismo campo. Las había: el atributo llevaba puesto en la página pública desde el capítulo 34 y la hoja no lo miraba. El mensaje de debajo se queda —§1.4.1 no admite que el color sea el único portador—; lo que el borde añade es **cuál** de los ocho campos es. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: el borde rojo no puede cambiar con el foco, y ningún color alcanza los 3.0 por encima de él —1.96 el aro de la paleta, 2.60 el rojo más claro que sigue siendo rojo, y solo el blanco puro pasa, que no es un rojo—, así que el foco es un aro **añadido** por fuera. Cuando no hay salida cromática, la salida es geométrica (R38 §40.5, §40.6) | R37 §39.14 |
+| 37 | **Las otras siete formas del panel siguen enseñando el nombre de la columna, y diez avisos escriben su geometría en línea.** El capítulo 40 repartió el 422 por campos en las cuatro formas que pueden recibirlo con más de un campo y escribió `.alert` y sus tres variantes en la hoja; en las demás, un 422 sigue saliendo por `parseApiError` como `nueva: La contraseña está en la lista de filtradas`, con el nombre del campo del esquema delante —el mensaje ya es castellano, el nombre no—, y diez avisos conservan sus siete propiedades en un `style` aunque el color ya salga de la paleta. No incumple ningún mínimo: es el mismo arreglo en los sitios donde el 422 es menos probable, y hacerlo toca diez componentes más sin corregir ningún número | R38 §40.12 |
+| 38 | **Siete errores del panel se avisan con un `alert()` del navegador**: seis en el recálculo masivo de `App.jsx` y uno en el recálculo de una ficha. Un cuadro del navegador no forma parte de la página —ningún lector de pantalla lo anuncia como contenido—, no se puede señalar junto a nada y tapa lo que hay que corregir. El del formulario de edición se cambió en el capítulo 40 porque es el del 422 que ese capítulo reparte; los demás no son errores de un campo y darles sitio en la pantalla es otra decisión | R38 §40.12 |
+| 39 | **`--warm-*` hace dos oficios, y dos usos de `--hot-text` también.** El capítulo 40 partió el rojo —`--error-*` para lo que avisa de un fallo, `--hot-*` para la temperatura de una ficha— y dejó sin partir el ámbar: `.alert-warn` usa la familia WARM porque el ámbar de esta paleta es ese y no hay otro. Lo mismo con el aviso del enlace caducado de una publicación y la confirmación de un borrado, que son advertencias y no errores y siguen con `--hot-text`. Es el mismo trabajo que el rojo y no se hace a medias | R38 §40.3, §40.12 |
 
 ---
 

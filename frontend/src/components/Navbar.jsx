@@ -27,7 +27,7 @@ export default function Navbar({
   return (
     <header style={{
       borderBottom: '1px solid var(--border-subtle)',
-      background: 'rgba(11, 15, 25, 0.95)',
+      background: 'var(--bg-navbar)',
       backdropFilter: 'blur(8px)',
       position: 'sticky',
       top: 0,
@@ -49,14 +49,14 @@ export default function Navbar({
             width: '30px',
             height: '30px',
             borderRadius: 'var(--radius-sm)',
-            background: '#ffffff',
+            background: 'var(--color-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '0.9rem',
             fontWeight: '900',
-            color: '#090a0f',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
+            color: 'var(--color-primary-text)',
+            boxShadow: 'var(--shadow-sm)'
           }}>
             ⚡
           </div>

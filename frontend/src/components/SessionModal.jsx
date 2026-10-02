@@ -120,7 +120,7 @@ export default function SessionModal({ user, onLogout, onClose }) {
             borderRadius: 'var(--radius-full)',
             // --color-primary es #ffffff en este tema oscuro: el texto va en el color del fondo base
             background: 'var(--color-primary)',
-            color: '#0b0f19',
+            color: 'var(--color-primary-text)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -182,7 +182,7 @@ export default function SessionModal({ user, onLogout, onClose }) {
                 símbolos.
               </p>
               {error && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--hot-text, #b42318)', marginBottom: '10px', whiteSpace: 'pre-line' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--error-text)', marginBottom: '10px', whiteSpace: 'pre-line' }}>
                   {error}
                 </p>
               )}

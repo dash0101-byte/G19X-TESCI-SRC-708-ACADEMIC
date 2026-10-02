@@ -328,3 +328,93 @@ describe('vaciar un campo desde la ficha', () => {
     expect(screen.getByText(/Sin cargo/)).toBeInTheDocument();
   });
 });
+
+// ============================================================================
+// Capítulo 40: el 422 de la edición deja de ser un cuadro del navegador
+// ============================================================================
+//
+// Este formulario es el que más razones tiene para recibir un 422: tiene trece campos y es
+// el que el capítulo 33 se encargó de que contestara 422 **nombrando el campo** cuando se
+// vacía algo que la ficha no puede no tener, en vez del 200 mentiroso que había antes.
+//
+// Lo que hacía con esa respuesta era `alert('Error al actualizar prospecto: ' +
+// err.message)`. Un cuadro del navegador: no se puede poner junto a un campo, no forma
+// parte de la página —ningún lector de pantalla lo anuncia como contenido—, tapa
+// justamente el formulario que hay que corregir y enseña el nombre de la columna. El
+// trabajo del capítulo 33 llegaba hasta el servidor y se perdía en la última pulgada.
+
+describe('un 422 al guardar la ficha', () => {
+  function error422(detalle) {
+    const err = new Error('Error de validación');
+    err.status = 422;
+    err.detalle = detalle;
+    return err;
+  }
+
+  async function guardarYFallar(usuario, detalle) {
+    updateLead.mockReset().mockRejectedValue(error422(detalle));
+    montar();
+    await usuario.click(screen.getByRole('button', { name: /Editar Prospecto/ }));
+    await usuario.click(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(updateLead).toHaveBeenCalledTimes(1));
+  }
+
+  it('se anuncia en la página y no en un cuadro del navegador', async () => {
+    const usuario = userEvent.setup();
+    // Si algo volviera a llamar a `alert`, esta prueba lo dice en vez de dejarlo pasar: en
+    // jsdom `window.alert` no existe y llamarlo sería un error que nadie vería.
+    const cuadroDelNavegador = vi.fn();
+    vi.stubGlobal('alert', cuadroDelNavegador);
+
+    await guardarYFallar(usuario, [
+      { type: 'missing', loc: ['body', 'first_name'], msg: 'Field required' },
+    ]);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.className).toContain('alert-error');
+    expect(cuadroDelNavegador).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('cada queja va debajo de su campo, atada por aria-describedby', async () => {
+    const usuario = userEvent.setup();
+    await guardarYFallar(usuario, [
+      { type: 'missing', loc: ['body', 'first_name'], msg: 'Field required' },
+    ]);
+
+    const nombre = screen.getByLabelText('Nombre(s) *');
+    await waitFor(() => expect(nombre).toHaveAttribute('aria-invalid', 'true'));
+    const explicacion = document.getElementById(nombre.getAttribute('aria-describedby'));
+    expect(explicacion.textContent).toBe('Falta este campo.');
+    expect(explicacion.className).toContain('form-error');
+  });
+
+  it('el resumen de arriba usa la etiqueta de la pantalla, no la columna', async () => {
+    const usuario = userEvent.setup();
+    await guardarYFallar(usuario, [
+      { type: 'missing', loc: ['body', 'first_name'], msg: 'Field required' },
+      {
+        type: 'value_error',
+        loc: ['body', 'phone'],
+        msg: 'Value error, El teléfono no es un número válido: revise la lada y el número de dígitos.',
+      },
+    ]);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toMatch(/Revise estos campos: Nombre\(s\), Teléfono \/ WhatsApp/);
+    expect(aviso.textContent).not.toMatch(/first_name/);
+  });
+
+  it('y la pantalla se queda en modo edición, con los datos escritos', async () => {
+    // Un formulario que se cierra al fallar obliga a volver a escribirlo todo. Antes no se
+    // cerraba —el `alert` no cambiaba el modo—, así que esto es una propiedad que había que
+    // conservar al cambiar el manejo del error, no una que este capítulo añade.
+    const usuario = userEvent.setup();
+    await guardarYFallar(usuario, [
+      { type: 'missing', loc: ['body', 'first_name'], msg: 'Field required' },
+    ]);
+
+    expect(screen.getByLabelText('Nombre(s) *')).toHaveValue('Ana');
+    expect(screen.getByRole('button', { name: /Guardar/ })).not.toBeNull();
+  });
+});

@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { addLeadActivity, recalculateLeadScore, updateLead } from '../services/api';
 import AsignarAsesor from './AsignarAsesor';
 import CerrarProspecto from './CerrarProspecto';
 import LlegoPor from './LlegoPor';
 import { ingresosDelFormulario } from '../services/prospecto';
+import MensajeDeCampo from './MensajeDeCampo.jsx';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDelServidor,
+  propiedadesDeCampo,
+  resumenDeCampos,
+  sinElCampo,
+} from './erroresDeFormulario';
 import { useVentanaModal } from './ventanaModal';
 import {
   AYUDA_DE_TIPO,
@@ -20,6 +29,34 @@ import {
   nombreDeFuente,
 } from '../services/actividades';
 
+// Los campos que el formulario de edición pinta y que el servidor valida uno por uno. El
+// 422 de este formulario es el que el capítulo 33 se encargó de que existiera: vaciar un
+// campo que la ficha no puede no tener contesta 422 **nombrando el campo**, en vez del 200
+// mentiroso que había antes. Hasta el capítulo 40 ese nombre no llegaba a la pantalla.
+const CAMPOS_EDITABLES = [
+  'first_name', 'last_name', 'email', 'phone', 'country', 'city', 'company', 'job_title',
+  'industry', 'annual_revenue', 'profiles_needed', 'budget_range', 'tags',
+];
+
+// La etiqueta con la que esta pantalla llama a cada campo, para el resumen de arriba.
+const ETIQUETAS_EDITABLES = {
+  first_name: 'Nombre(s)',
+  last_name: 'Apellidos',
+  email: 'Correo corporativo',
+  phone: 'Teléfono / WhatsApp',
+  country: 'País',
+  city: 'Ciudad',
+  company: 'Empresa',
+  job_title: 'Cargo',
+  industry: 'Industria',
+  annual_revenue: 'Ingresos anuales estimados',
+  profiles_needed: 'Perfiles o solicitud específica',
+  budget_range: 'Rango de presupuesto estimado',
+  tags: 'Etiquetas',
+};
+
+const PROPIOS_EDITABLES = { email: 'Escriba un correo con la forma nombre@empresa.com.' };
+
 export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpdated, startInEditMode = false }) {
   // La guarda contra `lead` ausente estaba AQUÍ, antes de los hooks. Hoy no se dispara
   // —`App.jsx` monta el modal con `{selectedLead && ...}`, así que nunca llega nulo—,
@@ -34,6 +71,11 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
   const [isEditing, setIsEditing] = useState(startInEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  // Lo que el servidor dijo de cada campo, y lo que no cabe junto a ninguno. Antes del
+  // capítulo 40 esto era un `alert()` del navegador con el mensaje tal cual venía.
+  const [erroresDeEdicion, setErroresDeEdicion] = useState({});
+  const [errorDeEdicion, setErrorDeEdicion] = useState('');
+  const formularioDeEdicionRef = useRef(null);
 
   // Registro de actividad. Sin canal ni peso: el canal lo deduce el servidor del tipo, y el
   // peso lo mandaba este formulario sin que el scoring lo leyera nunca.
@@ -124,7 +166,15 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
 
   const handleEditChange = (field, value) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
+    // Al corregir el campo se le quita la marca: el borde rojo y el mensaje no pueden
+    // seguir puestos mientras se escribe la corrección.
+    setErroresDeEdicion((prev) => sinElCampo(prev, field));
   };
+
+  const conError = (nombre) => propiedadesDeCampo(nombre, erroresDeEdicion, 'lead-edicion');
+  const mensaje = (nombre) => (
+    <MensajeDeCampo nombre={nombre} errores={erroresDeEdicion} prefijo="lead-edicion" />
+  );
 
   // Qué hacer con un campo que la ficha NO admite vacío cuando el usuario lo deja en blanco.
   //
@@ -145,6 +195,8 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
     e.preventDefault();
     setIsSaving(true);
     setSaveSuccessMsg('');
+    setErroresDeEdicion({});
+    setErrorDeEdicion('');
     try {
       const payload = {
         first_name: obligatorio(editForm.first_name, datos.first_name),
@@ -180,7 +232,29 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
       if (onLeadUpdated) onLeadUpdated();
       setTimeout(() => setSaveSuccessMsg(''), 4000);
     } catch (err) {
-      alert('Error al actualizar prospecto: ' + err.message);
+      // Era un `alert()` del navegador con el mensaje tal cual: «first_name: Field
+      // required». Un cuadro del navegador no se puede señalar junto a un campo, no lo
+      // anuncia la página y tapa el formulario que hay que corregir. Ahora cada queja va
+      // debajo de su campo y el aviso de arriba dice cuáles son.
+      const repartidos = err.status === 422
+        ? erroresDelServidor(err.detalle, {
+          propios: PROPIOS_EDITABLES, campos: CAMPOS_EDITABLES,
+        })
+        : null;
+      if (repartidos && Object.keys(repartidos.porCampo).length) {
+        setErroresDeEdicion(repartidos.porCampo);
+        setErrorDeEdicion(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS_EDITABLES),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(
+          formularioDeEdicionRef, repartidos.porCampo, CAMPOS_EDITABLES,
+        );
+      } else if (repartidos && repartidos.sueltos.length) {
+        setErrorDeEdicion(comoAviso(repartidos.sueltos));
+      } else {
+        setErrorDeEdicion(err.message);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +305,8 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
       await recalculateLeadScore(lead.id);
       if (onLeadUpdated) onLeadUpdated();
     } catch (err) {
-      alert('Error al recalcular: ' + err.message);
+      // Al mismo aviso que el guardado: un cuadro del navegador no lo anuncia nadie.
+      setErrorDeEdicion(err.message);
     } finally {
       setIsRecalculating(false);
     }
@@ -349,11 +424,20 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
           </div>
         )}
 
+        {/* El aviso de que algo no se pudo guardar. `role="alert"` para que se anuncie, y
+            la clase de la hoja en vez de siete propiedades en línea: el resumen dice qué
+            campos hay que revisar, y cada uno lleva su propia queja debajo. */}
+        {errorDeEdicion && (
+          <div role="alert" className="alert alert-error" style={{ marginBottom: '20px' }}>
+            {errorDeEdicion}
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* EDIT MODE FORM                                                            */}
         {/* ========================================================================= */}
         {isEditing ? (
-          <form onSubmit={handleSaveEdit}>
+          <form onSubmit={handleSaveEdit} ref={formularioDeEdicionRef}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
               
               {/* Sección: Contacto */}
@@ -371,7 +455,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.first_name}
                       onChange={(e) => handleEditChange('first_name', e.target.value)}
+                      {...conError('first_name')}
                     />
+                    {mensaje('first_name')}
                   </div>
                   <div>
                     {/* Sin asterisco: la página de interés guarda el nombre entero en un solo
@@ -383,7 +469,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.last_name}
                       onChange={(e) => handleEditChange('last_name', e.target.value)}
+                      {...conError('last_name')}
                     />
+                    {mensaje('last_name')}
                   </div>
                   <div>
                     <label htmlFor="lead-email" className="form-label">Correo Corporativo *</label>
@@ -394,7 +482,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.email}
                       onChange={(e) => handleEditChange('email', e.target.value)}
+                      {...conError('email')}
                     />
+                    {mensaje('email')}
                   </div>
                   <div>
                     <label htmlFor="lead-phone" className="form-label">Teléfono / WhatsApp</label>
@@ -404,7 +494,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.phone}
                       onChange={(e) => handleEditChange('phone', e.target.value)}
+                      {...conError('phone')}
                     />
+                    {mensaje('phone')}
                   </div>
                   <div>
                     <label htmlFor="lead-country" className="form-label">País</label>
@@ -414,7 +506,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.country}
                       onChange={(e) => handleEditChange('country', e.target.value)}
+                      {...conError('country')}
                     />
+                    {mensaje('country')}
                   </div>
                   <div>
                     <label htmlFor="lead-city" className="form-label">Ciudad</label>
@@ -424,7 +518,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.city}
                       onChange={(e) => handleEditChange('city', e.target.value)}
+                      {...conError('city')}
                     />
+                    {mensaje('city')}
                   </div>
                 </div>
               </div>
@@ -453,7 +549,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.company}
                       onChange={(e) => handleEditChange('company', e.target.value)}
+                      {...conError('company')}
                     />
+                    {mensaje('company')}
                   </div>
                   <div>
                     <label htmlFor="lead-job-title" className="form-label">Cargo / Puesto de Decisión</label>
@@ -463,8 +561,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.job_title}
                       onChange={(e) => handleEditChange('job_title', e.target.value)}
+                      {...conError('job_title')}
                       placeholder="Ej. CTO, Director de Talento, Psicólogo..."
                     />
+                    {mensaje('job_title')}
                   </div>
                   <div>
                     <label htmlFor="lead-industry" className="form-label">Industria / Sector (Abierto) ✏️</label>
@@ -474,8 +574,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.industry}
                       onChange={(e) => handleEditChange('industry', e.target.value)}
+                      {...conError('industry')}
                       placeholder="Selecciona o escribe sector libre..."
                     />
+                    {mensaje('industry')}
                     <datalist id="edit-industry-list">
                       <option value="FinTech" />
                       <option value="Software/TI" />
@@ -542,7 +644,9 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.annual_revenue}
                       onChange={(e) => handleEditChange('annual_revenue', e.target.value)}
+                      {...conError('annual_revenue')}
                     />
+                    {mensaje('annual_revenue')}
                   </div>
                 </div>
               </div>
@@ -561,8 +665,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.profiles_needed}
                       onChange={(e) => handleEditChange('profiles_needed', e.target.value)}
+                      {...conError('profiles_needed')}
                       placeholder="Ej. 2 Psicólogos Organizacionales, 3 Devs Fullstack, Consultor de Procesos..."
                     />
+                    {mensaje('profiles_needed')}
                   </div>
                   <div>
                     <label htmlFor="lead-urgency" className="form-label">Nivel de Urgencia Comercial</label>
@@ -586,8 +692,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.budget_range}
                       onChange={(e) => handleEditChange('budget_range', e.target.value)}
+                      {...conError('budget_range')}
                       placeholder="Ej. $15,000 - $30,000 USD"
                     />
+                    {mensaje('budget_range')}
                   </div>
                   <div>
                     <label htmlFor="lead-work-mode" className="form-label">Modalidad de Trabajo</label>
@@ -610,8 +718,10 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                       className="input-field"
                       value={editForm.tags}
                       onChange={(e) => handleEditChange('tags', e.target.value)}
+                      {...conError('tags')}
                       placeholder="Ej. Lead Cualificado, Interés HR, Prioridad 1"
                     />
+                    {mensaje('tags')}
                   </div>
                 </div>
               </div>
@@ -653,29 +763,29 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {lead.raw_metadata?.profiles_needed ? (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.04)', color: 'var(--text-primary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
-                      💼 Requerimiento: <strong style={{ color: '#ffffff' }}>{lead.raw_metadata.profiles_needed}</strong>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-primary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                      💼 Requerimiento: <strong style={{ color: 'var(--text-primary)' }}>{lead.raw_metadata.profiles_needed}</strong>
                     </span>
                   ) : (
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sin perfiles específicos configurados.</span>
                   )}
                   {lead.raw_metadata?.urgency && (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                       ⏱️ Urgencia: {lead.raw_metadata.urgency}
                     </span>
                   )}
                   {lead.raw_metadata?.budget_range && (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.04)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                       💵 Presupuesto: {lead.raw_metadata.budget_range}
                     </span>
                   )}
                   {lead.raw_metadata?.work_modality && (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                       🏢 {lead.raw_metadata.work_modality}
                     </span>
                   )}
                   {lead.raw_metadata?.tags && (
-                    <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                       🏷️ {lead.raw_metadata.tags}
                     </span>
                   )}
@@ -1019,7 +1129,7 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                         marginBottom: '8px',
                         border: '1px solid var(--border-subtle)',
                         borderRadius: 'var(--radius-sm)',
-                        color: 'var(--hot-text)',
+                        color: 'var(--error-text)',
                         fontSize: '0.8rem',
                       }}
                     >

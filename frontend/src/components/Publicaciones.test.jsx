@@ -632,3 +632,94 @@ describe('la dirección pública', () => {
     expect(fetchEstadoDeLaDireccionPublica).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// Capítulo 40: el 422 de este formulario, debajo de su campo
+// ============================================================================
+//
+// Este formulario tiene dos cosas que los otros tres no, y por eso sus pruebas están aquí
+// y no solo en las del módulo:
+//
+// 1. Un campo cuyo nombre **no es el que viaja**: la «fecha de cierre» es `end_date` para
+//    el servidor. Sin traducir el nombre, su error no encontraría su campo.
+// 2. Dos campos que **ya tenían** un `aria-describedby` propio —«quedan N caracteres» y «al
+//    terminar ese día se cierra sola»—. El mensaje de error se añade a esa ayuda en vez de
+//    sustituirla, y eso no se nota mirando la pantalla: el atributo sigue siendo válido con
+//    un solo `id`.
+
+describe('un 422 al guardar una publicación', () => {
+  async function guardarYFallar(detalle) {
+    const usuario = prepararUsuario();
+    fetchCampaignList.mockResolvedValueOnce({ total: 0, items: [] });
+    const err = new Error('Error de validación');
+    err.status = 422;
+    err.detalle = detalle;
+    createCampaign.mockReset().mockRejectedValue(err);
+
+    render(<Publicaciones puedeGestionar />);
+    await screen.findByText('Todavía no hay publicaciones.');
+    await usuario.click(screen.getByRole('button', { name: '+ Nueva publicación' }));
+    await usuario.type(screen.getByLabelText('Título interno'), 'Post de prueba');
+    await usuario.type(screen.getByLabelText('Texto de la publicación'), 'Texto de prueba');
+    await usuario.click(screen.getByRole('button', { name: 'Crear publicación' }));
+    await waitFor(() => expect(createCampaign).toHaveBeenCalledTimes(1));
+    return usuario;
+  }
+
+  it('la dirección del post mal escrita se señala en su campo', async () => {
+    await guardarYFallar([{
+      type: 'value_error',
+      loc: ['body', 'url_del_post'],
+      msg: 'Value error, La dirección del post tiene que empezar por https://',
+    }]);
+
+    const url = screen.getByLabelText('Dirección del post publicado (opcional)');
+    await waitFor(() => expect(url).toHaveAttribute('aria-invalid', 'true'));
+    const explicacion = document.getElementById(url.getAttribute('aria-describedby'));
+    expect(explicacion.textContent).toMatch(/tiene que empezar por/);
+  });
+
+  it('el error de `end_date` llega al campo que la pantalla llama «fecha de cierre»', async () => {
+    await guardarYFallar([{
+      type: 'date_from_datetime_parsing',
+      loc: ['body', 'end_date'],
+      msg: 'Input should be a valid date',
+    }]);
+
+    const fecha = screen.getByLabelText('Fecha de cierre (opcional)');
+    await waitFor(() => expect(fecha).toHaveAttribute('aria-invalid', 'true'));
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toMatch(/Revise el campo Fecha de cierre/);
+    expect(aviso.textContent).not.toMatch(/end_date/);
+  });
+
+  it('el mensaje de error se suma a la ayuda del campo, no la sustituye', async () => {
+    await guardarYFallar([{
+      type: 'string_too_long',
+      loc: ['body', 'description'],
+      msg: 'String should have at most 2800 characters',
+      ctx: { max_length: 2800 },
+    }]);
+
+    const texto = screen.getByLabelText('Texto de la publicación');
+    await waitFor(() => expect(texto).toHaveAttribute('aria-invalid', 'true'));
+    const descriptores = texto.getAttribute('aria-describedby').split(' ');
+    expect(descriptores).toContain('publicacion-descripcion-restantes');
+    expect(descriptores).toContain('publicacion-description-error');
+    // Las dos cosas que el lector tiene que poder leer siguen estando.
+    expect(document.getElementById(descriptores[0]).textContent).toMatch(/Quedan/);
+    expect(document.getElementById(descriptores[1]).textContent)
+      .toBe('No puede pasar de 2800 caracteres.');
+  });
+
+  it('y la ayuda sola sigue ahí cuando el campo está bien', async () => {
+    const usuario = prepararUsuario();
+    fetchCampaignList.mockResolvedValueOnce({ total: 0, items: [] });
+    render(<Publicaciones puedeGestionar />);
+    await screen.findByText('Todavía no hay publicaciones.');
+    await usuario.click(screen.getByRole('button', { name: '+ Nueva publicación' }));
+
+    expect(screen.getByLabelText('Texto de la publicación'))
+      .toHaveAttribute('aria-describedby', 'publicacion-descripcion-restantes');
+  });
+});

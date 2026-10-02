@@ -44,6 +44,28 @@
      Medido en pruebas/contraste.test.js, que lo recalcula de aquí. */
   --border-focus: rgba(255, 255, 255, 0.71);
 
+  /* El contorno de un control cuyo valor no vale: el cuarto miembro de esta familia.
+     §1.4.11 habla del contorno de un control **y de sus estados**, y este es un estado
+     que la hoja no dibujaba (§6.4 punto 36): un campo con un valor inválido se veía
+     exactamente igual que uno correcto, y lo único que avisaba era el mensaje de debajo.
+     En un formulario de ocho campos eso es leer ocho mensajes para encontrar uno.
+
+     Opaco y no translúcido como el borde del aviso: da 4.28:1 en el peor de los cinco
+     fondos donde hay controles, muy por encima de los 3.0 de la norma. No se baja a la
+     primera parada que pasa, como se hizo con --border-control, por un motivo medido:
+     este borde **no cambia cuando el campo recibe el foco**, y cuanto más claro sea,
+     menos sitio queda por encima para que algo se note. Lo de abajo.
+
+     Por qué el foco de un campo inválido es un aro **añadido** y no este borde cambiando
+     de color: los dos candidatos a sustituirlo se quedan cortos. El aro de foco de esta
+     paleta, compuesto sobre el fondo del campo con foco, da 1.96 contra este rojo; y el
+     rojo más claro que sigue siendo rojo, #fecaca, da 2.60. Pasar de 3.0 exige el blanco
+     puro (3.76), que no es ni un rojo —se perdería el error, justo mientras se escribe en
+     el campo— ni el aro de esta paleta. Es el mismo callejón del capítulo 39 un piso más
+     abajo, y esta vez no tiene salida cromática: la salida es geométrica. Medido en
+     pruebas/contraste.test.js, que recalcula esos tres números y los deja escritos. */
+  --border-error: #ef4444;
+
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   /* Era #64748b y no llegaba al mínimo de la norma en ninguna de las tres superficies:
@@ -105,6 +127,62 @@
   --danger-bg-hover: #dc2626;
   --danger-border: #ef4444;
   --danger-text: #f8fafc;
+
+  /* El estado de error (capítulo 40)
+     --------------------------------
+     Tres tokens para lo que avisa de que algo está mal, y una familia propia por el mismo
+     argumento del capítulo 39 con --danger-*: ni --hot-* ni --danger-* valen aquí. El
+     rojo de HOT es una **temperatura de prospecto**, y un error pintado con él dice que
+     el error es un prospecto caliente; el de --danger-* es el de una **acción**
+     destructiva, un relleno sólido con aspecto de botón, y un aviso no es un botón. Que
+     tres cosas se parezcan en la pantalla no las hace la misma en la paleta.
+
+     Estaban escritos a mano en cuatro avisos de tres pantallas —el del segundo paso del
+     login, el de las credenciales, el del cambio obligatorio de contraseña y el del alta
+     del segundo factor—, y por estar escritos a mano **nadie los midió**:
+     `accesibilidad.test.jsx` dice en su cabecera que no mide contraste porque jsdom no
+     dibuja, y manda a `contraste.test.js`; `contraste.test.js` lee el `:root`. Un color
+     en un `style` del JSX no está en ninguno de los dos. El que había, #ef4444 como
+     texto, daba 4.43:1 sobre el panel y 4.17:1 sobre el elevado, por debajo de los 4.5
+     de §1.4.3 — y el token que la paleta ya tenía para ese sitio, --hot-text, daba 6.02.
+     El color no estaba mal elegido: estaba elegido donde no se mide.
+
+     --error-text es la primera parada de la rampa de #ef4444 hacia el blanco que pasa 4.5
+     en los tres fondos donde hay avisos, con el fondo translúcido ya compuesto: 5.19
+     sobre --bg-base, 4.82 sobre --bg-surface y 4.54 sobre --bg-surface-elevated. La
+     anterior, #f05151, se queda en 4.49. Medido en pruebas/contraste.test.js. */
+  --error-bg: rgba(239, 68, 68, 0.12);
+  /* El canto del aviso. Como --hot-border y los otros dos de los cuadrantes: no delimita
+     ningún control ni identifica nada, así que §1.4.11 no le pide número y se queda con
+     el alfa con el que estaba escrito en las cuatro pantallas. */
+  --error-border: rgba(239, 68, 68, 0.35);
+  --error-text: #f05353;
+
+  /* Los colores que vivían en un `style` del JSX (capítulo 40)
+     ----------------------------------------------------------
+     Ninguno de estos es un color nuevo: son los que ya se usaban, escritos a mano en
+     trece archivos del cliente. Están aquí por el mismo motivo por el que el capítulo 39
+     subió --bg-field y --bg-field-focus a la paleta: **lo que no está en el `:root` no lo
+     mide nadie**, y el rojo de los avisos de arriba es la prueba de a dónde lleva eso.
+
+     Donde el valor escrito a mano era un token con otro nombre —#ffffff por
+     --color-primary, #34d399 por --success-text, #f59e0b por --warm-dot— no se añade
+     token: se usa el que había. Y donde había cuatro alfas distintas para la misma idea
+     —0.02, 0.04 y 0.05 para «un relleno apenas visible»— se unifican en una: que dos
+     cosas iguales se vean iguales no es un rediseño, es lo contrario de un accidente. */
+  --bg-chip: rgba(255, 255, 255, 0.04);
+  --bg-navbar: rgba(11, 15, 25, 0.95);
+  --overlay-modal: rgba(3, 7, 18, 0.75);
+  --overlay-loading: rgba(0, 0, 0, 0.55);
+
+  /* Las tres etapas de la barra del embudo. Son objetos gráficos que llevan información
+     —el ancho dice cuántas fichas hay en cada etapa—, así que se miden contra la pista
+     sobre la que se dibujan, y no contra el panel: 6.26, 3.56 y 7.40 en el peor caso,
+     por encima de los 3.0 de §1.4.11. La tercera no es un color propio: el ámbar del
+     embudo y el punto de WARM eran ya el mismo #f59e0b escrito dos veces. */
+  --funnel-won: #10b981;
+  --funnel-qualified: #6366f1;
+  --funnel-rest: var(--warm-dot);
 
   /* Lo que el marcado pedía desde hace capítulos y la hoja no tenía (capítulo 39)
      -----------------------------------------------------------------------------
@@ -249,14 +327,14 @@ h1, h2, h3, h4, h5 {
 .btn-primary {
   background: var(--color-primary);
   color: var(--color-primary-text);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
   background: var(--color-primary-hover);
   color: var(--color-primary-text);
-  border-color: #ffffff;
+  border-color: var(--color-primary);
 }
 
 .btn-secondary {
@@ -277,7 +355,7 @@ h1, h2, h3, h4, h5 {
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
   color: var(--danger-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-danger:hover {
@@ -328,6 +406,78 @@ h1, h2, h3, h4, h5 {
   background: var(--bg-field-focus);
 }
 
+/* Un campo cuyo valor no vale (§6.4 punto 36, capítulo 40)
+   --------------------------------------------------------
+   Se dibuja sobre `[aria-invalid='true']` y no sobre una clase propia, y es la decisión
+   que más importa de esta regla: así la hoja pinta **exactamente** lo que el lector de
+   pantalla anuncia. Con una clase habría dos verdades sobre el mismo campo —una para el
+   ojo y otra para quien no mira— y nada que impida que se separen; de hecho es lo que
+   pasaba, porque el atributo ya estaba puesto en la página pública desde el capítulo 34 y
+   la hoja no lo miraba.
+
+   El rojo no reemplaza al mensaje de debajo: §1.4.1 no admite que el color sea el único
+   portador de la información, y el `.form-error` sigue ahí. Lo que añade es **cuál** de
+   los ocho campos del formulario es, que es lo que no se podía saber sin leerlos todos. */
+.input-field[aria-invalid='true'] {
+  border-color: var(--border-error);
+}
+
+/* Con el foco puesto, el borde rojo **no cambia**: el error no desaparece porque se esté
+   escribiendo en el campo. El foco se señala con un aro añadido por fuera, que se mide
+   contra el panel —lo que había en ese sitio antes de aparecer— y no contra el borde. No
+   es una elección estética: el aro de foco de la paleta solo da 1.96 sobre este rojo y el
+   rojo más claro que sigue siendo rojo, 2.60, así que señalar el foco cambiando este
+   color dejaría §2.4.7 incumplido en todos los campos inválidos. Los tres números están
+   en la paleta y recalculados en pruebas/contraste.test.js. */
+.input-field[aria-invalid='true']:focus {
+  border-color: var(--border-error);
+  background: var(--bg-field-focus);
+  box-shadow: 0 0 0 2px var(--border-focus);
+}
+
+/* Los avisos de una pantalla (capítulo 40)
+   ---------------------------------------
+   Vivían escritos a mano: el mismo bloque de siete propiedades copiado en cada
+   componente que tuviera algo que decir, con el rojo que no llegaba a 4.5 en cuatro de
+   ellos. Se escriben una vez, con la misma forma que `.btn` y sus variantes: la geometría
+   en `.alert` y el color en la variante.
+
+   `white-space` no es adorno y vale para los tres: `parseApiError` une los campos de un
+   422 con saltos de línea, y un salto de línea en HTML no es un salto. Sin esto, un 422
+   de tres campos sale en un renglón corrido con los tres pegados. */
+.alert {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  white-space: pre-line;
+}
+
+.alert-error {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}
+
+/* El ámbar y el verde de un aviso que no es un error. Estos dos **sí** reutilizan una
+   familia que ya existía, y el caso del ámbar no es cómodo: --warm-* es la temperatura
+   WARM de un prospecto, y por el argumento del capítulo 39 —el que separó --danger-* de
+   --hot-*— un aviso no debería pintarse con la temperatura de una ficha. Se reutiliza
+   porque el ámbar de esta paleta es ese y no hay otro, y queda anotado en §6.4: el token
+   hace dos oficios y solo uno tiene nombre. --success-* no tiene ese problema: ya era
+   semántico, «algo salió bien», y no la temperatura de nada. */
+.alert-warn {
+  background: var(--warm-bg);
+  border-color: var(--warm-border);
+  color: var(--warm-text);
+}
+
+.alert-ok {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
 .form-label {
   display: block;
   font-size: 0.75rem;
@@ -374,7 +524,7 @@ h1, h2, h3, h4, h5 {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(3, 7, 18, 0.75);
+  background: var(--overlay-modal);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -458,7 +608,7 @@ h1, h2, h3, h4, h5 {
   gap: 10px;
 }
 .interes-error {
-  color: var(--hot-text);
+  color: var(--error-text);
   font-size: 0.8rem;
   margin-top: 3px;
 }
@@ -467,7 +617,7 @@ h1, h2, h3, h4, h5 {
   margin-bottom: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  color: var(--hot-text);
+  color: var(--error-text);
   font-size: 0.85rem;
   white-space: pre-wrap;
 }
@@ -516,7 +666,7 @@ h1, h2, h3, h4, h5 {
 .interes-boton.elegido {
   border-color: var(--color-primary);
   color: var(--text-primary);
-  background: #161b2b;
+  background: var(--bg-surface-elevated);
   font-weight: 600;
 }
 .interes-boton:has(input:focus-visible) {
@@ -638,7 +788,7 @@ h1, h2, h3, h4, h5 {
 }
 .form-error {
   font-size: 0.8rem;
-  color: var(--hot-text);
+  color: var(--error-text);
   margin-top: 4px;
   line-height: 1.5;
 }

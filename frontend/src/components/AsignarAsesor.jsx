@@ -95,7 +95,7 @@ export default function AsignarAsesor({ lead, onAsignado }) {
         {guardando ? 'Asignando...' : 'Asignar'}
       </button>
       {error && (
-        <span role="alert" style={{ color: 'var(--hot-text)' }}>{error}</span>
+        <span role="alert" style={{ color: 'var(--error-text)' }}>{error}</span>
       )}
     </div>
   );

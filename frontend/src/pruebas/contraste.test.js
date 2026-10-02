@@ -150,13 +150,54 @@ describe('arreglar un criterio sin romper el otro', () => {
     }
   });
 
-  it('mide los dos sitios donde el cambio ocurre, no uno', () => {
+  it('mide los tres sitios donde el cambio ocurre, no uno', () => {
     // El campo da 3.30 y el botón secundario 3.06: es el **botón** el que obliga a 0.71,
     // porque pasa de un fondo más claro a otro más claro todavía. Medir solo el campo
-    // habría dejado pasar 0.70, que en el botón se queda en 2.99.
+    // habría dejado pasar 0.70, que en el botón se queda en 2.99. El tercero lo añade el
+    // capítulo 40: un campo inválido, donde el borde no cambia y el aro se añade.
     const cambios = medirCambios(variables);
-    expect(cambios).toHaveLength(2);
-    expect(cambios.map((c) => c.donde).join(' ')).toMatch(/campo[\s\S]*bot/);
+    expect(cambios).toHaveLength(3);
+    expect(cambios.map((c) => c.donde).join(' ')).toMatch(/campo[\s\S]*bot[\s\S]*inválido/);
+  });
+
+  it('en un campo inválido el foco no se puede señalar cambiando el color del borde', () => {
+    // Esta prueba no comprueba un arreglo: comprueba **por qué el arreglo es el que es**.
+    //
+    // El capítulo 39 encontró que subir el borde en reposo a 3.0 dejaba el aro de foco a
+    // 1.11, y la salida fue mover los dos tokens juntos. Aquí esa salida no existe: el
+    // borde de un campo inválido es rojo y no puede cambiar al recibir el foco —si
+    // cambiara, el error desaparecería justo mientras se escribe en el campo—, y los dos
+    // candidatos naturales a sustituirlo se quedan cortos:
+    //
+    // * el aro de foco de esta paleta, rgba(255,255,255,0.71), compuesto sobre el fondo
+    //   del campo con foco: **1.96**;
+    // * el rojo más claro que sigue siendo rojo, #fecaca, que ya es casi rosa: **2.60**.
+    //
+    // Pasar de 3.0 exige el blanco puro (3.76), que no es ni un rojo —se perdería el
+    // error— ni el aro de foco de esta paleta —sería un quinto token de borde inventado
+    // para un solo caso—. De ahí que el foco de un campo inválido sea un aro **añadido**
+    // por fuera: cuando no hay salida cromática, la salida es geométrica.
+    //
+    // Si algún día --border-error se oscurece lo bastante como para que el aro de foco de
+    // la paleta sí alcance 3.0 sobre él, esta prueba se pone en rojo y hay que volver a
+    // decidir. Es la única forma de que una decisión tomada por imposibilidad no sobreviva
+    // a la imposibilidad.
+    const invalido = componer(variables['--border-error'], variables['--bg-field']);
+    const aroDeLaPaleta = componer(variables['--border-focus'], variables['--bg-field-focus']);
+    expect(
+      razon(aroDeLaPaleta, invalido),
+      'el aro de foco de la paleta ya alcanza 3.0 sobre --border-error: un cambio de color '
+      + 'bastaría para señalar el foco, y hay que revisar si el aro añadido sigue siendo '
+      + 'la solución correcta',
+    ).toBeLessThan(MINIMO_NO_TEXTO);
+    expect(razon('#fecaca', invalido)).toBeLessThan(MINIMO_NO_TEXTO);
+    // Y lo que sí llegaría, dicho con su número para que no se busque dos veces.
+    expect(razon('#ffffff', invalido)).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
+
+    // El aro, que es la salida que se tomó, sí se distingue de lo que había debajo: el
+    // panel. Es el tercer renglón de CAMBIOS_DE_ESTADO, medido de la paleta.
+    const aro = medirCambios(variables).find((c) => c.donde.includes('inválido'));
+    expect(aro.razon).toBeGreaterThanOrEqual(MINIMO_NO_TEXTO);
   });
 });
 
@@ -193,12 +234,16 @@ describe('el modo claro', () => {
 });
 
 describe('el texto pequeño no se aprueba llamándolo grande', () => {
-  // Los únicos pares que se miden contra 3.0 son los tres que no son texto: §1.4.11 habla
-  // de bordes y de estados, no de letras. Se enumeran aquí, y no se deduce del nombre del
-  // token, para que bajarle el mínimo a un color de texto obligue a tocar esta lista.
-  const NO_TEXTO = ['--border-control', '--border-focus', '--danger-border'];
+  // Los únicos pares que se miden contra 3.0 son los que no son texto: §1.4.11 habla de
+  // bordes, de estados y de objetos gráficos con información, no de letras. Se enumeran
+  // aquí, y no se deduce del nombre del token, para que bajarle el mínimo a un color de
+  // texto obligue a tocar esta lista.
+  const NO_TEXTO = [
+    '--border-control', '--border-focus', '--border-error', '--danger-border',
+    '--funnel-won', '--funnel-qualified', '--funnel-rest',
+  ];
 
-  it('todos los pares se miden contra 4.5, salvo los tres bordes', () => {
+  it('todos los pares se miden contra 4.5, salvo los bordes y las barras', () => {
     // La norma permite 3.0 para texto de 24 px, o de 18.66 px en negrita. Esta interfaz va
     // de 0.7 a 0.875 rem —de 11 a 14 px— y no tiene nada de ese tamaño, así que no hay
     // ningún par que pueda acogerse a esa excepción. Escrito como prueba para que nadie
@@ -214,7 +259,7 @@ describe('el texto pequeño no se aprueba llamándolo grande', () => {
     const colados = PARES.filter((p) => p.minimo === MINIMO_NO_TEXTO && !NO_TEXTO.includes(p.texto));
     expect(
       colados.map((p) => p.texto),
-      'Estos pares se miden contra 3.0 y no son ninguno de los bordes: o son texto y les '
+      'Estos pares se miden contra 3.0 y no están en la lista de arriba: o son texto y les '
       + 'toca 4.5, o hay que decir aquí por qué no lo son',
     ).toEqual([]);
   });

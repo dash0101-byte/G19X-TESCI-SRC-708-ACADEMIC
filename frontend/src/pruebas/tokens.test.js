@@ -40,36 +40,15 @@
 // token se use donde tiene sentido. Comprueba que lo que el marcado nombra existe.
 
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import { matrizQR } from '../components/qr';
+// `fuentes` y `sinComentarios` vivían aquí hasta el capítulo 40, que escribió una segunda
+// guarda que recorre los mismos archivos. Dos copias de «qué archivos son el cliente» es
+// una forma silenciosa de que una de las dos deje de mirar algo, así que están en un
+// módulo y las dos lo importan.
+import { fuentes, lineaDe, sinComentarios } from './codigo.js';
 import { HOJA, resolverAlias, variablesDe } from './contraste.js';
-
-/** Los archivos del cliente que pueden nombrar un token, sin las pruebas. */
-function fuentes(directorio) {
-  const encontrados = [];
-  for (const entrada of readdirSync(directorio)) {
-    const ruta = join(directorio, entrada);
-    if (statSync(ruta).isDirectory()) encontrados.push(...fuentes(ruta));
-    else if (/\.(jsx|js|css)$/.test(ruta) && !ruta.includes('.test.')) encontrados.push(ruta);
-  }
-  return encontrados;
-}
-
-/**
- * Se quitan los comentarios antes de buscar.
- *
- * Es la lección del capítulo 37 aplicada aquí: una guarda que busca un texto en un archivo
- * se satisface con su propia documentación. Este archivo nombra `var(--accent-primary)` en
- * su cabecera para explicar de dónde viene, y la cabecera no es código.
- *
- * Las de línea se quitan solo cuando empiezan la línea: `//` en medio de una es casi
- * siempre el de un `https://`.
- */
-function sinComentarios(codigo) {
-  return codigo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-}
 
 /**
  * Los `var(--x)` de un archivo, separados por si llevan respaldo escrito.
@@ -83,7 +62,7 @@ function tokensPedidos(codigo) {
   const conRespaldo = new Map();
   const limpio = sinComentarios(codigo);
   for (const coincidencia of limpio.matchAll(/var\(\s*(--[\w-]+)\s*([,)])/g)) {
-    const donde = limpio.slice(0, coincidencia.index).split('\n').length;
+    const donde = lineaDe(limpio, coincidencia.index);
     const destino = coincidencia[2] === ',' ? conRespaldo : sinRespaldo;
     if (!destino.has(coincidencia[1])) destino.set(coincidencia[1], donde);
   }

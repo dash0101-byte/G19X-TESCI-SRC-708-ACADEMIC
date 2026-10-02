@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { enviarInteres, fetchPublicacionDeInteres } from '../services/api';
+// El reparto de un 422 por campo nació aquí, en el capítulo 34. El 40 lo sacó a un módulo
+// para que los cuatro formularios del panel lo usen, y esta página lo importa en vez de
+// quedarse con su copia: dos copias de la misma mecánica son dos cosas que se separan.
+import MensajeDeCampo from './MensajeDeCampo.jsx';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDelServidor,
+  propiedadesDeCampo,
+} from './erroresDeFormulario';
 
 // La página a la que lleva el enlace de una publicación de LinkedIn. Es la única pantalla
 // sin sesión: quien la abre no tiene cuenta ni la va a tener.
@@ -59,21 +69,6 @@ function validar(formulario) {
   if (!CORREO.test(formulario.correo.trim())) errores.correo = FALTA.correo;
   if (!formulario.aviso_de_privacidad) errores.aviso_de_privacidad = FALTA.aviso_de_privacidad;
   return errores;
-}
-
-// Un 422 del servidor trae, por campo, qué no valió. Se reparte junto a cada campo. Para
-// los campos que la página ya comprueba se usa su propio texto —el del validador de correo
-// llega en inglés—; para el perfil de LinkedIn y el teléfono, el del servidor, que ya
-// explica qué forma espera.
-function erroresDelServidor(detalle) {
-  if (!Array.isArray(detalle)) return null;
-  const errores = {};
-  for (const item of detalle) {
-    const campo = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : null;
-    if (!ORDEN.includes(campo) || errores[campo]) continue;
-    errores[campo] = FALTA[campo] || String(item.msg || '').replace(/^(Value error|Assertion failed),\s*/, '');
-  }
-  return Object.keys(errores).length ? errores : null;
 }
 
 // `red`: por dónde llegó quien abre la página (`?r=whatsapp`). Solo viaja al servidor, que
@@ -143,16 +138,11 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
     });
   };
 
-  const enfocarPrimerError = (encontrados) => {
-    const primero = ORDEN.find((campo) => encontrados[campo]);
-    if (!primero) return;
-    if (OPCIONALES.has(primero)) setMasDatos(true);
-    // Tras el render: si el campo estaba plegado, aún no está en el documento.
-    setTimeout(() => {
-      const nodo = formularioRef.current?.querySelector(`[data-campo="${primero}"]`);
-      nodo?.focus();
-    }, 0);
-  };
+  // Si el campo que falla está plegado bajo «Añadir más datos», se despliega antes de
+  // buscarlo: un campo que no está en el documento no puede recibir el foco.
+  const enfocarPrimerError = (encontrados) => enfocarPrimerCampoConError(
+    formularioRef, encontrados, ORDEN, (campo) => { if (OPCIONALES.has(campo)) setMasDatos(true); },
+  );
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -179,10 +169,18 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
       );
       setGracias(respuesta.mensaje);
     } catch (err) {
-      const porCampo = err.status === 422 ? erroresDelServidor(err.detalle) : null;
-      if (porCampo) {
-        setErrores(porCampo);
-        enfocarPrimerError(porCampo);
+      // `propios: FALTA` hace que ganen las frases de esta página sobre las del servidor:
+      // están escritas para quien rellena el formulario. `campos: ORDEN` saca aparte lo que
+      // esta pantalla no pinta, para que no desaparezca al repartir.
+      const repartidos = err.status === 422
+        ? erroresDelServidor(err.detalle, { propios: FALTA, campos: ORDEN })
+        : null;
+      if (repartidos && Object.keys(repartidos.porCampo).length) {
+        setErrores(repartidos.porCampo);
+        enfocarPrimerError(repartidos.porCampo);
+        if (repartidos.sueltos.length) setError(comoAviso(repartidos.sueltos));
+      } else if (repartidos && repartidos.sueltos.length) {
+        setError(comoAviso(repartidos.sueltos));
       } else {
         setError(err.message);
       }
@@ -235,17 +233,15 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
   const { opciones } = publicacion;
   const esLarga = (publicacion.descripcion || '').length > LARGA;
 
-  // Las propiedades que conectan un campo con su error: el lector de pantalla lo anuncia
-  // al llegar al campo, y `data-campo` es por donde se le devuelve el foco.
-  const conError = (nombre) => ({
-    'data-campo': nombre,
-    'aria-invalid': errores[nombre] ? 'true' : undefined,
-    'aria-describedby': errores[nombre] ? `interes-${nombre}-error` : undefined,
-  });
-  const mensaje = (nombre) =>
-    errores[nombre] ? (
-      <div id={`interes-${nombre}-error`} className="interes-error">{errores[nombre]}</div>
-    ) : null;
+  // Las propiedades que conectan un campo con su error y el renglón que va debajo. Los dos
+  // los construye el mismo módulo, que es lo que garantiza que el `id` del mensaje y el
+  // `aria-describedby` del campo digan lo mismo.
+  const conError = (nombre, ademasDescritoPor = null) => propiedadesDeCampo(
+    nombre, errores, 'interes', ademasDescritoPor,
+  );
+  const mensaje = (nombre) => (
+    <MensajeDeCampo nombre={nombre} errores={errores} prefijo="interes" clase="interes-error" />
+  );
 
   return (
     <main style={envoltorio}>
@@ -338,8 +334,12 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
           {/* Botones de un clic: radios nativos con aspecto de botón. Se eligen con un
               toque, con las flechas del teclado, y el lector de pantalla los anuncia como
               un grupo de opciones. */}
+          {/* El `id` del mensaje no se escribe aquí: sale de la misma función que lo pone
+              en el mensaje. El `data-campo` lo lleva el primer radio del grupo, que es
+              donde tiene sentido devolver el foco, así que de este juego de propiedades el
+              fieldset solo se queda con `aria-describedby`. */}
           <fieldset className="interes-necesidades"
-            aria-describedby={errores.necesidad ? 'interes-necesidad-error' : undefined}>
+            aria-describedby={conError('necesidad')['aria-describedby']}>
             <legend className="form-label">¿Qué necesitas?</legend>
             <div className="interes-botones">
               {Object.entries(opciones.necesidades).map(([clave, etiqueta], indice) => (
@@ -374,9 +374,7 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
                 <label htmlFor="interes-linkedin" className="form-label">Tu perfil de LinkedIn</label>
                 <input id="interes-linkedin" type="text" inputMode="url" className="input-field" maxLength={200}
                   placeholder="linkedin.com/in/tu-perfil"
-                  data-campo="linkedin"
-                  aria-invalid={errores.linkedin ? 'true' : undefined}
-                  aria-describedby={errores.linkedin ? 'interes-linkedin-ayuda interes-linkedin-error' : 'interes-linkedin-ayuda'}
+                  {...conError('linkedin', 'interes-linkedin-ayuda')}
                   value={formulario.linkedin} onChange={(e) => cambiar('linkedin', e.target.value)} />
                 <div id="interes-linkedin-ayuda" className="interes-ayuda">
                   Puedes pegarlo tal como te lo dé la aplicación de LinkedIn.

@@ -107,7 +107,7 @@ export default function CerrarProspecto({ lead, onCerrado, onCancelar }) {
       </div>
 
       {error && (
-        <div role="alert" style={{ fontSize: '0.78rem', color: 'var(--hot-text)' }}>
+        <div role="alert" style={{ fontSize: '0.78rem', color: 'var(--error-text)' }}>
           {error}
         </div>
       )}
