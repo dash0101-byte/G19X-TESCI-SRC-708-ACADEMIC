@@ -3,7 +3,69 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 41)
+**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 42)
+
+> **Revisión del capítulo 42.** La congelación se mantiene, y este capítulo la abrió **para
+> dos puntos de §6.4 y para ninguno más**: el **26** y el **40**, que este documento mandaba
+> arreglar juntos porque «las dos son sobre lo que el servidor dice cuando la base rechaza
+> algo».
+>
+> Los dos puntos eran ciertos y los dos estaban cortos en lo mismo: daban por hecho que el
+> único camino hasta ese `commit` es una **carrera**, y por eso los dos decían que el fallo no
+> se ve en uso normal. `leads` tiene dos claves ajenas, así que un `assigned_rep_id` que no
+> existe pasa el esquema —es un entero— y lo rechaza la base, sin ninguna carrera y con
+> cualquier cliente de la API. Medido antes de tocar nada: `POST /leads` con un identificador
+> inexistente era un **500**, y `PUT /leads/{id}` con un asesor inexistente era un **409 que
+> decía «el correo de esta ficha ya está registrado en otro prospecto»** — el correo de la
+> propia ficha, que quien editaba no había tocado, dentro de una frase sobre un conflicto que
+> no había ocurrido (R40 §42.4).
+>
+> **Lo importante no es el arreglo sino por qué no había forma de encontrarlo.** SQLite no
+> comprueba las claves ajenas si no se le pide: `PRAGMA foreign_keys` nace apagado y hay que
+> encenderlo **en cada conexión**. La línea estaba escrita seis veces en este repositorio, y
+> las seis dentro de tres pruebas de migración; faltaba en `app/core/database.py`, el único
+> sitio donde se crea el motor de la aplicación —el de la suite y el del desarrollo local—.
+> Las **18 claves ajenas y las 18 cláusulas `ondelete`** del esquema eran inertes ahí. Al
+> encender el pragma, la suite dio **1587 pasadas y 2 omitidas: exactamente lo mismo que sin
+> él**, y eso no es tranquilidad: es la demostración de que ninguna de las 1589 pruebas había
+> escrito nunca una clave que no apuntara a nada ni borrado un padre cuya cascada importara.
+> **Una restricción que el motor de las pruebas no hace cumplir es una restricción que nadie
+> ha probado nunca**, y se nota en que encenderla no cambia nada (R40 §42.2).
+>
+> **El punto 26 era verdad a medias, y la mitad que faltaba cambia el arreglo.** Proponía leer
+> el error del motor, dialecto por dialecto. SQLite dice `UNIQUE constraint failed:
+> leads.email` y `NOT NULL constraint failed: leads.first_name`, pero para una clave ajena
+> dice exactamente `FOREIGN KEY constraint failed` **y nada más**: ni columna, ni tabla, ni
+> valor, y es el caso más probable de los tres. Leer el mensaje no podía nombrar el campo
+> justo donde hace falta. Así que el `except` no lee el mensaje: **pregunta a la base** cuál
+> de sus reglas no se cumple, con la lista de reglas sacada de `__table__` como hizo el 33 y
+> generalizó el 41, y contesta un 422 con el campo en `loc` — que el mecanismo del capítulo 40
+> pinta debajo del campo sin tocar una línea del cliente (R40 §42.5).
+>
+> Lo demás, en una línea cada cosa. De las dieciocho claves ajenas, **catorce se escriben
+> desde una fila ya cargada** y cuatro pueden venir de un cuerpo de petición; la lista sale de
+> cruzar los esquemas de entrada con el esquema de la base, y al derivarla apareció que la
+> pregunta «¿y si ese identificador no existe?» ya tenía **tres respuestas escritas** en el
+> repositorio —un 422 que además exige un asesor activo, un 404 que protege la cartera ajena,
+> y nada— (R40 §42.3). De los siete `except IntegrityError`, dos preguntaban y cuatro
+> suponían, y el más caro era el del webhook: contestar «duplicado» a un rechazo que no lo era
+> **descarta el evento entero**, el CRM no reintenta y el prospecto no existe en ninguna
+> parte, cuando dos capas más abajo el registro de actividad ya preguntaba antes de decirlo
+> (R40 §42.8). `PUT /leads/{id}` con `campaign_id` respondía **200 con la ficha entera** sin
+> cambiar nada, que es la forma exacta del defecto que el 33 cerró, sobreviviendo en un campo
+> que no estaba declarado (R40 §42.9). Y `LeadRepository.delete` seguía siendo el borrado que
+> la Fase 14 había retirado por dejar atrás las entregas de webhook: no lo llamaba nadie y
+> parecía la forma de borrar un prospecto (R40 §42.10). **Sin migración**: PostgreSQL ha
+> rechazado estas filas desde que las claves existen, así que no hay nada que igualar.
+>
+> §6.4 pasa de **diez entradas abiertas de veinte a once de veintitrés**: se cierran la 26 y
+> la 40, y entran la **41**, la **42** y la **43**. Y hay otra vuelta de tuerca del arnés,
+> distinta de la del 41: de los veintitrés defectos reintroducidos, cuatro escaparon en la
+> primera pasada, y **dos de ellos decían que una comprobación de este capítulo no hacía
+> nada** —quitarla dejaba la suite verde, porque la red del `except` contesta lo mismo—. Esta
+> vez la respuesta no fue quitarla: las dos capas sí se distinguen, pero en **el momento** y no
+> en la respuesta, y nadie lo había escrito. Un arreglo cuya razón de ser no está en ninguna
+> prueba es indistinguible de uno que sobra (R40 §42.7, §42.12).
 
 > **Revisión del capítulo 41.** La congelación se mantiene, y este capítulo la abrió **para
 > un punto de §6.4 y para ninguno más**: el **25**, que el 33 encontró, dejó escrito en su
@@ -914,7 +976,7 @@ defectos reintroducidos y 22 detectados.
 | 22 | ~~Los ceros de ingresos que ya hay en la base no se migraron a nulos. El extractor los lee como ausentes, que es lo que importa al modelo; la ficha los muestra como cero hasta que alguien la edite~~ — **cerrado** en el capítulo 32: la migración `a4c8d1e70f39` los pasa a vacío y la base dice ya lo que el modelo leía (R32 §32.4) | R24 §24.9 |
 | 23 | Un aviso purgado puede volver a entrar si el sistema de origen lo reentrega pasado el plazo; y **descartar no bloquea** | R21 §21.12 · R22 §22.9 |
 | 25 | ~~El **alta** no normaliza los textos en blanco: `LeadCreate` guarda `''` donde la edición guarda `NULL` desde el capítulo 33. Es el mismo arreglo en otro camino, y afecta también a las integraciones que dan de alta fichas, así que tiene su propia discusión~~ — **cerrado en el capítulo 41**, y el punto estaba corto en tres sitios. El alta y la edición no son dos puertas sino dos de **cinco**, y de los 61 campos de texto de las entradas **34 guardaban el blanco**; la única que lo rechazaba era el formulario público, con una línea de configuración que nadie más tenía desde el capítulo 34. La frase sobre las integraciones era además falsa: las dos normalizaban ya, con una copia privada de la misma función —ahora comparten `app.core.texto.texto_o_nada`—; lo que no normalizaba nadie era el **sobre** del webhook. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: el alta de una cuenta declaraba un mínimo de dos caracteres y recortaba **después** de comprobarlo, así que dos espacios lo cumplían y se guardaban como `''`; y la regla que el 33 derivó de la tabla estaba escrita dentro del esquema de **una** tabla, de modo que las otras dos ediciones parciales contestaban 500 a un `null` sobre una columna obligatoria (R39 §41.2, §41.4) | R33 §33.8 |
-| 26 | El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado | R33 §33.8 |
+| 26 | ~~El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado~~ — **cerrado en el capítulo 42**, y el punto estaba corto en dos sitios. El primero: «si llegara» ya llegaba. `leads` tiene dos claves ajenas además de la restricción única, así que un `assigned_rep_id` que no existe pasa el esquema —es un entero— y lo rechaza la base **sin ninguna carrera**; el 409 que salía nombraba el correo de la propia ficha, que quien editaba no había tocado. El segundo: leer el error del motor no sirve para el caso más probable, porque SQLite nombra la columna en `UNIQUE constraint failed: leads.email` y para una clave ajena dice exactamente `FOREIGN KEY constraint failed` y nada más. Así que no se lee el mensaje: se **pregunta a la base** cuál de sus reglas no se cumple, con la lista sacada de `__table__`. Eran siete `except IntegrityError` —dos preguntaban, cuatro suponían, uno no tenía que averiguar nada— y el más caro era el del webhook del CRM, que contestando «duplicado» **descartaba el evento entero**. **Lo importante no es el arreglo sino por qué no se podía encontrar**: el motor de la suite no comprobaba ninguna de las 18 claves ajenas del esquema (R40 §42.2, §42.5, §42.8) | R33 §33.8 |
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
 | 29 | Un administrador **no puede quitarle el segundo factor a otro** desde el panel: la salida (b) de la guía existe en el diseño pero no tiene botón, porque la gestión de cuentas no ganó esa operación. Hoy se resuelve por la vía (c), que es la misma sentencia SQL | R35 §35.9 |
@@ -927,7 +989,10 @@ defectos reintroducidos y 22 detectados.
 | 37 | **Las otras siete formas del panel siguen enseñando el nombre de la columna, y diez avisos escriben su geometría en línea.** El capítulo 40 repartió el 422 por campos en las cuatro formas que pueden recibirlo con más de un campo y escribió `.alert` y sus tres variantes en la hoja; en las demás, un 422 sigue saliendo por `parseApiError` como `nueva: La contraseña está en la lista de filtradas`, con el nombre del campo del esquema delante —el mensaje ya es castellano, el nombre no—, y diez avisos conservan sus siete propiedades en un `style` aunque el color ya salga de la paleta. No incumple ningún mínimo: es el mismo arreglo en los sitios donde el 422 es menos probable, y hacerlo toca diez componentes más sin corregir ningún número | R38 §40.12 |
 | 38 | **Siete errores del panel se avisan con un `alert()` del navegador**: seis en el recálculo masivo de `App.jsx` y uno en el recálculo de una ficha. Un cuadro del navegador no forma parte de la página —ningún lector de pantalla lo anuncia como contenido—, no se puede señalar junto a nada y tapa lo que hay que corregir. El del formulario de edición se cambió en el capítulo 40 porque es el del 422 que ese capítulo reparte; los demás no son errores de un campo y darles sitio en la pantalla es otra decisión | R38 §40.12 |
 | 39 | **`--warm-*` hace dos oficios, y dos usos de `--hot-text` también.** El capítulo 40 partió el rojo —`--error-*` para lo que avisa de un fallo, `--hot-*` para la temperatura de una ficha— y dejó sin partir el ámbar: `.alert-warn` usa la familia WARM porque el ámbar de esta paleta es ese y no hay otro. Lo mismo con el aviso del enlace caducado de una publicación y la confirmación de un borrado, que son advertencias y no errores y siguen con `--hot-text`. Es el mismo trabajo que el rojo y no se hace a medias | R38 §40.3, §40.12 |
-| 40 | **El alta de una ficha no tiene la red del `IntegrityError` que sí tiene la edición.** `create_lead` comprueba que el correo no esté registrado y después inserta; entre las dos cosas cabe otra transacción que tome ese correo, y entonces el `INSERT` viola el índice único y sale como **500**. La edición lleva ese `except` desde el capítulo 33 por este mismo motivo, con el comentario «red de seguridad ante dos actualizaciones simultáneas». Es una carrera, así que no se ve en uso normal y no la provoca ninguna prueba; va junto al punto 26, porque las dos son sobre lo que el servidor dice cuando la base rechaza algo, y se arreglan mejor juntas | R39 §41.14 |
+| 40 | ~~**El alta de una ficha no tiene la red del `IntegrityError` que sí tiene la edición.** `create_lead` comprueba que el correo no esté registrado y después inserta; entre las dos cosas cabe otra transacción que tome ese correo, y entonces el `INSERT` viola el índice único y sale como **500**. La edición lleva ese `except` desde el capítulo 33 por este mismo motivo, con el comentario «red de seguridad ante dos actualizaciones simultáneas». Es una carrera, así que no se ve en uso normal y no la provoca ninguna prueba; va junto al punto 26, porque las dos son sobre lo que el servidor dice cuando la base rechaza algo, y se arreglan mejor juntas~~ — **cerrada en el capítulo 42**. La red está escrita y cubre las dos cosas: la carrera del correo y la clave ajena que puede perder su destino en el mismo hueco. Y la carrera no era el camino que importaba: `POST /leads` con un `campaign_id` que no existe era un **500** sin carrera ninguna, que cualquier cliente de la API podía provocar. Delante de la red va la comprobación de existencia, que es la misma función en el alta y en la edición, y el arnés obligó a demostrar que las dos capas no son la misma: la comprobación contesta **sin intentar escribir**, y eso es lo que mide su prueba (R40 §42.6, §42.7) | R39 §41.14 |
+| 41 | **La suite no se ejecuta nunca contra PostgreSQL.** El capítulo 42 encendió `PRAGMA foreign_keys` en el motor, así que SQLite exige ya lo mismo que PostgreSQL en las tres clases de restricción que importan —única, obligatoria y ajena—, y eso cubrió el defecto de ese capítulo. No cubre todo lo demás en lo que los dos motores se distinguen, y la única forma de saberlo es correr la suite contra PostgreSQL: hoy ese motor solo aparece en el trabajo de migraciones y en el arranque del contenedor. Es un servicio más en el CI y varios minutos en cada ejecución, con su propia discusión; no es una corrección | R40 §42.14 |
+| 42 | **La atribución de una ficha no se puede corregir.** `LeadUpdate` no acepta `campaign_id`, y desde el capítulo 42 lo **rechaza** con su motivo en vez de responder 200 y no hacer nada. Una ficha dada de alta a mano con la publicación equivocada —o sin ninguna— se queda así, y el informe de rendimiento por campaña la cuenta donde está. Que se pueda cambiar es una frase nueva: ninguna pantalla la pide, y decidir si la atribución es un dato editable o es cómo llegó el prospecto es una decisión de producto, no una corrección | R40 §42.9 |
+| 43 | **El alta de una ficha contesta 400 y 409 para el mismo conflicto.** Cuando el correo repetido lo encuentra su comprobación, responde **400**; cuando lo encuentra la red del `IntegrityError` —la carrera—, responde **409**, que es lo que contesta la edición en los dos casos. Es la misma situación con dos códigos, y el 400 lleva ahí desde el capítulo 10. Cambiarlo es tocar lo que un cliente ya recibe sin corregir ningún dato | R40 §42.14 |
 
 ---
 

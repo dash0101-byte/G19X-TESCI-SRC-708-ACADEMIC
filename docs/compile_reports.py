@@ -101,6 +101,11 @@ REPORT_FILES = [
     # otra. Y que la regla derivada de la tabla, lo mejor del capítulo 33, se escribió para
     # una tabla de tres.
     ("Reporte_39_El_Minimo_que_no_Media_Nada_Un_Blanco_en_Cinco_Puertas_la_Regla_que_Solo_Tenia_una_Tabla_y_el_Espacio_que_Duplicaba_un_Evento.md", "Capítulo 41: El Mínimo que no Medía Nada — Un Blanco en Cinco Puertas, la Regla que Solo Tenía una Tabla y el Espacio que Duplicaba un Evento"),
+    # El capítulo 42 abre los puntos 26 y 40 de §6.4 —lo que el servidor contesta cuando
+    # la base rechaza una fila— y encuentra la mitad que no estaba en ninguna lista: el
+    # motor de las pruebas y del desarrollo no comprobaba ninguna de las dieciocho claves
+    # ajenas del esquema, así que esa clase entera de fallo no podía ponerse roja.
+    ("Reporte_40_El_Motor_que_no_Comprobaba_Nada_Dieciocho_Claves_sin_Probar_el_Except_que_Adivinaba_y_el_Duplicado_que_Perdia_un_Prospecto.md", "Capítulo 42: El Motor que no Comprobaba Nada — Dieciocho Claves sin Probar, el `except` que Adivinaba y el «Duplicado» que Perdía un Prospecto"),
 ]
 
 

@@ -175,7 +175,29 @@ class LeadUpdate(BaseModel):
     status: Optional[LeadStatus] = None
     qualification_status: Optional[QualificationStatus] = None
     assigned_rep_id: Optional[int] = None
+    # Se declara **para poder rechazarlo**, que es lo único que este campo hace aquí.
+    #
+    # Hasta el capítulo 42 no estaba declarado y el esquema no prohíbe campos de más, así que
+    # `PUT /leads/{id}` con `{"campaign_id": 3}` respondía **200 con la ficha entera** y no
+    # cambiaba nada. Es exactamente la forma del defecto que el capítulo 33 vino a arreglar
+    # —«no respondía que no: respondía 200 con la ficha entera»— sobreviviendo en un campo,
+    # y la pantalla decía «Prospecto actualizado».
+    #
+    # Que la atribución se **pueda** corregir es una frase nueva y vive en §6.4; lo que entra
+    # aquí es dejar de decir sí a lo que no se hace. Y se rechaza con un campo declarado en
+    # vez de con `extra="forbid"` porque prohibirle de golpe los campos de más a un cliente
+    # que ya existe es un cambio de contrato: rompería a quien mande un campo que el servidor
+    # lleva años ignorando, sin corregir ningún dato.
+    campaign_id: Optional[int] = None
     raw_metadata: Optional[Dict[str, Any]] = None
+
+    @field_validator("campaign_id")
+    @classmethod
+    def _la_atribucion_no_se_edita(cls, valor: Optional[int]) -> Optional[int]:
+        raise ValueError(
+            "La publicación que atrajo esta ficha no se cambia desde aquí: es cómo llegó, "
+            "no un dato de la ficha."
+        )
 
     _phone = field_validator("phone")(_telefono_e164)
     # Todo el texto de la edición pasa por la misma normalización desde el capítulo 33, no

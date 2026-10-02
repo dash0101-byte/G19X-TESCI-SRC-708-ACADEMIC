@@ -27,6 +27,7 @@ credencial que conoce otra persona no identifica a nadie. La cuenta queda marcad
 import logging
 from typing import List, Optional
 
+from app.core import integridad
 from app.core.audit import (
     ACCION_CARTERA_REPARTIR,
     ACCION_USUARIO_ACTUALIZAR,
@@ -220,15 +221,26 @@ def crear_usuario(
         # otra persona, la cuenta no identifica a nadie.
         must_change_password=True,
     )
+    # Lo que se intenta escribir, antes del `commit`: después de un `rollback` los objetos de
+    # la sesión caducan y leerlos devuelve lo que la base tiene, no lo que se intentó.
+    valores = {columna.name: getattr(usuario, columna.name, None) for columna in User.__table__.columns}
     db.add(usuario)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Ya existe una cuenta con el correo '{correo}'.",
-        ) from exc
+        # La carrera del correo sigue contestándose con la frase que esta red tenía escrita,
+        # y lo demás deja de contestarse con ella: `users` tiene una restricción única y
+        # nueve columnas obligatorias, así que esta línea nombraba el correo también cuando
+        # la base había rechazado otra cosa (punto 26 de §6.4).
+        rechazo = integridad.motivo_del_rechazo(db, User, valores)
+        if rechazo.clase == integridad.REPETIDO:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe una cuenta con el correo '{correo}'.",
+            ) from exc
+        codigo, detalle = integridad.respuesta(rechazo)
+        raise HTTPException(status_code=codigo, detail=detalle) from exc
     db.refresh(usuario)
 
     auditoria.anotar(

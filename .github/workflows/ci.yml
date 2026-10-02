@@ -4463,6 +4463,154 @@ jobs:
           print("El recorte ocurre antes de medir en todas las entradas, y las contrasenas quedan fuera.")
           PY
 
+      # ------------------------------------------------------------------ control 56
+      # El motor comprueba lo que el esquema declara, y el except no adivina.
+      #
+      # El defecto del capitulo 42 tenia dos mitades. La primera es que SQLite no comprueba
+      # las claves ajenas si no se le pide -`PRAGMA foreign_keys` nace apagado en cada
+      # conexion-, asi que las 18 claves y las 18 clausulas `ondelete` del esquema eran
+      # inertes en el motor de la suite y del desarrollo: las 1589 pruebas daban el mismo
+      # resultado con el pragma y sin el. La segunda es que cuatro de los siete
+      # `except IntegrityError` traducian CUALQUIER violacion a la unica que su autor tenia
+      # en mente, de modo que un asesor inexistente salia como «el correo ya esta
+      # registrado» -el correo de la propia ficha- y un rechazo del webhook salia como
+      # «duplicado», descartando el evento entero.
+      #
+      # Lo que esta guarda vigila es la forma de las dos mitades: que el pragma siga en el
+      # motor y no en las pruebas, que ningun `except IntegrityError` conteste sin preguntar
+      # a la base, y que las claves ajenas que llegan en un cuerpo de peticion sigan
+      # comprobandose antes de escribir.
+      - name: Las claves ajenas se comprueban, y el except pregunta en vez de suponer
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          BACKEND = pathlib.Path("backend/app")
+          PRUEBAS = pathlib.Path("backend/tests")
+
+          fallos = []
+
+          # 1. El pragma, donde vive el motor.
+          motor = BACKEND / "core" / "database.py"
+          fuente_motor = motor.read_text(encoding="utf-8")
+          if "PRAGMA foreign_keys=ON" not in fuente_motor:
+              fallos.append(
+                  "app/core/database.py ya no enciende las claves ajenas: SQLite las "
+                  "ignora por omision y el esquema vuelve a ser decorativo"
+              )
+          if not re.search(r"if IS_SQLITE:\s*\n\s*@event\.listens_for\(engine, \"connect\"\)", fuente_motor):
+              fallos.append(
+                  "el oyente del pragma ya no se registra para SQLite en el motor"
+              )
+
+          # 2. Y no en el conftest, que solo cubriria la suite.
+          conftest = (PRUEBAS / "conftest.py").read_text(encoding="utf-8")
+          if "PRAGMA foreign_keys" in conftest:
+              fallos.append(
+                  "el pragma esta en conftest.py: asi lo tendria la suite y no el "
+                  "desarrollo local, que usa el mismo motor"
+              )
+
+          # 3. El modulo que pregunta.
+          nucleo = BACKEND / "core" / "integridad.py"
+          if not nucleo.exists():
+              sys.exit("FALLO: desaparecio backend/app/core/integridad.py.")
+          fuente_nucleo = nucleo.read_text(encoding="utf-8")
+          for pieza in ("def motivo_del_rechazo", "def claves_que_no_apuntan_a_nada", "def grupos_unicos"):
+              if pieza not in fuente_nucleo:
+                  fallos.append(f"integridad.py ya no tiene {pieza}")
+          if 'f"Value error, {rechazo.motivo}"' not in fuente_nucleo:
+              fallos.append(
+                  "el renglon del 422 pierde el prefijo de Pydantic: el cliente deja de "
+                  "reconocer el mensaje como propio y lo cambia por una frase vaga"
+              )
+
+          # 4. Ningun `except IntegrityError` contesta sin preguntar.
+          PREGUNTAS = (
+              "motivo_del_rechazo", "_ya_registrado", "trabajo_en_curso",
+              "entrega_registrada", "_lo_que_la_base_rechazo",
+          )
+          DELIBERADOS = {"services/ciclo_de_publicaciones.py"}
+          cuantos = 0
+          for fuente in sorted(BACKEND.rglob("*.py")):
+              lineas = fuente.read_text(encoding="utf-8").splitlines()
+              relativo = fuente.relative_to(BACKEND).as_posix()
+              for numero, linea in enumerate(lineas):
+                  if not re.match(r"\s*except IntegrityError", linea):
+                      continue
+                  cuantos += 1
+                  if relativo in DELIBERADOS:
+                      continue
+                  cuerpo = "\n".join(lineas[numero:numero + 25])
+                  if not any(p in cuerpo for p in PREGUNTAS):
+                      fallos.append(
+                          f"el except IntegrityError de {relativo}:{numero + 1} supone que "
+                          f"sabe que restriccion fallo en vez de preguntarlo"
+                      )
+          if cuantos != 8:
+              fallos.append(
+                  f"hay {cuantos} except IntegrityError y el inventario del capitulo 42 "
+                  f"cuenta 8: uno nuevo tiene que decir como decide lo que contesta"
+              )
+
+          # 5. Las dos puertas de la ficha comprueban antes de escribir, y por la misma via.
+          repo = (BACKEND / "repositories" / "lead_repository.py").read_text(encoding="utf-8")
+          if repo.count("integridad.claves_que_no_apuntan_a_nada") != 2:
+              fallos.append(
+                  "el alta y la edicion de una ficha ya no comprueban las dos claves "
+                  "ajenas que llegan en el cuerpo: un identificador inexistente vuelve a "
+                  "llegar al INSERT, que es el 500 del punto 40"
+              )
+          if "suprimir_prospecto(self.db, lead)" not in repo:
+              fallos.append(
+                  "el borrado del repositorio vuelve a fiarse de las cascadas en vez de "
+                  "recorrer el mapa de derechos_del_titular (la leccion de la Fase 14)"
+              )
+
+          # 6. La atribucion de una ficha se rechaza explicitamente y no se ignora.
+          esquema = (BACKEND / "schemas" / "lead.py").read_text(encoding="utf-8")
+          if "_la_atribucion_no_se_edita" not in esquema or 'field_validator("campaign_id")' not in esquema:
+              fallos.append(
+                  "LeadUpdate vuelve a ignorar campaign_id en silencio: un 200 con la "
+                  "ficha entera para algo que no cambia nada"
+              )
+
+          # 7. Las clausulas del esquema siguen siendo dieciocho.
+          entidades = (BACKEND / "models" / "entities.py").read_text(encoding="utf-8")
+          clausulas = len(re.findall(r"ondelete=", entidades))
+          ajenas = len(re.findall(r"ForeignKey\(", entidades))
+          if clausulas != ajenas:
+              fallos.append(
+                  f"hay {ajenas} claves ajenas y {clausulas} clausulas ondelete: una clave "
+                  f"sin clausula deja al motor decidiendo por omision (RESTRICT)"
+              )
+
+          # 8. Las guardas siguen derivando sus listas del codigo.
+          for nombre, piezas in {
+              "test_las_cascadas_declaradas.py": ("CLAUSULAS", "Base.metadata.sorted_tables", "PRAGMA foreign_keys"),
+              "test_lo_que_el_motor_rechaza.py": ("esquemas_de_entrada", "CLAVES_DE_UN_CUERPO", "_bloques_con_except"),
+          }.items():
+              ruta = PRUEBAS / nombre
+              if not ruta.exists():
+                  fallos.append(f"desaparecio backend/tests/{nombre}")
+                  continue
+              contenido = ruta.read_text(encoding="utf-8")
+              for pieza in piezas:
+                  if pieza not in contenido:
+                      fallos.append(f"{nombre} ya no deriva su lista del codigo: falta {pieza}")
+
+          if fallos:
+              print("FALLO: el motor vuelve a no comprobar, o el except vuelve a adivinar.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"El pragma esta en el motor, las {ajenas} claves ajenas declaran su clausula")
+          print(f"y los {cuantos} except IntegrityError preguntan antes de contestar.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

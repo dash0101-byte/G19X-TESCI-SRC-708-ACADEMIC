@@ -142,6 +142,30 @@ describe('el reparto por campos', () => {
     expect(porCampo.first_name).toBe('Falta este campo.');
   });
 
+  it('el 422 de una clave ajena del capítulo 42 llega entero, en castellano', () => {
+    // El renglón, literal, tal como lo manda `app.core.integridad`. Ese módulo no imita un
+    // error de validación: construye el mismo que Pydantic daría si un validador pudiera
+    // preguntar a la base. Copiarlo aquí tal cual es lo que ata las dos mitades del
+    // contrato: si el servidor dejara de poner el prefijo, esta prueba diría «No se admite
+    // este valor» y el motivo —que explica qué pasó— se habría perdido por el camino.
+    const CLAVE_SIN_DESTINO = {
+      type: 'value_error',
+      loc: ['body', 'assigned_rep_id'],
+      msg: 'Value error, No existe ninguna cuenta con ese identificador.',
+      ctx: { error: 'No existe ninguna cuenta con ese identificador.' },
+    };
+    expect(mensajeDelRenglon(CLAVE_SIN_DESTINO))
+      .toBe('No existe ninguna cuenta con ese identificador.');
+
+    // Y en la edición de una ficha, que no pinta ese campo, va al aviso de arriba con el
+    // mensaje completo: ni se pierde ni enseña el nombre de la columna.
+    const { porCampo, sueltos } = erroresDelServidor([CLAVE_SIN_DESTINO], {
+      campos: ['first_name', 'last_name', 'email'],
+    });
+    expect(porCampo).toEqual({});
+    expect(sueltos).toEqual(['No existe ninguna cuenta con ese identificador.']);
+  });
+
   it('un detalle que no es una lista no se interpreta', () => {
     // Un 409 o un 500 traen otra cosa —una cadena, un objeto con `mensaje`—, y el
     // formulario tiene que caer al aviso general en vez de inventarse campos.

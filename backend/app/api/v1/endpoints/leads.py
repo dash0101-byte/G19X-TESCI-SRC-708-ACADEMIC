@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+from app.core import integridad
 from app.core.audit import (
     ACCION_ACCESO_FUERA_DE_ALCANCE,
     ACCION_DESENLACE_REGISTRAR,
@@ -200,6 +201,13 @@ async def create_lead(
                 "decisión del líder comercial."
             ),
         ) from exc
+    except LeadEmailAlreadyExists as exc:
+        # La carrera del correo: entre la comprobación de arriba y el `INSERT` otra
+        # transacción lo tomó. Mismo 409 que la edición desde el capítulo 33.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except integridad.LaBaseRechaza as exc:
+        codigo, detalle = integridad.respuesta(exc.rechazo)
+        raise HTTPException(status_code=codigo, detail=detalle) from exc
 
     if lead_in.privacy_notice_accepted:
         lead.privacy_notice_accepted_at = utc_now()
@@ -317,6 +325,12 @@ async def update_lead(
         updated_lead = repo.update(lead, lead_in)
     except LeadEmailAlreadyExists as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except integridad.LaBaseRechaza as exc:
+        # Un asesor que no existe contestaba aquí el 409 del correo —el de la propia ficha,
+        # que nadie había tocado—. Ahora el 422 nombra el campo y el mecanismo del capítulo
+        # 40 lo pinta debajo de él.
+        codigo, detalle = integridad.respuesta(exc.rechazo)
+        raise HTTPException(status_code=codigo, detail=detalle) from exc
     except FueraDeAlcance as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

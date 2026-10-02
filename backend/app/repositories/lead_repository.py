@@ -5,6 +5,7 @@ from sqlalchemy import desc, false, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core import integridad
 from app.core.autorizacion import AlcanceDeCartera, FueraDeAlcance
 from app.models.entities import (
     Lead,
@@ -185,10 +186,53 @@ class LeadRepository:
             campaign_id=lead_in.campaign_id,
             raw_metadata=lead_in.raw_metadata or {},
         )
+
+        # Las dos columnas de la ficha que apuntan a otra tabla —la publicación que la trajo
+        # y el asesor que la atiende— son también las dos únicas claves ajenas del esquema
+        # que salen de un cuerpo de petición: las otras dieciséis se escriben desde una fila
+        # ya cargada. Hasta el capítulo 42 nadie comprobaba que existieran, así que un
+        # `campaign_id` que no existe llegaba al `INSERT` y salía como **500**, sin decir qué
+        # campo era. La comprobación ya estaba escrita en este repositorio y dos veces, para
+        # la columna hermana: `ciclo.comprobar_responsable` y `ciclo.asesor_para`.
+        enviados = {"assigned_rep_id": destino, "campaign_id": lead_in.campaign_id}
+        sin_destino = integridad.claves_que_no_apuntan_a_nada(self.db, Lead, enviados)
+        if sin_destino:
+            raise integridad.LaBaseRechaza(sin_destino[0])
+
+        # Lo que se intenta escribir, copiado ANTES del `commit`: un `rollback` caduca los
+        # objetos de la sesión, y después de él `lead.campaign_id` ya no dice lo que se
+        # intentó sino lo que la base tiene.
+        valores = {
+            columna.name: getattr(lead, columna.name, None) for columna in Lead.__table__.columns
+        }
+
         self.db.add(lead)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError as exc:
+            # La red que la edición lleva desde el capítulo 33 y el alta no tenía (punto 40
+            # de §6.4). Cubre dos cosas: la carrera del correo —entre la comprobación del
+            # endpoint y este `commit` cabe otra transacción que lo tome— y la de las claves
+            # de arriba, que puede perder su destino en el mismo hueco.
+            self.db.rollback()
+            raise self._lo_que_la_base_rechazo(valores) from exc
         self.db.refresh(lead)
         return lead
+
+    def _lo_que_la_base_rechazo(self, valores: dict, *, id_propio: Optional[int] = None) -> Exception:
+        """
+        Qué excepción corresponde a un `IntegrityError`, preguntándoselo a la base.
+
+        El conflicto del correo sigue contestándose con la frase que el capítulo 33 escribió
+        para él —es el caso para el que se puso la red, y la pantalla ya la enseña—, y todo
+        lo demás deja de contestarse con esa frase, que era el punto 26 de §6.4: una clave
+        ajena sin destino salía como «El correo … ya está registrado en otro prospecto», con
+        el correo de la propia ficha dentro de una frase sobre un conflicto que no ocurrió.
+        """
+        rechazo = integridad.motivo_del_rechazo(self.db, Lead, valores, id_propio=id_propio)
+        if rechazo.clase == integridad.REPETIDO and rechazo.campo == "email":
+            return LeadEmailAlreadyExists(valores.get("email") or "")
+        return integridad.LaBaseRechaza(rechazo)
 
     def update(self, lead: Lead, lead_in: LeadUpdate) -> Lead:
         """
@@ -220,6 +264,12 @@ class LeadRepository:
                 if existing and existing.id != lead.id:
                     raise LeadEmailAlreadyExists(new_email)
 
+        # La misma comprobación que el alta, por el mismo motivo y en la misma función: un
+        # asesor que no existe salía de aquí como un 409 sobre el correo de la propia ficha.
+        sin_destino = integridad.claves_que_no_apuntan_a_nada(self.db, Lead, update_data)
+        if sin_destino:
+            raise integridad.LaBaseRechaza(sin_destino[0])
+
         # Se aplica TODO lo que vino en el cuerpo, incluido lo que vino vacío. Hasta el
         # capítulo 33 la condición era `and value is not None`, y esa línea convertía el
         # `exclude_unset=True` de arriba en decoración: el dump ya distinguía «no lo mandó»
@@ -238,22 +288,46 @@ class LeadRepository:
                 setattr(lead, field, value)
         lead.updated_at = datetime.datetime.now(datetime.timezone.utc)
 
+        # Lo que se intenta escribir, antes del `rollback` que lo haría ilegible: la fila ya
+        # tiene los valores nuevos encima y el `dump` dice cuáles vinieron en el cuerpo.
+        intentado = {"email": lead.email, **update_data}
+
         try:
             self.db.commit()
         except IntegrityError as exc:
             # Red de seguridad ante dos actualizaciones simultáneas: entre la
             # comprobación anterior y este commit, otra transacción pudo tomar el correo.
+            # Desde el capítulo 42 no lo supone: lo pregunta, porque el correo es una de las
+            # seis reglas que esta tabla puede hacer cumplir y era la única que esta línea
+            # sabía nombrar.
             self.db.rollback()
-            raise LeadEmailAlreadyExists(new_email or lead.email) from exc
+            raise self._lo_que_la_base_rechazo(intentado, id_propio=lead.id) from exc
 
         self.db.refresh(lead)
         return lead
 
     def delete(self, lead_id: int) -> bool:
+        """
+        Suprime un prospecto con todo lo que el sistema guarda de él, o dice que no estaba.
+
+        Borra por el mapa de `derechos_del_titular` y no con un `db.delete(lead)`, y eso es
+        lo que este método arrastraba corregido a medias. La Fase 14 ya había descubierto que
+        fiarse de las cascadas dejaba atrás las entregas de webhook, los registros de ingesta
+        revertida y el correo de la persona dentro de la bitácora, y cambió el **endpoint**
+        para que recorriera ese mapa; este método se quedó con el borrado que esa decisión
+        había retirado, sin que lo llamara nadie y pareciendo la forma de borrar un
+        prospecto. El día que alguien lo llamara, la supresión volvería a ser incompleta.
+
+        Y era además el único borrado del sistema que dependía de las cláusulas `ondelete`
+        del esquema: con `PRAGMA foreign_keys` apagado —el motor de la suite y del desarrollo
+        hasta el capítulo 42— las tareas y los avisos del prospecto se quedaban apuntando a
+        una fila que ya no estaba, y la bandeja «Hoy» de su asesor reventaba al pintarlas.
+        """
+        from app.services.derechos_del_titular import suprimir_prospecto
+
         lead = self._acotar(self.db.query(Lead)).filter(Lead.id == lead_id).first()
         if not lead:
             return False
-        self.db.delete(lead)
-        self.db.commit()
+        suprimir_prospecto(self.db, lead)
         return True
 

@@ -3,7 +3,7 @@ import os
 from typing import Generator, Optional
 
 from app.core.config import settings
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -34,6 +34,32 @@ if IS_IN_MEMORY_SQLITE:
 
 # Creación de motor SQLAlchemy
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
+
+if IS_SQLITE:
+    @event.listens_for(engine, "connect")
+    def _exigir_las_claves_ajenas(conexion_dbapi, _registro) -> None:
+        """
+        SQLite no comprueba las claves ajenas si no se le pide, y hay que pedírselo en CADA
+        conexión: `PRAGMA foreign_keys` nace apagado y no se hereda ni se guarda en el
+        archivo. PostgreSQL las comprueba siempre, así que sin esta línea el motor del
+        desarrollo y el de la suite aceptan filas que el de producción rechaza.
+
+        Lo que aceptaban son las dieciocho claves ajenas del esquema y, con ellas, las
+        dieciocho cláusulas `ondelete`: una ficha podía quedarse apuntando a una campaña
+        que no existe, y borrar un padre no arrastraba a sus hijos. Las 1589 pruebas pasaban
+        igual con el pragma y sin él, que no es señal de que diera lo mismo: es la prueba de
+        que ninguna había tocado esa clase entera de fallo. Los 500 del capítulo 42 estaban
+        ahí desde que existen las dos columnas y no había forma de que nada se pusiera rojo.
+
+        La línea ya estaba escrita en este repositorio, seis veces y todas dentro de tres
+        pruebas de migración, una por transacción, por este mismo motivo. Faltaba en el
+        único sitio donde se crea el motor de la aplicación.
+        """
+        cursor = conexion_dbapi.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
 # Fábrica de sesiones
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

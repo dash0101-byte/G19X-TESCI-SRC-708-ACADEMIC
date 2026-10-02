@@ -13,6 +13,7 @@ from app.services.webhook_dedup import (
     EntregaYaAtendida,
     clave_de_idempotencia,
     confirmar_entrega,
+    entrega_registrada,
     purgar_entregas_caducadas,
     reservar_entrega,
     verificar_entrega,
@@ -128,12 +129,30 @@ async def crm_webhook_receiver(
         ) from invalido
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve)) from ve
-    except IntegrityError:
+    except IntegrityError as exc:
         # Dos entregas idénticas confirmando a la vez: el índice único deja pasar una y
         # rechaza la otra. La primera ya hizo el trabajo, así que esta es un duplicado.
+        #
+        # Desde el capítulo 42 eso se **comprueba** antes de decirlo. Suponerlo era la
+        # respuesta más cara de las cuatro que §6.4 encontró: contestar «duplicado» a un
+        # rechazo que no era un duplicado descarta el evento entero y da por hecho que
+        # alguien ya lo procesó, así que el prospecto se pierde sin que nadie lo sepa —y por
+        # eso el registro de actividad, dos capas más abajo, pregunta `_ya_registrado` y
+        # vuelve a lanzar si no lo era—. La pregunta es la misma que hace `verificar_entrega`
+        # y es una consulta: si la entrega consta, la ganó otra transacción.
         db.rollback()
-        logger.warning("Entrega concurrente rechazada por el índice único (clave '%s').", clave)
-        raise duplicado from None
+        if entrega_registrada(db, signature=firma, idempotency_key=clave):
+            logger.warning("Entrega concurrente rechazada por el índice único (clave '%s').", clave)
+            raise duplicado from None
+        logger.error(
+            "La base rechazó la ingesta del webhook y no era una entrega repetida "
+            "(clave '%s'): %s",
+            clave, exc, exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error durante el procesamiento del Webhook CRM.",
+        ) from exc
     except Exception as exc:
         # El detalle va solo al log: el mensaje de una excepción interna puede contener
         # SQL, rutas o fragmentos del payload, y el emisor del webhook no debe verlos.

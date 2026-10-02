@@ -71,6 +71,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core import integridad
 from app.core.agenda import (
     ABIERTA,
     CUMPLIDA,
@@ -177,15 +178,34 @@ def _crear(db: Session, fila) -> bool:
     El punto de guardado es lo que permite que una colisión no arrastre a la transacción
     entera: sin él, el `IntegrityError` de la tercera tarea invalidaría las dos anteriores y
     la pasada no crearía nada el día que una sola se repitiera.
+
+    Y la colisión se **comprueba**, desde el capítulo 42. Devolver `False` ante cualquier
+    `IntegrityError` significaba «ya existía», y una tarea rechazada por otro motivo —un
+    asesor que la base ya no tiene, una columna obligatoria vacía— se saltaba en silencio con
+    esa misma respuesta: la pasada decía que no había nada que hacer. El motivo se pregunta a
+    la base, con las restricciones sacadas de la tabla, y lo que no es un duplicado se vuelve
+    a lanzar para que lo cuente quien llame. Los valores se copian antes de `add`: el
+    `rollback` del punto de guardado los deja ilegibles.
     """
+    modelo = type(fila)
+    valores = {
+        columna.name: getattr(fila, columna.name, None) for columna in modelo.__table__.columns
+    }
     punto = db.begin_nested()
     try:
         db.add(fila)
         punto.commit()
         return True
-    except IntegrityError:
+    except IntegrityError as exc:
         punto.rollback()
-        return False
+        rechazo = integridad.motivo_del_rechazo(db, modelo, valores)
+        if rechazo.clase == integridad.REPETIDO:
+            return False
+        logger.error(
+            "La base rechazó una fila de la agenda y no era un duplicado (%s, %s): %s",
+            modelo.__tablename__, rechazo.clase, rechazo.motivo,
+        )
+        raise integridad.LaBaseRechaza(rechazo) from exc
 
 
 def _tarea(

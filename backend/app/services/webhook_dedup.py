@@ -44,6 +44,7 @@ import logging
 import threading
 from typing import Any, Dict, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -160,6 +161,33 @@ def verificar_entrega(db: Session, *, signature: str, idempotency_key: str) -> N
             db.delete(caducada)
     if por_firma is not None or por_clave is not None:
         db.flush()
+
+
+def entrega_registrada(db: Session, *, signature: str, idempotency_key: str) -> bool:
+    """
+    ¿Consta esta entrega en la base, aunque no la haya escrito esta transacción?
+
+    Se pregunta después de un `IntegrityError`, para distinguir la entrega que perdió la
+    carrera contra otra idéntica —el índice único deja pasar una— de cualquier otra cosa que
+    la base pueda rechazar. Hasta el capítulo 42 el endpoint no lo distinguía: contestaba
+    «duplicado» a las dos, y a la segunda le estaba diciendo que su evento ya se había
+    procesado cuando no se había procesado nunca.
+
+    No mira si la entrada ha caducado, al contrario que `verificar_entrega`: aquí la pregunta
+    no es si vale como respuesta repetida, sino si la fila existe. Una entrada vencida que
+    siguiera ahí explicaría igual el rechazo del índice.
+    """
+    existe = (
+        db.query(WebhookDelivery.id)
+        .filter(
+            or_(
+                WebhookDelivery.signature == signature,
+                WebhookDelivery.idempotency_key == idempotency_key,
+            )
+        )
+        .first()
+    )
+    return existe is not None
 
 
 def reservar_entrega(

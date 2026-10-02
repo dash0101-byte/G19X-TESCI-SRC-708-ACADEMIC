@@ -167,6 +167,13 @@ def registrar_visita(
         db.add(VisitaDePublicacion(campaign_id=campana.id, dia=dia, red=red, visitas=1))
         db.commit()
     except IntegrityError:
+        # El séptimo `except IntegrityError` del sistema, y el único que no tiene que
+        # averiguar nada: no traduce el rechazo a ningún mensaje ni decide si la fila existía,
+        # vuelve a ejecutar la suma. Si la fila la acaba de crear otra visita, ahora suma
+        # sobre ella; si el rechazo fuera otro, el `UPDATE` no encuentra nada y lo que se
+        # pierde es el recuento de una visita, que es la única cosa del sistema que puede
+        # perderse sin que nadie tenga que enterarse. Queda inventariado así en la guarda del
+        # capítulo 42 precisamente para que se vea que la excepción es deliberada.
         db.rollback()
         db.execute(suma)
         db.commit()
