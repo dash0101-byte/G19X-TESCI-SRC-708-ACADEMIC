@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.texto import ENTRADA_DE_TEXTO
 from app.models.entities import ActivityType, CallOutcome, MessageDirection, ScoreCategory
 
 
@@ -16,6 +17,9 @@ class ActivityCreate(BaseModel):
     resultado, el mensaje su dirección, la propuesta se registra cambiando la etapa— las
     aplica `registrar_evento`, igual que a cualquier otra fuente.
     """
+
+    model_config = ENTRADA_DE_TEXTO
+
     # Estrictamente el enum: un tipo desconocido es un 422 que lista los admitidos.
     activity_type: ActivityType = Field(..., description="Tipo de actividad del prospecto")
     call_outcome: Optional[CallOutcome] = Field(None, description="Resultado, solo en llamadas")
@@ -32,6 +36,21 @@ class ActivityCreate(BaseModel):
     inicio_de_la_reunion: Optional[datetime.datetime] = Field(
         None, description="Cuándo es la reunión; solo en reuniones agendadas y siempre en el futuro."
     )
+
+    # Aquí **no** hay un normalizador de blancos, y es una decisión del capítulo 41 que vale la
+    # pena escribir porque el primer impulso fue poner uno.
+    #
+    # `channel` y `notes` no llegan a una columna desde este esquema: pasan por
+    # `registrar_evento`, que es el borde común del panel, del webhook del CRM y de las dos
+    # integraciones, y que desde el capítulo 24 hace exactamente esto —`(evento.canal or
+    # "").strip() or CANAL_POR_TIPO[...]`, `(evento.notas or "").strip() or None`—. Repetirlo
+    # aquí no habría arreglado nada y habría dejado una guarda que no se puede falsear: el
+    # arnés de reintroducción quitó el validador y ninguna prueba se puso roja, que es cómo se
+    # descubrió que era de adorno.
+    #
+    # La regla del capítulo sigue siendo una sola: el blanco se normaliza en el borde por el
+    # que pasa cada camino. Para una ficha ese borde es el esquema, porque de ahí va derecho a
+    # la columna; para una actividad es el registro, que además lo comparten cuatro fuentes.
 
     @model_validator(mode="after")
     def _la_fecha_es_de_la_reunion(self) -> "ActivityCreate":

@@ -10,7 +10,15 @@ añadiera un endpoint nuevo.
 import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 from app.core.publicaciones import (
     ESTADOS,
@@ -35,6 +43,14 @@ from app.core.redes import (
 )
 from app.core.security import UserRole
 from app.core.telefono import validador_de_telefono
+from app.core.texto import (
+    ENTRADA_DE_TEXTO,
+    Contrasena,
+    campos_sin_los_que_no_existe,
+    texto_o_nada,
+    vacios_prohibidos,
+)
+from app.models.entities import Campaign, User
 
 # El máximo lo impone bcrypt (72 bytes); el mínimo, la política de `app.core.passwords`.
 # Aquí se declara laxo a propósito: si Pydantic rechazara antes por longitud, el usuario
@@ -105,18 +121,31 @@ class ResultadoDeReparto(BaseModel):
 
 
 class UsuarioCreate(BaseModel):
+    # Aquí vivía el defecto del capítulo 41, y es un problema de orden y no de criterio.
+    # `full_name` declaraba `min_length=2` y un `field_validator` que recortaba, y un
+    # validador de campo corre **después** de las restricciones declaradas: el mínimo medía lo
+    # que entró y el recorte cambiaba lo que se guardaba. Dos espacios —dos caracteres, mínimo
+    # cumplido— se guardaban como `''`, y `' A '` como una sola letra. La columna es `NOT
+    # NULL` porque una cuenta sin nombre no identifica a nadie, y el esquema que promete dos
+    # caracteres admitía cero.
+    #
+    # `str_strip_whitespace` recorta **antes**, así que ahora el mínimo mide lo que se guarda y
+    # el validador de arriba sobra. No se sustituye por una comprobación nueva: la que ya
+    # estaba declarada empieza a funcionar.
+    model_config = ENTRADA_DE_TEXTO
+
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=150)
     role: UserRole
-    password: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    # La contraseña NO se recorta, y por eso lleva su propio tipo. Un espacio al principio o
+    # al final es parte del secreto: recortarlo dejaría fuera a quien ya tuviera uno, y
+    # vaciaría de contenido la regla de `app.core.passwords` que rechaza exactamente eso
+    # —«se pierden al copiarla y luego no coincide»—, que pasaría a no tener nunca nada que
+    # rechazar.
+    password: Contrasena = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
     is_sales_rep: bool = False
     phone: Optional[str] = Field(None, max_length=50)
     capacity: Optional[int] = Field(None, ge=1, le=1000)
-
-    @field_validator("full_name")
-    @classmethod
-    def _sin_espacios_sobrantes(cls, valor: str) -> str:
-        return valor.strip()
 
     # El mismo E.164 que el de los prospectos, y con el mismo módulo (capítulo 32). El
     # teléfono de un asesor se había quedado como texto libre desde el capítulo 21, que se
@@ -135,6 +164,8 @@ class UsuarioUpdate(BaseModel):
     quedaran en la bitácora como la misma acción, y son cosas de gravedad muy distinta.
     """
 
+    model_config = ENTRADA_DE_TEXTO
+
     full_name: Optional[str] = Field(None, min_length=2, max_length=150)
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
@@ -144,11 +175,40 @@ class UsuarioUpdate(BaseModel):
 
     _phone = field_validator("phone")(validador_de_telefono)
 
+    @model_validator(mode="after")
+    def _vaciar_solo_lo_que_la_cuenta_admite_vaciar(self) -> "UsuarioUpdate":
+        """
+        La regla del capítulo 33, que hasta el 41 solo tenían los prospectos.
+
+        `PUT /users/{id}` aplica lo que vino, igual que la edición de una ficha, y con
+        `{"full_name": null}` escribía `None` en una columna `NOT NULL`: el `commit` fallaba y
+        la respuesta era un **500**. No es el mismo fallo que el del 33 —aquel contestaba 200 a
+        algo que no había hecho, y este no finge nada— pero sale del mismo sitio: la lista de
+        campos sin los que la fila no existe estaba derivada para una tabla y escrita en el
+        esquema de esa tabla, así que las otras dos ediciones parciales del sistema no la
+        tenían. Un 500 no dice qué campo fue, se anota como error del servidor y no del cuerpo
+        enviado, y en la pantalla sale como «algo ha ido mal».
+        """
+        prohibidos = vacios_prohibidos(self, campos_sin_los_que_no_existe(User))
+        if prohibidos:
+            raise ValueError(
+                "La cuenta no existe sin estos campos, así que no se pueden dejar vacíos: "
+                + ", ".join(prohibidos)
+                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
+            )
+        return self
+
 
 class RestablecerContrasena(BaseModel):
     """Un administrador fija una contraseña nueva para otra persona."""
 
-    nueva_contrasena: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    # El recorte general, aunque aquí no alcance a nada: lo lleva **toda** entrada con texto, y
+    # que lo lleve también la que solo tiene una contraseña es lo que permite comprobar la
+    # regla sin excepciones. La contraseña se sale por su tipo, que es donde se ve.
+    model_config = ENTRADA_DE_TEXTO
+
+    # Sin recorte, como en el alta: lo único que este esquema lleva es una contraseña.
+    nueva_contrasena: Contrasena = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
 
 
 class CambiarContrasenaPropia(BaseModel):
@@ -161,8 +221,10 @@ class CambiarContrasenaPropia(BaseModel):
     temporal se convierta en un acceso permanente cambiando la credencial.
     """
 
-    contrasena_actual: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
-    nueva_contrasena: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    model_config = ENTRADA_DE_TEXTO
+
+    contrasena_actual: Contrasena = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    nueva_contrasena: Contrasena = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
 
 
 class ResultadoDeContrasena(BaseModel):
@@ -182,7 +244,45 @@ class _CamposDePublicacion(BaseModel):
 
     `necesidades` entra como la lista de etiquetas que escribe el líder («Cubrir vacantes de
     TI», …) y sale convertida en `[{clave, etiqueta}]`, que es lo que se guarda.
+
+    Desde el capítulo 41 esta base es también la que trae el recorte y la regla de los campos
+    obligatorios, que es el motivo de que exista: ponerlos aquí es ponerlos en el alta y en la
+    edición a la vez, y el defecto del 41 consiste precisamente en reglas que una puerta tenía
+    y la de al lado no.
     """
+
+    model_config = ENTRADA_DE_TEXTO
+
+    # Los textos de una publicación que la tabla deja vacíos. `url_del_post` no está: tiene su
+    # propio normalizador, que ya convierte el blanco en nada.
+    _textos = field_validator(
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "description",
+        "target_audience",
+        check_fields=False,
+    )(texto_o_nada)
+
+    @model_validator(mode="after")
+    def _vaciar_solo_lo_que_la_publicacion_admite_vaciar(self):
+        """
+        Lo mismo que en las cuentas, y con el mismo síntoma: `{"name": null}` daba un 500.
+
+        `name` y `channel` son `NOT NULL` y declaran `min_length=2`, así que un blanco se
+        rechaza ya por el mínimo —ahora que se recorta antes de medirlo—. Esto cubre el `null`
+        explícito, que ningún mínimo ve, y cubrirá la columna obligatoria que alguien añada sin
+        acordarse de declararle un mínimo. Es la parte de la regla que no depende de que cada
+        campo esté bien escrito, solo de que la tabla diga la verdad.
+        """
+        prohibidos = vacios_prohibidos(self, campos_sin_los_que_no_existe(Campaign))
+        if prohibidos:
+            raise ValueError(
+                "La publicación no existe sin estos campos, así que no se pueden dejar "
+                "vacíos: " + ", ".join(prohibidos)
+                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
+            )
+        return self
 
     @field_validator("estado", check_fields=False)
     @classmethod

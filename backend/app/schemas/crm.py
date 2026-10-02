@@ -2,6 +2,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.texto import ENTRADA_DE_TEXTO, texto_o_nada
+
 # Ancho de las columnas de `Lead` en las que aterriza cada clave conocida de `data`.
 # El webhook es la única entrada del sistema que no pasa por `LeadCreate`, así que sin
 # esta comprobación un CRM externo podía enviar un `company` de 200 KB (por debajo del
@@ -23,10 +25,36 @@ CRM_DATA_MAX_LENGTHS: Dict[str, int] = {
 
 
 class CRMWebhookPayload(BaseModel):
-    event: str = Field("lead.created", max_length=50, description="Tipo de evento CRM (lead.created, lead.updated, form.submission)")
-    crm_platform: str = Field("HubSpot", max_length=50, description="Plataforma de origen (HubSpot, Salesforce, Zoho, CustomCRM)")
+    # Lo que el capítulo 41 corrige aquí es **el sobre**, no la carga.
+    #
+    # Los campos de `data` ya estaban cubiertos por dos sitios: el validador de abajo acota su
+    # longitud y `_prospecto_normalizado` —en `registro_de_actividad`, desde el capítulo 25—
+    # recorta cada uno y descarta el que se queda en nada. Un `data.city` de espacios no llega
+    # a la columna desde entonces.
+    #
+    # El sobre no lo normalizaba nadie, y `crm_platform` es el valor que más lejos llega: es el
+    # canal de la actividad (`lead_activities.channel`), la plataforma de las dos trazas
+    # (`crm_integration_logs`, `webhook_deliveries`) —cuatro columnas `NOT NULL`— y, lo
+    # importante, el prefijo del identificador con el que el evento se deduplica para siempre.
+    # «HubSpot» y «HubSpot » son dos prefijos distintos, así que el mismo evento del mismo CRM
+    # entregado con un espacio de más **vuelve a entrar**: una actividad duplicada en la ficha
+    # y un score recalculado sobre un hecho que ocurrió una vez. Es el mismo fallo que §3.10
+    # describe para los CRM que no mandan `event_id`, pero por una causa que sí está en
+    # nuestras manos.
+    #
+    # Con mínimo, además: un sobre sin plataforma no identifica a nadie y no puede ser el canal
+    # de una columna obligatoria. Es un 422 al emisor, que es quien puede corregirlo.
+    model_config = ENTRADA_DE_TEXTO
+
+    event: str = Field("lead.created", min_length=1, max_length=50, description="Tipo de evento CRM (lead.created, lead.updated, form.submission)")
+    crm_platform: str = Field("HubSpot", min_length=1, max_length=50, description="Plataforma de origen (HubSpot, Salesforce, Zoho, CustomCRM)")
     external_lead_id: Optional[str] = Field(None, max_length=100, description="Identificador único en el CRM externo")
     data: Dict[str, Any] = Field(..., description="Carga útil con los atributos del prospecto y actividad")
+
+    # El identificador del prospecto en el CRM ajeno: en blanco es que no lo mandó, no que su
+    # identificador sea la cadena vacía. Se guarda en `webhook_deliveries.external_lead_id`,
+    # que admite nulo precisamente para decir eso.
+    _external = field_validator("external_lead_id")(texto_o_nada)
 
     @field_validator("data")
     @classmethod

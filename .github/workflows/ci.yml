@@ -4294,6 +4294,175 @@ jobs:
           print(f"Los {len(FORMULARIOS)} formularios reparten el 422 por campos con el mismo mecanismo.")
           PY
 
+      # ------------------------------------------------------------------ control 55
+      # Un blanco no es un dato, y el minimo mide lo que se guarda.
+      #
+      # El defecto del capitulo 41 era de ORDEN: `UsuarioCreate.full_name` declaraba
+      # `min_length=2` y recortaba en un `field_validator`, y un validador de campo corre
+      # DESPUES de las restricciones declaradas. Dos espacios -dos caracteres, minimo
+      # cumplido- se guardaban como '' en una columna NOT NULL, y ' A ' como una letra.
+      #
+      # Lo que esta guarda vigila es la forma del defecto, no su sintoma: un recorte
+      # escrito en un validador vuelve a dejar el minimo midiendo otra cadena, y nada se
+      # pone rojo porque el campo sigue teniendo su minimo declarado. Tambien vigila lo
+      # contrario: que el recorte general no alcance nunca a una contrasena, donde un
+      # espacio de los bordes es parte del secreto y recortarlo dejaria sin nada que
+      # rechazar a la regla de la politica que lo prohibe.
+      - name: El recorte ocurre antes de medir, y no alcanza a las contrasenas
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          BACKEND = pathlib.Path("backend/app")
+          ESQUEMAS = BACKEND / "schemas"
+
+          def sin_comentarios(texto):
+              limpio = re.sub(r'""".*?"""', "", texto, flags=re.S)
+              return "\n".join(re.sub(r"^\s*#.*$", "", l) for l in limpio.splitlines())
+
+          fallos = []
+          nucleo = BACKEND / "core" / "texto.py"
+          if not nucleo.exists():
+              sys.exit("FALLO: desaparecio backend/app/core/texto.py, donde vive la definicion.")
+          texto = sin_comentarios(nucleo.read_text(encoding="utf-8"))
+
+          # 1. La configuracion compartida es SOLO el recorte. Si alguien le añade
+          # `extra="forbid"` aqui, cambia de golpe como responden dieciseis endpoints a un
+          # campo desconocido, y el diff que lo hace cabe en una linea.
+          declaracion = re.search(r"ENTRADA_DE_TEXTO\s*=\s*ConfigDict\((.*?)\)", texto, re.S)
+          if not declaracion:
+              fallos.append("ENTRADA_DE_TEXTO ya no se declara como un ConfigDict")
+          else:
+              dentro = declaracion.group(1)
+              if "str_strip_whitespace=True" not in dentro.replace(" ", ""):
+                  fallos.append("ENTRADA_DE_TEXTO dejo de recortar antes de medir")
+              if dentro.count("=") != 1:
+                  fallos.append(
+                      "ENTRADA_DE_TEXTO lleva algo mas que el recorte: eso cambia todas las "
+                      "entradas a la vez"
+                  )
+
+          # 2. La contrasena se sale por el campo, que es lo que pesa mas que la
+          # configuracion del modelo.
+          if "strip_whitespace=False" not in texto:
+              fallos.append("Contrasena dejo de eximirse del recorte")
+
+          # 3. Y TODO campo de contrasena usa ese tipo. Se busca por uso: declarar el tipo y
+          # no usarlo es exactamente el fallo que el arnes del capitulo 40 encontro cuatro
+          # veces -el nombre sigue ahi y la guarda sigue verde-.
+          for fuente in sorted(ESQUEMAS.glob("*.py")):
+              limpio = sin_comentarios(fuente.read_text(encoding="utf-8"))
+              for linea in limpio.splitlines():
+                  declara = re.match(r"\s*(\w*(?:password|contrasena)\w*)\s*:\s*(\S+)", linea)
+                  # Se mira el tipo declarado y no solo el nombre: `must_change_password` es
+                  # un booleano y no guarda ningun secreto. Lo que no puede quedar como texto
+                  # llano es el campo que SI lo guarda.
+                  if declara and declara.group(2).rstrip(",") in ("str", "Optional[str]"):
+                      fallos.append(
+                          f"{fuente.name}: «{declara.group(1)}» ya no es Contrasena, asi que "
+                          "el recorte general le llega"
+                      )
+
+          # 4. Ningun validador de esquema vuelve a recortar. Es la forma del defecto, y la
+          # unica excepcion va nombrada: `normalizar_perfil` recorta una direccion de
+          # LinkedIn, que no es normalizar un vacio.
+          for fuente in sorted(ESQUEMAS.glob("*.py")):
+              limpio = sin_comentarios(fuente.read_text(encoding="utf-8"))
+              for bruto in re.findall(r"^\s*(?:return|\w+ =)\s*\w*\.?\w*\.strip\(\)", limpio, re.M):
+                  if fuente.name == "interes.py":
+                      continue
+                  fallos.append(
+                      f"{fuente.name}: un validador vuelve a recortar ({bruto.strip()}); "
+                      "corre despues del minimo y lo deja midiendo otra cadena"
+                  )
+
+          # 5. Una sola definicion de «vacio». La copia que `integraciones` tenia con otro
+          # nombre es ahora un alias, y si vuelve a tener cuerpo, vuelven las dos verdades.
+          integraciones = sin_comentarios(
+              (BACKEND / "services" / "integraciones.py").read_text(encoding="utf-8")
+          )
+          if "_texto = texto_o_nada" not in integraciones:
+              fallos.append("integraciones.py volvio a definir su propio «vacio»")
+          if re.search(r"def _texto\(", integraciones):
+              fallos.append("integraciones.py volvio a tener su propia funcion _texto")
+
+          # 6. La red derivada de la tabla existe para las TRES tablas que un cuerpo de
+          # peticion escribe. Hasta el 41 solo la tenia `Lead`, y en las otras dos un `null`
+          # sobre una columna obligatoria se escribia y salia como 500.
+          esquemas = {
+              "lead.py": "Lead",
+              "user.py": "User",
+          }
+          for fuente, _modelo in esquemas.items():
+              limpio = sin_comentarios((ESQUEMAS / fuente).read_text(encoding="utf-8"))
+              if "vacios_prohibidos(" not in limpio:
+                  fallos.append(f"{fuente} dejo de comprobar los vacios sobre columnas obligatorias")
+          usuarios = sin_comentarios((ESQUEMAS / "user.py").read_text(encoding="utf-8"))
+          for modelo in ("User", "Campaign"):
+              if f"campos_sin_los_que_no_existe({modelo})" not in usuarios:
+                  fallos.append(
+                      f"user.py ya no deriva de {modelo} los campos sin los que la fila no existe"
+                  )
+          ficha = sin_comentarios((ESQUEMAS / "lead.py").read_text(encoding="utf-8"))
+          if "campos_sin_los_que_no_existe(Lead)" not in ficha:
+              fallos.append("lead.py ya no deriva de la tabla los campos obligatorios")
+          # Y los textos que SI se vacian salen de una sola lista, usada por el alta y por la
+          # edicion. Que el alta tuviera su propia lista -con un campo de diez- es el defecto.
+          if ficha.count("field_validator(*TEXTOS_QUE_ADMITEN_VACIO") != 2:
+              fallos.append(
+                  "el alta y la edicion de una ficha ya no comparten la lista de textos que "
+                  "se vacian"
+              )
+
+          # 7. La guarda saca la lista de las rutas. Si pasara a ser una lista escrita, dejaria
+          # de cubrir el endpoint que alguien añada mañana, que es justo lo que paso entre el
+          # capitulo 33 y el 41.
+          guarda = pathlib.Path("backend/tests/test_un_blanco_no_es_un_dato.py")
+          if not guarda.exists():
+              fallos.append("desaparecio la guarda test_un_blanco_no_es_un_dato.py")
+          else:
+              codigo = guarda.read_text(encoding="utf-8")
+              for simbolo in ("dependant.body_params", "model_validate", "ACEPTADOS", "str_strip_whitespace"):
+                  if simbolo not in codigo:
+                      fallos.append(f"la guarda perdio «{simbolo}»: ya no saca la lista del codigo")
+
+          # 8. La migracion que iguala lo que ya hay en la base, y su lista derivada.
+          revision = pathlib.Path(
+              "backend/alembic/versions/d8b3e5f09a71_un_blanco_no_es_un_dato.py"
+          )
+          if not revision.exists():
+              fallos.append("desaparecio la migracion d8b3e5f09a71")
+          else:
+              codigo = revision.read_text(encoding="utf-8")
+              for tabla in ("leads", "users", "campaigns"):
+                  if f'"{tabla}"' not in codigo:
+                      fallos.append(f"la migracion ya no iguala los blancos de {tabla}")
+              if "TRIM(" not in codigo:
+                  fallos.append("la migracion ya no reconoce un blanco de espacios, solo la cadena vacia")
+
+          # 9. El cliente no vuelve a hacer la mitad de la regla. Un recorte en el navegador
+          # no es una garantia -ni el webhook ni las integraciones pasan por ahi- y tener la
+          # mitad escrita en una pantalla hacia creer que la regla existia.
+          for nombre, variable in (("AdminPanel.jsx", "alta"), ("Publicaciones.jsx", "formulario")):
+              fuente = pathlib.Path("frontend/src/components") / nombre
+              codigo = fuente.read_text(encoding="utf-8")
+              for linea in re.findall(rf"^\s*\w+: {variable}\.\w+\.trim\(\).*$", codigo, re.M):
+                  fallos.append(
+                      f"{nombre} vuelve a recortar lo que envia ({linea.strip()}): eso lo "
+                      "garantiza el esquema, y aqui solo cubre esta pantalla"
+                  )
+
+          if fallos:
+              print("FALLO: el blanco vuelve a poder guardarse, o el minimo a medir otra cadena.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print("El recorte ocurre antes de medir en todas las entradas, y las contrasenas quedan fuera.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

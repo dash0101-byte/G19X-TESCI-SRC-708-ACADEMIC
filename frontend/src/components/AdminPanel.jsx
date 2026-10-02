@@ -166,13 +166,21 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
     setCreando(true);
     setErroresDelAlta({});
     await conAviso(async () => {
+      // Sin `trim()`: lo recorta el servidor, y eso es una mejora y no un descuido.
+      //
+      // Esta pantalla recortaba tres campos y `NewLeadModal` ninguno, así que «aquí los
+      // espacios no cuentan» era verdad según la pantalla. Y un recorte en el cliente no es
+      // una garantía: ni el webhook del CRM ni las integraciones pasan por aquí. Desde el
+      // capítulo 41 lo garantiza el esquema —`str_strip_whitespace` en `app.core.texto`—,
+      // que es el único sitio por el que pasan las cinco puertas. La contraseña nunca se
+      // recortó, ni aquí ni allí: un espacio en los bordes es parte del secreto.
       const datos = {
-        email: alta.email.trim(),
-        full_name: alta.full_name.trim(),
+        email: alta.email,
+        full_name: alta.full_name,
         role: alta.role,
         password: alta.password,
         is_sales_rep: alta.is_sales_rep,
-        phone: alta.phone.trim() || null,
+        phone: alta.phone || null,
         capacity: alta.is_sales_rep ? Number(alta.capacity) || 50 : null,
       };
       await createUser(datos);

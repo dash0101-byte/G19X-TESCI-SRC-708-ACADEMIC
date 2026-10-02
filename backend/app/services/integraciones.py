@@ -32,6 +32,7 @@ from limits import parse
 from app.core.config import settings
 from app.core.proxy import ip_del_cliente
 from app.core.rate_limit import limiter
+from app.core.texto import texto_o_nada
 from app.models.entities import ActivityType, MessageDirection
 from app.services.registro_de_actividad import Contacto, Evento, EventoInvalido
 
@@ -39,13 +40,13 @@ from app.services.registro_de_actividad import Contacto, Evento, EventoInvalido
 # Utilidades de lectura
 # ==============================================================================
 
-def _texto(valor: Any) -> Optional[str]:
-    if valor is None:
-        return None
-    if isinstance(valor, (dict, list)):
-        return None
-    texto = str(valor).strip()
-    return texto or None
+# La definición de «vacío» de este módulo era propia hasta el capítulo 41: otro nombre y el
+# mismo cuerpo que `_texto_o_vacio` en los esquemas de la ficha. Las dos eran correctas y
+# estaban de acuerdo por casualidad, porque quien tocara una no tenía por qué saber de la
+# otra. Ahora las dos son `app.core.texto.texto_o_nada`, que conserva el comportamiento de
+# **esta** copia —un diccionario o una lista donde se esperaba texto devuelven nada, no su
+# `repr`—, por ser la que lee cargas de sistemas ajenos.
+_texto = texto_o_nada
 
 
 def _objeto(carga: Dict[str, Any], clave: str) -> Dict[str, Any]:

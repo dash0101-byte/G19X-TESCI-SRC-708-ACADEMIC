@@ -222,31 +222,37 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
     setTrabajando(true);
     setError('');
     setErroresDelFormulario({});
+    // Sin `trim()` en lo que viaja: lo recorta el servidor desde el capítulo 41, y el vacío
+    // lo convierte en nulo él, que es donde tiene que decidirse —el `|| null` de aquí era la
+    // mitad de la regla escrita en el sitio por el que no pasan las integraciones—. El
+    // recorte de la vista previa de más abajo se queda: ese es trabajo del cliente, porque es
+    // el texto que se enseña.
     const datos = {
-      name: formulario.name.trim(),
-      description: formulario.description.trim(),
-      target_audience: formulario.target_audience.trim() || null,
+      name: formulario.name,
+      description: formulario.description,
+      target_audience: formulario.target_audience,
       estado: formulario.estado,
       end_date: finDelDia(formulario.fecha_de_cierre),
       responsable_id: formulario.responsable_id ? Number(formulario.responsable_id) : null,
-      url_del_post: formulario.url_del_post.trim() || null,
+      url_del_post: formulario.url_del_post,
       // Sin opciones propias viaja `null`: la publicación usa las de siempre.
-      necesidades: formulario.necesidades_propias
-        ? formulario.necesidades.map((n) => n.trim())
-        : null,
+      necesidades: formulario.necesidades_propias ? formulario.necesidades : null,
       redes: formulario.redes,
     };
     try {
+      // El nombre del aviso sale de lo que el servidor guardó, no de lo que se escribió en
+      // el formulario: son la misma cosa salvo los espacios, y decir «Publicación «  X  »
+      // creada» enseñaría un nombre que la publicación no tiene.
       if (enEdicion === 'nueva') {
-        await createCampaign({ ...datos, channel: CANAL_LINKEDIN });
+        const creada = await createCampaign({ ...datos, channel: CANAL_LINKEDIN });
         setAviso(
           datos.estado === 'borrador'
-            ? `Borrador «${datos.name}» guardado. Revise su página con «Ver la página» antes de activarlo.`
-            : `Publicación «${datos.name}» creada. Ya puede copiar su texto para LinkedIn.`,
+            ? `Borrador «${creada.name}» guardado. Revise su página con «Ver la página» antes de activarlo.`
+            : `Publicación «${creada.name}» creada. Ya puede copiar su texto para LinkedIn.`,
         );
       } else {
-        await updateCampaign(enEdicion, datos);
-        setAviso(`Publicación «${datos.name}» guardada.`);
+        const guardada = await updateCampaign(enEdicion, datos);
+        setAviso(`Publicación «${guardada.name}» guardada.`);
       }
       setEnEdicion(null);
       await cargar();

@@ -30,6 +30,7 @@ from app.core.desenlaces import (
     etiqueta_de_tramo,
     motivos_de,
 )
+from app.core.texto import ENTRADA_DE_TEXTO
 from app.models.entities import LeadStatus, ScoreCategory
 
 # ============================================================================
@@ -84,6 +85,9 @@ class CierreDelProspecto(BaseModel):
     servicio es lo que necesita la base: que la fecha de cierre no sea anterior al alta del
     prospecto.
     """
+
+    model_config = ENTRADA_DE_TEXTO
+
     resultado: str = Field(..., description="«ganado» o «perdido».")
     motivo: str = Field(..., description="Clave de la lista cerrada de ese resultado.")
     cerrado_el: datetime.date = Field(..., description="El día en que se cerró, no el de hoy.")

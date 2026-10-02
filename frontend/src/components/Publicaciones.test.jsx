@@ -229,7 +229,11 @@ describe('crear una publicación y copiar su texto', () => {
       estado: 'activa',
       end_date: null,
       responsable_id: null,
-      url_del_post: null,
+      // Lo que el campo vacío tiene escrito, sin que el cliente decida que eso es «nada»:
+      // desde el capítulo 41 lo decide el servidor, que es por donde pasan también el
+      // webhook y las integraciones. Antes viajaba `null` porque esta pantalla hacía la
+      // mitad de la regla, y la otra mitad no existía en ninguna parte.
+      url_del_post: '',
       necesidades: null,
       // Las de siempre: una publicación nueva sale difundible por las cuatro por defecto.
       redes: ['linkedin', 'whatsapp', 'facebook', 'correo'],
@@ -370,7 +374,7 @@ describe('editar y el ciclo de estados', () => {
         estado: 'activa',
         end_date: '2026-10-31T23:59:59+00:00',
         responsable_id: 21,
-        url_del_post: null,
+        url_del_post: '',
         necesidades: ['Cubrir vacantes de TI', 'Formar un equipo completo'],
         redes: ['linkedin', 'whatsapp', 'facebook', 'correo'],
       }),

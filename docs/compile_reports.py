@@ -95,6 +95,12 @@ REPORT_FILES = [
     # aro de foco a 1.11:1 de él, es decir, cumplía un criterio rompiendo otro.
     ("Reporte_37_Lo_que_el_Marcado_Pedia_y_la_Hoja_no_Tenia_La_Barra_que_no_Pintaba_el_Contorno_que_no_se_Veia_y_el_Criterio_que_Casi_Rompe_el_Otro.md", "Capítulo 39: Lo que el Marcado Pedía y la Hoja no Tenía — La Barra que no Pintaba, el Contorno que no se Veía y el Criterio que Casi Rompe el Otro"),
     ("Reporte_38_El_Error_que_el_Servidor_ya_Explicaba_El_Color_que_Nadie_Media_el_Campo_que_no_se_Senalaba_y_el_Aro_que_Tuvo_que_ser_Geometrico.md", "Capítulo 40: El Error que el Servidor ya Explicaba — El Color que Nadie Medía, el Campo que no se Señalaba y el Aro que Tuvo que ser Geométrico"),
+    # El capítulo 41 abre el punto 25 de §6.4 —el alta guardaba el texto en blanco que la
+    # edición normalizaba— y encuentra que el defecto es de orden: una comprobación de
+    # longitud y un recorte puestos de manera que el mínimo mide una cadena y la base recibe
+    # otra. Y que la regla derivada de la tabla, lo mejor del capítulo 33, se escribió para
+    # una tabla de tres.
+    ("Reporte_39_El_Minimo_que_no_Media_Nada_Un_Blanco_en_Cinco_Puertas_la_Regla_que_Solo_Tenia_una_Tabla_y_el_Espacio_que_Duplicaba_un_Evento.md", "Capítulo 41: El Mínimo que no Medía Nada — Un Blanco en Cinco Puertas, la Regla que Solo Tenía una Tabla y el Espacio que Duplicaba un Evento"),
 ]
 
 

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.texto import ENTRADA_DE_TEXTO
 from app.models.entities import ScoreCategory
 
 
@@ -66,7 +67,11 @@ class ScorePredictRequest(BaseModel):
     Por eso `extra="forbid"`: es preferible un 422 que señale el campo desconocido a
     seguir aceptando peticiones cuyo efecto se pierde sin dejar rastro.
     """
-    model_config = ConfigDict(extra="forbid")
+    # El recorte, aunque el simulador no escriba en ninguna columna: un cargo de espacios es
+    # un cargo que no se indicó, y la regla heurística ya lo puntúa como desconocido. Si el
+    # simulador lo tratara de otro modo que el alta, enseñaría una puntuación que la ficha
+    # luego no tendría, y el simulador existe justamente para enseñar la que tendrá.
+    model_config = ConfigDict(**ENTRADA_DE_TEXTO, extra="forbid")
 
     # --- Identificación (solo alimenta el texto explicativo, no la puntuación) ---
     first_name: Optional[str] = Field("Prospecto", max_length=100)

@@ -4,6 +4,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 
 from app.core.security import exige_segundo_factor
+from app.core.texto import ENTRADA_DE_TEXTO, Contrasena
 
 # bcrypt opera sobre un máximo de 72 bytes; se corta aquí, en el borde de la API,
 # para devolver un 422 explicativo en lugar de truncar la contraseña en silencio.
@@ -12,8 +13,15 @@ MAX_PASSWORD_LENGTH = 72
 
 class LoginRequest(BaseModel):
     """Credenciales enviadas a `POST /api/v1/auth/login`."""
+
+    model_config = ENTRADA_DE_TEXTO
+
     email: EmailStr
-    password: str = Field(min_length=8, max_length=MAX_PASSWORD_LENGTH)
+    # La contraseña no se recorta, y es el único campo del sistema del que eso se dice en voz
+    # alta. El endpoint ya recorta el correo antes de buscar la cuenta; hacer lo mismo con la
+    # contraseña dejaría fuera a quien tenga un espacio en la suya y convertiría el
+    # `min_length` de ocho en la medida de otra cadena.
+    password: Contrasena = Field(min_length=8, max_length=MAX_PASSWORD_LENGTH)
 
 
 class TokenResponse(BaseModel):
@@ -95,6 +103,11 @@ class DesafioDeSegundoFactor(BaseModel):
 class SegundoFactorDelLogin(BaseModel):
     """El segundo paso: el desafío y el código del teléfono o uno de recuperación."""
 
+    # Recorta los bordes, que aquí hace algo útil: un código copiado del teléfono o del papel
+    # de los de recuperación viene a menudo con un espacio pegado, y hasta ahora ese espacio
+    # convertía un código correcto en un intento fallido.
+    model_config = ENTRADA_DE_TEXTO
+
     desafio: str
     # Sin `min_length`: un TOTP son 6 dígitos y un código de recuperación 12 caracteres con
     # guiones. Un mínimo que valiera para los dos no filtraría nada y uno por forma obligaría
@@ -134,6 +147,8 @@ class CodigoDelSegundoFactor(BaseModel):
     abierta en un equipo ajeno tiene ahí la contraseña guardada en el navegador mucho más a
     menudo que el teléfono.
     """
+
+    model_config = ENTRADA_DE_TEXTO
 
     codigo: str = Field(max_length=64)
 

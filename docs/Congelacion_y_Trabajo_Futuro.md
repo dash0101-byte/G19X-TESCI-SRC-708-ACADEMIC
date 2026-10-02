@@ -3,7 +3,59 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 1 de octubre de 2026 (apéndice del capítulo 40)
+**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 41)
+
+> **Revisión del capítulo 41.** La congelación se mantiene, y este capítulo la abrió **para
+> un punto de §6.4 y para ninguno más**: el **25**, que el 33 encontró, dejó escrito en su
+> propio docstring y no pagó.
+>
+> El punto decía que el alta de una ficha guarda `''` donde la edición guarda `NULL`. Es
+> cierto, en nueve campos, y está corto en tres sitios. **El alta y la edición no son dos
+> puertas: son dos de cinco**, y cada una respondía algo distinto a «qué es un vacío». De los
+> **61 campos de texto** de los dieciocho cuerpos de petición de la API, **34 guardaban el
+> blanco tal cual**, 15 lo normalizaban y 12 lo rechazaban — y los doce eran el formulario
+> público y tres listas cerradas. El formulario público lo rechazaba con **una línea de
+> configuración** que llevaba ahí desde el capítulo 34 y que no tenía ninguna otra entrada:
+> el arreglo estaba escrito desde hacía siete capítulos, en una puerta de cinco (R39 §41.3).
+>
+> **El defecto es de orden, y es lo que conviene recordar de este capítulo.**
+> `UsuarioCreate.full_name` declaraba `min_length=2` y recortaba en un `field_validator`, y
+> un validador de campo corre **después** de las restricciones declaradas: el mínimo medía lo
+> que llegaba y la base recibía otra cadena. Dos espacios —dos caracteres, mínimo cumplido—
+> se guardaban como `''` en una columna `NOT NULL`, y `' A '` como una sola letra. Las dos
+> piezas eran correctas y no se veía nada raro en el archivo; lo que estaba mal era que una
+> corriera antes que la otra. **Una comprobación y una normalización en el orden equivocado
+> son una comprobación que no comprueba nada** (R39 §41.2).
+>
+> **Y la regla del capítulo 33 solo existía para una tabla.** Ese capítulo derivó de
+> `Lead.__table__` la lista de campos sin los que una fila no existe —lo difícil, y lo que
+> hace que el arreglo no caduque— y la escribió **dentro del esquema de esa tabla**. El
+> sistema tiene tres ediciones parciales, y en las otras dos un `null` explícito sobre una
+> columna obligatoria llegaba al `commit` y salía como **500**: `{"name": null}` sobre una
+> publicación y `{"full_name": null}` sobre una cuenta. No es el mismo fallo que el del 33
+> —aquel contestaba 200 a algo que no había hecho— pero es peor de lo que el número sugiere:
+> un 500 se anota como fallo del servidor y no del cuerpo enviado, no dice qué campo fue, y
+> en la pantalla sale como «algo ha ido mal» (R39 §41.4).
+>
+> Lo demás, en una línea cada cosa: `crm_platform` es el prefijo del identificador con el que
+> un evento del CRM queda marcado para siempre, y nadie lo recortaba, así que **«HubSpot» y
+> «HubSpot » eran dos eventos distintos y el mismo evento entraba dos veces** (R39 §41.7); la
+> migración `d8b3e5f09a71` iguala los blancos que ya hay en catorce columnas y **cuenta y
+> nombra** las seis obligatorias que no puede tocar, porque un nombre no se inventa y porque
+> un nombre vacío puede ser el vacío deliberado del webhook (R39 §41.10); y el blanco del
+> webhook **no se unifica a propósito**: donde hay alguien delante un campo indispensable en
+> blanco es un 422, y donde no hay nadie rechazar el evento perdería el prospecto entero
+> (R39 §41.6).
+>
+> §6.4 pasa de **diez entradas abiertas de diecinueve a diez de veinte**: se cierra la 25 y
+> entra la **40**. Y hay una cosa más que no es del código sino de cómo se comprueba, y que
+> es la vuelta de tuerca del capítulo 40 sobre otra superficie: de los treinta y tres
+> defectos reintroducidos, seis escaparon en la primera pasada, y **dos de ellos eran
+> arreglos de este mismo capítulo que no arreglaban nada**. Un normalizador que se le puso a
+> `ActivityCreate` se quitó y ninguna prueba se puso roja, porque `registrar_evento` ya hacía
+> eso desde el capítulo 24. El arnés dejó de medir guardas y empezó a medir arreglos: **una
+> guarda que no se puede falsear es peor que ninguna, porque parece cubrir algo** (R39
+> §41.12).
 
 > **Revisión del capítulo 40.** La congelación se mantiene, y este capítulo la abrió **para
 > un punto de §6.4 y para ninguno más**: el **36**, que el 39 encontró y no pagó.
@@ -861,7 +913,7 @@ defectos reintroducidos y 22 detectados.
 | 21 | En el entorno de desarrollo de **esta máquina** quedan `cffi`, `cryptography` y `pycparser`: un proceso ajeno tenía abierto `_cffi_backend.pyd` y no se detuvo. El código no los importa, el CI instala desde cero y la imagen no los lleva | R23 §23.7 |
 | 22 | ~~Los ceros de ingresos que ya hay en la base no se migraron a nulos. El extractor los lee como ausentes, que es lo que importa al modelo; la ficha los muestra como cero hasta que alguien la edite~~ — **cerrado** en el capítulo 32: la migración `a4c8d1e70f39` los pasa a vacío y la base dice ya lo que el modelo leía (R32 §32.4) | R24 §24.9 |
 | 23 | Un aviso purgado puede volver a entrar si el sistema de origen lo reentrega pasado el plazo; y **descartar no bloquea** | R21 §21.12 · R22 §22.9 |
-| 25 | El **alta** no normaliza los textos en blanco: `LeadCreate` guarda `''` donde la edición guarda `NULL` desde el capítulo 33. Es el mismo arreglo en otro camino, y afecta también a las integraciones que dan de alta fichas, así que tiene su propia discusión | R33 §33.8 |
+| 25 | ~~El **alta** no normaliza los textos en blanco: `LeadCreate` guarda `''` donde la edición guarda `NULL` desde el capítulo 33. Es el mismo arreglo en otro camino, y afecta también a las integraciones que dan de alta fichas, así que tiene su propia discusión~~ — **cerrado en el capítulo 41**, y el punto estaba corto en tres sitios. El alta y la edición no son dos puertas sino dos de **cinco**, y de los 61 campos de texto de las entradas **34 guardaban el blanco**; la única que lo rechazaba era el formulario público, con una línea de configuración que nadie más tenía desde el capítulo 34. La frase sobre las integraciones era además falsa: las dos normalizaban ya, con una copia privada de la misma función —ahora comparten `app.core.texto.texto_o_nada`—; lo que no normalizaba nadie era el **sobre** del webhook. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: el alta de una cuenta declaraba un mínimo de dos caracteres y recortaba **después** de comprobarlo, así que dos espacios lo cumplían y se guardaban como `''`; y la regla que el 33 derivó de la tabla estaba escrita dentro del esquema de **una** tabla, de modo que las otras dos ediciones parciales contestaban 500 a un `null` sobre una columna obligatoria (R39 §41.2, §41.4) | R33 §33.8 |
 | 26 | El `except IntegrityError` de la edición traduce **cualquier** violación de integridad a «el correo ya existe», que es lo único que podía producirla. Con el 422 del esquema delante, un nulo sobre una columna `NOT NULL` no llega a ese commit; si llegara, el mensaje sería equivocado. Distinguir qué restricción falló obliga a leer el error del motor, específico de PostgreSQL y de SQLite por separado | R33 §33.8 |
 | 27 | El **bundle de la SPA es descargable** desde la puerta pública: la página de interés lo necesita para dibujarse y es un solo archivo. Es código de cliente sin secretos y no puede llamar a nada —las rutas de gestión no existen en esa puerta—; evitarlo exigiría compilar un segundo bundle solo para esa página | R34 §34.8 |
 | 28 | El **túnel no arranca con la pila**: hay que abrir una ventana y dejarla abierta, y la dirección hay que copiarla a mano en `pila.env` en cada arranque. Es deliberado mientras la dirección sea efímera —cerrar la ventana apaga la exposición al instante—, y es lo primero que se automatiza cuando haya dominio | R34 §34.8 |
@@ -875,6 +927,7 @@ defectos reintroducidos y 22 detectados.
 | 37 | **Las otras siete formas del panel siguen enseñando el nombre de la columna, y diez avisos escriben su geometría en línea.** El capítulo 40 repartió el 422 por campos en las cuatro formas que pueden recibirlo con más de un campo y escribió `.alert` y sus tres variantes en la hoja; en las demás, un 422 sigue saliendo por `parseApiError` como `nueva: La contraseña está en la lista de filtradas`, con el nombre del campo del esquema delante —el mensaje ya es castellano, el nombre no—, y diez avisos conservan sus siete propiedades en un `style` aunque el color ya salga de la paleta. No incumple ningún mínimo: es el mismo arreglo en los sitios donde el 422 es menos probable, y hacerlo toca diez componentes más sin corregir ningún número | R38 §40.12 |
 | 38 | **Siete errores del panel se avisan con un `alert()` del navegador**: seis en el recálculo masivo de `App.jsx` y uno en el recálculo de una ficha. Un cuadro del navegador no forma parte de la página —ningún lector de pantalla lo anuncia como contenido—, no se puede señalar junto a nada y tapa lo que hay que corregir. El del formulario de edición se cambió en el capítulo 40 porque es el del 422 que ese capítulo reparte; los demás no son errores de un campo y darles sitio en la pantalla es otra decisión | R38 §40.12 |
 | 39 | **`--warm-*` hace dos oficios, y dos usos de `--hot-text` también.** El capítulo 40 partió el rojo —`--error-*` para lo que avisa de un fallo, `--hot-*` para la temperatura de una ficha— y dejó sin partir el ámbar: `.alert-warn` usa la familia WARM porque el ámbar de esta paleta es ese y no hay otro. Lo mismo con el aviso del enlace caducado de una publicación y la confirmación de un borrado, que son advertencias y no errores y siguen con `--hot-text`. Es el mismo trabajo que el rojo y no se hace a medias | R38 §40.3, §40.12 |
+| 40 | **El alta de una ficha no tiene la red del `IntegrityError` que sí tiene la edición.** `create_lead` comprueba que el correo no esté registrado y después inserta; entre las dos cosas cabe otra transacción que tome ese correo, y entonces el `INSERT` viola el índice único y sale como **500**. La edición lleva ese `except` desde el capítulo 33 por este mismo motivo, con el comentario «red de seguridad ante dos actualizaciones simultáneas». Es una carrera, así que no se ve en uso normal y no la provoca ninguna prueba; va junto al punto 26, porque las dos son sobre lo que el servidor dice cuando la base rechaza algo, y se arreglan mejor juntas | R39 §41.14 |
 
 ---
 

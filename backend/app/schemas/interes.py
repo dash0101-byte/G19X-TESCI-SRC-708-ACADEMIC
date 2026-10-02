@@ -29,6 +29,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.publicaciones import CLAVE_DE_NECESIDAD, NECESIDADES_POR_DEFECTO
+from app.core.texto import ENTRADA_DE_TEXTO
 from app.core.vector_del_modelo import CATEGORIAS_DEL_MODELO
 
 MAX_NOMBRE = 100
@@ -95,7 +96,13 @@ class PublicacionPublica(BaseModel):
 class SolicitudDeInteres(BaseModel):
     # Estricto: un campo de más es un error, no algo que se ignora en silencio. Si mañana la
     # página manda algo que el servidor no espera, se ve en la primera prueba.
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    #
+    # El recorte lleva aquí desde el capítulo 34 y, hasta el 41, esta era la **única** entrada
+    # del sistema que lo tenía: la única que rechazaba un nombre de tres espacios, y lo hacía
+    # con esta línea y sin una comprobación propia. Ahora el recorte sale de `app.core.texto`,
+    # donde lo comparten las once entradas, y lo que queda propio de esta pantalla es el
+    # `extra="forbid"`.
+    model_config = ConfigDict(**ENTRADA_DE_TEXTO, extra="forbid")
 
     nombre: str = Field(min_length=1, max_length=MAX_NOMBRE)
     correo: EmailStr = Field(max_length=150)

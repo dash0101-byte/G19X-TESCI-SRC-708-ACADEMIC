@@ -5,6 +5,13 @@ from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 from app.core.redes import es_de_publicacion
 from app.core.telefono import validador_de_telefono
+from app.core.texto import (
+    ENTRADA_DE_TEXTO,
+    campos_sin_los_que_no_existe,
+    exigir_texto,
+    texto_o_nada,
+    vacios_prohibidos,
+)
 from app.models.entities import (
     ActivityType,
     Lead,
@@ -36,49 +43,51 @@ MAX_SOURCE = 100
 MAX_NOTES = 500
 
 
-def _texto_o_vacio(valor: Optional[str]) -> Optional[str]:
-    """
-    Un texto en blanco es ausencia de dato, no la cadena vacía.
+# Un texto en blanco es ausencia de dato, no la cadena vacía.
+#
+# El formulario del panel manda `""` cuando el campo se deja sin rellenar, y guardarlo tal
+# cual habría dejado en la base dos formas de decir lo mismo: `NULL` para las fichas que
+# nunca lo tuvieron y `''` para las que pasaron por la pantalla. Cualquier consulta posterior
+# tendría que acordarse de las dos.
+#
+# La función nació aquí —`_texto_o_vacio`, capítulo 32 para el país y 33 para el resto del
+# texto de la **edición**— y en el 41 se mudó a `app.core.texto`, cuando hizo falta la cuarta
+# vez: el alta, el webhook del CRM y las integraciones son tres puertas más a la misma base, y
+# cada una respondía algo distinto a «qué es un vacío». Los dos nombres anteriores,
+# `_texto_o_vacio` y `_pais_o_vacio`, no se conservan como alias: un alias que nadie usa es un
+# nombre más que buscar el día que algo falle, y aquí solo servirían para que este comentario
+# no tuviera que escribirse.
 
-    El formulario del panel manda `""` cuando el campo se deja sin rellenar, y guardarlo
-    tal cual habría dejado en la base dos formas de decir lo mismo: `NULL` para las fichas
-    que nunca lo tuvieron y `''` para las que pasaron por la pantalla. Cualquier consulta
-    posterior tendría que acordarse de las dos.
+# Qué campos de la ficha no se pueden dejar vacíos, preguntándoselo a la tabla.
+#
+# Se deriva de `Lead.__table__` a propósito, y es la mitad del arreglo del capítulo 33. La
+# lista «nombre, apellido, correo, etapa» es fácil de escribir a mano y es justo lo que no hay
+# que hacer: una copia escrita a mano acierta el día que se escribe y se queda atrás en la
+# primera migración que añada o quite un `NOT NULL`, sin que nada se ponga rojo.
+#
+# Desde el capítulo 41 la derivación es de `app.core.texto` y la comparten `Campaign` y
+# `User`. Que fuera una función privada de este módulo no se veía como un límite y lo era: la
+# misma edición parcial existe para las publicaciones y para las cuentas, y en las dos un
+# `null` sobre una columna obligatoria se escribía y salía como 500.
+CAMPOS_QUE_NO_ADMITEN_VACIO = campos_sin_los_que_no_existe(Lead)
 
-    Nació en el capítulo 32 para el país y en el 33 se aplica a los demás campos de texto de
-    la **edición**. El motivo es el mismo y se vio al arreglar el vaciado: mientras «vacío»
-    tuviera dos representaciones, «vaciar un campo» no era una operación sino dos, y la que
-    dejaba `''` no se distinguía de un dato que alguien escribió y luego borró a medias.
-    """
-    if valor is None:
-        return None
-    limpio = valor.strip()
-    return limpio or None
-
-
-# Se mantiene el nombre anterior porque el capítulo 32 lo dejó escrito en el alta.
-_pais_o_vacio = _texto_o_vacio
-
-
-def _campos_que_no_admiten_vacio() -> frozenset:
-    """
-    Qué campos de la ficha no se pueden dejar vacíos, preguntándoselo a la tabla.
-
-    Se deriva de `Lead.__table__` a propósito, y es la mitad del arreglo del capítulo 33.
-    La lista «nombre, apellido, correo, etapa» es fácil de escribir a mano y es justo lo que
-    no hay que hacer: una copia escrita a mano acierta el día que se escribe y se queda atrás
-    en la primera migración que añada o quite un `NOT NULL`, sin que nada se ponga rojo. El
-    fallo que produciría es el peor de los dos posibles —un 500 desde el INSERT, o un 422 a
-    un campo que la base sí admite vacío— y llegaría meses después del cambio que lo causó.
-
-    `id` y las columnas calculadas (`current_score`, `created_at`…) entran en el conjunto y
-    no estorban: nunca están en `LeadUpdate`, así que el cruce con lo que el cliente envió
-    no las alcanza.
-    """
-    return frozenset(columna.name for columna in Lead.__table__.columns if not columna.nullable)
-
-
-CAMPOS_QUE_NO_ADMITEN_VACIO = _campos_que_no_admiten_vacio()
+# Los campos de texto de la ficha que la tabla sí deja vacíos, y que por tanto se normalizan
+# a `None` en vez de rechazarse.
+#
+# Esta lista sí está escrita, y lleva prueba: `test_un_blanco_no_es_un_dato.py` la compara con
+# las columnas de texto de `leads` que admiten nulo y exige que sea esa lista **menos** dos,
+# cada una con su motivo —`phone`, que pasa por E.164 y ya normaliza el blanco, y
+# `privacy_notice_source`, que no está en ningún esquema de entrada porque lo escribe el
+# servidor—. Así un campo de texto nuevo no puede entrar sin que alguien decida en qué montón
+# va, que es lo que pasó con los nueve del alta.
+TEXTOS_QUE_ADMITEN_VACIO = (
+    "company",
+    "job_title",
+    "industry",
+    "company_size",
+    "country",
+    "city",
+)
 
 
 # Valida y normaliza al guardar. Se aplica a la entrada —alta y edición— y no a `LeadBase`:
@@ -115,6 +124,19 @@ class LeadBase(BaseModel):
 
 
 class LeadCreate(LeadBase):
+    # Recorta antes de medir, y es lo que hace que `min_length=1` signifique algo: un
+    # `first_name` de tres espacios llegaba intacto a una columna que la tabla declara
+    # indispensable, porque el mínimo se aplicaba a lo que entró y no a lo que se guarda.
+    model_config = ENTRADA_DE_TEXTO
+
+    # `source` se redeclara solo para añadirle el mínimo. La columna es `NOT NULL` y no tenía
+    # ninguno: un canal en blanco respondía 201 en esta puerta y 422 en la de al lado, con el
+    # mismo valor y sobre la misma columna. No se sube a `LeadBase` porque de ella heredan las
+    # respuestas, y un canal en blanco que ya esté en la base convertiría la **lectura** de
+    # esa ficha en un error —el mismo motivo por el que `LeadResponse` no hereda el mínimo del
+    # nombre—.
+    source: str = Field("Website", min_length=1, max_length=MAX_SOURCE)
+
     initial_activity_type: Optional[ActivityType] = None
     initial_notes: Optional[str] = Field(None, max_length=MAX_NOTES)
     # El asesor que da de alta a la persona deja constancia de que aceptó el aviso de
@@ -122,10 +144,22 @@ class LeadCreate(LeadBase):
     privacy_notice_accepted: bool = False
 
     _phone = field_validator("phone")(_telefono_e164)
-    _country = field_validator("country")(_pais_o_vacio)
+    # Los mismos campos que la edición normaliza desde el capítulo 33, y por el mismo motivo.
+    # Hasta el 41 aquí solo estaba el país: el capítulo 32 lo escribió para el país porque era
+    # el campo del que se ocupaba, el 33 extendió la regla a la edición, y el alta se quedó
+    # con un campo normalizado de diez. Una ficha dada de alta por la API y la misma ficha
+    # después de una edición no decían lo mismo en la base.
+    _textos = field_validator(*TEXTOS_QUE_ADMITEN_VACIO, "initial_notes")(texto_o_nada)
 
 
 class LeadUpdate(BaseModel):
+    # La misma configuración que el alta, por el mismo motivo y con una consecuencia más: con
+    # el recorte delante, `first_name: '   '` choca con el `min_length=1` de abajo y responde
+    # 422 nombrando el campo, que es exactamente lo que el capítulo 33 quería para un campo sin
+    # el que la ficha no existe. Su validador —el de más abajo— solo miraba `None`, así que
+    # vaciar con un espacio pasaba por donde vaciar con un nulo no pasaba.
+    model_config = ENTRADA_DE_TEXTO
+
     first_name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME)
     last_name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME)
     email: Optional[EmailStr] = Field(None, max_length=MAX_EMAIL)
@@ -148,9 +182,13 @@ class LeadUpdate(BaseModel):
     # solo el país: es lo que hace que «lo mandó vacío» signifique una sola cosa. Sin ella,
     # borrar el contenido de «Ciudad» en el panel guardaba `''` y borrar el de «País»
     # guardaba `NULL`, dos vacíos distintos en la misma fila y por la misma pantalla.
-    _textos = field_validator(
-        "company", "job_title", "industry", "company_size", "country", "city", "source"
-    )(_texto_o_vacio)
+    _textos = field_validator(*TEXTOS_QUE_ADMITEN_VACIO)(texto_o_nada)
+    # `source` sale de esa lista en el capítulo 41. Su columna es `NOT NULL`, así que
+    # normalizarlo a `None` lo dejaba en manos del validador de modelo de abajo, que responde
+    # un error **sin campo**: el aviso de arriba decía «revise estos campos» y ninguno de los
+    # doce se ponía rojo. Con su propio validador el 422 llega con `loc`, y el mecanismo del
+    # capítulo 40 lo pone debajo del canal.
+    _source = field_validator("source")(exigir_texto)
 
     @model_validator(mode="after")
     def _vaciar_solo_lo_que_la_ficha_admite_vaciar(self) -> "LeadUpdate":
@@ -167,9 +205,15 @@ class LeadUpdate(BaseModel):
         —ignorarlo y devolver 200— es la que estaba, y es peor de lo que parece: no es que no
         obedezca, es que **contesta que sí**. El asesor borra el apellido, ve «Prospecto
         actualizado», y el apellido sigue ahí la próxima vez que abra la ficha.
+
+        El capítulo 41 cambia una palabra: `is None` pasa a ser `en_blanco`. Con `is None` el
+        mensaje —«La ficha no existe sin estos campos»— no se aplicaba al caso en que la ficha
+        de verdad no los tenía, porque tres espacios no son `None` y llegaban a la columna
+        intactos. Para la mayoría de los campos el recorte del `model_config` y el `min_length`
+        ya lo resuelven antes de llegar aquí; esto es la red que no depende de que cada campo
+        se acuerde de declarar un mínimo.
         """
-        vacios = {campo for campo in self.model_fields_set if getattr(self, campo, None) is None}
-        prohibidos = sorted(vacios & CAMPOS_QUE_NO_ADMITEN_VACIO)
+        prohibidos = vacios_prohibidos(self, CAMPOS_QUE_NO_ADMITEN_VACIO)
         if prohibidos:
             raise ValueError(
                 "La ficha no existe sin estos campos, así que no se pueden dejar vacíos: "
