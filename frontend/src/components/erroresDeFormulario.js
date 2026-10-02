@@ -147,6 +147,41 @@ export function erroresDelServidor(detalle, { propios = {}, campos = null, renom
 }
 
 /**
+ * De qué campo habla cada respuesta conocida del cambio de contraseña (capítulo 43).
+ *
+ * Las otras siete pantallas del panel no reparten su 422 por campos, y §6.4 lo contaba como
+ * «el mismo arreglo en los sitios donde el 422 es menos probable». Al medirlo, el reparto no
+ * era posible en casi ninguna: lo que el servidor contesta en esas puertas **no lleva el
+ * campo**. Los dos formularios de contraseña son el caso claro, y el que el propio punto 37
+ * ponía de ejemplo:
+ *
+ * * **401** — «La contraseña actual no es correcta.» Habla de la actual.
+ * * **422 con `motivos`** — la política la rechaza, y los motivos son todos los que
+ *   incumple. Habla de la nueva.
+ * * **422 sin `motivos`** — «no puede ser igual a la actual». También de la nueva.
+ *
+ * Ninguna trae `loc`, porque ninguna sale de un validador de Pydantic: son `HTTPException`
+ * escritas en el endpoint. Así que el campo no se **lee**, se **sabe**: es el contrato de esa
+ * puerta, y está escrito aquí una vez para los dos formularios que la llaman. No se decide
+ * comparando el texto del mensaje, que es lo que caducaría al reescribir una frase.
+ *
+ * El primer renglón va debajo del campo y los demás al aviso de arriba, que es el reparto
+ * que el capítulo 40 dejó montado: el renglón de un campo tiene que caber al lado del campo.
+ */
+export function erroresDeLaContrasena(err) {
+  if (!err || !err.status) return null;
+  const renglones = String(err.message || '').split('\n').filter(Boolean);
+  if (!renglones.length) return null;
+  if (err.status === 401) {
+    return { porCampo: { contrasena_actual: renglones[0] }, sueltos: renglones.slice(1) };
+  }
+  if (err.status === 422) {
+    return { porCampo: { nueva_contrasena: renglones[0] }, sueltos: renglones.slice(1) };
+  }
+  return null;
+}
+
+/**
  * Las propiedades que conectan un campo con su error.
  *
  * `aria-invalid` es lo que un lector de pantalla anuncia al llegar al campo, y **es también

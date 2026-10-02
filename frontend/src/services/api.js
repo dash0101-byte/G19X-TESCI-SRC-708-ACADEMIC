@@ -56,18 +56,39 @@ function clearSession() {
 // escrita para leerse. Se quita el prefijo, no el mensaje.
 const RUIDO_DE_PYDANTIC = /^(Value error|Assertion failed),\s*/;
 
+/**
+ * Los renglones de un 422, sin el nombre de la columna (capítulo 43).
+ *
+ * Esta función escribía `campo: mensaje` con el `campo` tal como viaja, que es el nombre de
+ * la columna de la base: `nueva_contrasena`, `assigned_rep_id`, `cerrado_el`. El capítulo
+ * 40 se lo quitó a las cuatro pantallas que reparten cada error debajo de su campo —ahí el
+ * nombre no hace falta, porque el mensaje ya está al lado del campo del que habla— y lo
+ * dejó escrito en §6.4 para las demás, que son las que caen aquí. Era «el mismo arreglo en
+ * los sitios donde el 422 es menos probable»; no lo es, porque el nombre no se escribe en
+ * esas pantallas sino **en este sitio**, una vez.
+ *
+ * Quitarlo y no traducirlo: una tabla de nombre de columna a etiqueta aquí sería una
+ * segunda verdad sobre cómo se llama cada campo, y la primera es la etiqueta que cada
+ * pantalla tiene escrita al lado de su `input` —`first_name` es «Nombre(s)» en la ficha y
+ * «Nombre» en el alta—. Donde hace falta decir cuál es el campo se reparte por campos, con
+ * `erroresDelServidor`, que para eso recibe las etiquetas de la pantalla.
+ *
+ * Los repetidos se colapsan: dos campos que fallan por lo mismo producen el mismo renglón
+ * —«Falta este campo.» dos veces— y repetirlo no añade información, solo ruido.
+ */
+function renglonesDelCuerpo(detalle) {
+  const vistos = [];
+  for (const item of detalle) {
+    const mensaje = String(item.msg || '').replace(RUIDO_DE_PYDANTIC, '');
+    if (mensaje && !vistos.includes(mensaje)) vistos.push(mensaje);
+  }
+  return vistos.join('\n');
+}
+
 function parseApiError(err, defaultMsg) {
   if (!err) return defaultMsg;
   if (typeof err.detail === 'string') return err.detail;
-  if (Array.isArray(err.detail)) {
-    return err.detail
-      .map((item) => {
-        const field = item.loc ? item.loc.filter((x) => x !== 'body').join('.') : '';
-        const mensaje = String(item.msg || '').replace(RUIDO_DE_PYDANTIC, '');
-        return field ? `${field}: ${mensaje}` : mensaje;
-      })
-      .join('\n');
-  }
+  if (Array.isArray(err.detail)) return renglonesDelCuerpo(err.detail);
   if (err.detail && typeof err.detail === 'object') {
     // El backend devuelve algunos conflictos con un detalle estructurado —el 409 del
     // recálculo masivo lleva el trabajo que ocupa el turno y por dónde va— para que el
@@ -75,7 +96,21 @@ function parseApiError(err, defaultMsg) {
     // para la persona; volcar el objeto entero con `JSON.stringify` dejaba en pantalla
     // `{"mensaje":"...","job_id":"...","estado":"RUNNING"}`, que tiene toda la
     // información y no se puede leer.
-    if (typeof err.detail.mensaje === 'string') return err.detail.mensaje;
+    if (typeof err.detail.mensaje === 'string') {
+      // Y cuando además trae `motivos`, van detrás, un renglón cada uno (capítulo 43).
+      //
+      // La política de contraseñas devuelve **todos** los motivos por los que una no vale
+      // —«Debe tener al menos 12 caracteres», «Está en la lista de contraseñas filtradas»—
+      // y lo hace a propósito: su propio código lo explica, «devolver uno solo obliga a
+      // descubrir la política a base de intentos». Esta función se quedaba con el
+      // `mensaje` y tiraba la lista, así que en pantalla salía «La contraseña no cumple la
+      // política del sistema.» y nada más. El comentario del formulario de sesión decía
+      // desde el capítulo 23 que los enseñaba todos; no llegaba ninguno.
+      const motivos = Array.isArray(err.detail.motivos)
+        ? err.detail.motivos.filter((m) => typeof m === 'string' && m)
+        : [];
+      return [err.detail.mensaje, ...motivos].join('\n');
+    }
     // Un evento que el registro de actividad rechaza (422) trae `motivo`: qué falta o qué
     // no se admite —una llamada sin resultado, una propuesta declarada a mano—.
     if (typeof err.detail.motivo === 'string') return err.detail.motivo;

@@ -168,13 +168,24 @@ describe('cambio de la contraseña propia', () => {
     expect(screen.queryByPlaceholderText('Contraseña actual')).not.toBeInTheDocument();
   });
 
+  // El error, construido como lo construye `api.js`: con su código y con los motivos ya
+  // unidos en el mensaje (capítulo 43). La versión anterior escribía el mensaje a mano, y
+  // por eso esta prueba pasaba mientras en la pantalla no salía ni un motivo: `parseApiError`
+  // se quedaba con el titular del detalle estructurado y tiraba la lista.
+  function comoLoDevuelveElServidor({ status, mensaje, motivos = [] }) {
+    return Object.assign(new Error([mensaje, ...motivos].join('\n')), {
+      status,
+      detalle: motivos.length ? { mensaje, motivos } : { mensaje },
+    });
+  }
+
   it('los motivos que devuelve la política de contraseñas se enseñan enteros', async () => {
     const usuario = userEvent.setup();
-    changeOwnPassword.mockRejectedValue(
-      new Error(
-        'La contraseña no cumple la política:\n- Debe tener al menos 12 caracteres\n- No puede ser una contraseña conocida',
-      ),
-    );
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Debe tener al menos 12 caracteres', 'No puede ser una contraseña conocida'],
+    }));
     montar();
     await rellenar(usuario, { actual: 'x', nueva: 'corta', repetida: 'corta' });
 
@@ -186,6 +197,54 @@ describe('cambio de la contraseña propia', () => {
     expect(screen.getByText(/contraseña conocida/)).toBeInTheDocument();
     // El formulario sigue ahí para corregir, con lo escrito intacto.
     expect(screen.getByPlaceholderText('Contraseña actual')).toBeInTheDocument();
+  });
+
+  it('el aviso es una alerta: antes no lo anunciaba ningún lector de pantalla', async () => {
+    // Era el único aviso del panel sin `role`. El texto estaba en la pantalla y para quien
+    // no la ve no pasaba nada: el formulario se quedaba igual, en silencio.
+    const usuario = userEvent.setup();
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Es demasiado común.'],
+    }));
+    montar();
+    await rellenar(usuario, { actual: 'x', nueva: 'corta', repetida: 'corta' });
+
+    await usuario.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso).toHaveTextContent('Revise el campo Contraseña nueva.');
+    expect(aviso).toHaveTextContent('Es demasiado común.');
+    expect(aviso.textContent).not.toContain('nueva_contrasena');
+  });
+
+  it('el rechazo señala el campo del que habla el servidor', async () => {
+    const usuario = userEvent.setup();
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 401, mensaje: 'La contraseña actual no es correcta.',
+    }));
+    montar();
+    await rellenar(usuario, { actual: 'la-que-no-es', nueva: 'una-frase-larga', repetida: 'una-frase-larga' });
+
+    await usuario.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    const actual = screen.getByPlaceholderText('Contraseña actual');
+    await waitFor(() => expect(actual).toHaveAttribute('aria-invalid', 'true'));
+    expect(screen.getByPlaceholderText(/Contraseña nueva/)).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('y los tres campos llevan ya la clase que la hoja mide', async () => {
+    // Eran una caja escrita a mano: borde en --border-subtle (1.12:1, lo que §6.4 punto 32
+    // cerró), sin aro de foco propio y sin el borde rojo que la hoja pinta sobre
+    // `[aria-invalid='true']`. El atributo se anunciaba y no se veía.
+    const usuario = userEvent.setup();
+    montar();
+    await usuario.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
+
+    for (const marcador of ['Contraseña actual', 'Contraseña nueva (mínimo 12 caracteres)', 'Repítala']) {
+      expect(screen.getByPlaceholderText(marcador).className).toContain('input-field');
+    }
   });
 
   it('un fallo sin mensaje no deja el aviso en blanco', async () => {

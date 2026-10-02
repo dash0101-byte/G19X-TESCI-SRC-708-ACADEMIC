@@ -106,6 +106,12 @@ REPORT_FILES = [
     # motor de las pruebas y del desarrollo no comprobaba ninguna de las dieciocho claves
     # ajenas del esquema, así que esa clase entera de fallo no podía ponerse roja.
     ("Reporte_40_El_Motor_que_no_Comprobaba_Nada_Dieciocho_Claves_sin_Probar_el_Except_que_Adivinaba_y_el_Duplicado_que_Perdia_un_Prospecto.md", "Capítulo 42: El Motor que no Comprobaba Nada — Dieciocho Claves sin Probar, el `except` que Adivinaba y el «Duplicado» que Perdía un Prospecto"),
+    # El capítulo 43 abre los puntos 37, 38 y 39 de §6.4 —los tres que quedaban del lado del
+    # cliente— y los tres estaban mal medidos. El hallazgo no son los cuadros del navegador,
+    # aunque uno pedía una contraseña en claro: es que un par de colores escrito en un `style`
+    # es un par que la suite de contraste no puede ver, y dos de los que aparecieron al
+    # derivarlos del código no llegaban al mínimo de §1.4.3.
+    ("Reporte_41_Los_Avisos_que_no_Estaban_en_la_Pagina_El_Cuadro_que_Pedia_una_Contrasena_en_Claro_el_Par_que_Nadie_Media_y_los_Motivos_que_el_Cliente_Tiraba.md", "Capítulo 43: Los Avisos que no Estaban en la Página — El Cuadro que Pedía una Contraseña en Claro, el Par que Nadie Medía y los Motivos que el Cliente Tiraba"),
 ]
 
 

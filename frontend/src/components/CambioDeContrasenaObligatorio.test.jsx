@@ -90,20 +90,110 @@ describe('el envío', () => {
     );
   });
 
+  // Este error se construye como lo construye `api.js`, con su `status` y con los motivos ya
+  // unidos en el mensaje, y eso tiene su historia (capítulo 43).
+  //
+  // La versión anterior de esta prueba escribía el mensaje a mano —«no cumple la
+  // política\n- es demasiado común»— y comprobaba que la pantalla lo enseñara. Lo enseñaba,
+  // claro: se lo había dado la prueba. Lo que nadie comprobaba era el tramo de antes, y en
+  // ese tramo estaba el defecto: `parseApiError` se quedaba con el titular del detalle
+  // estructurado y **tiraba la lista de motivos**, así que en pantalla no salía ninguno. Una
+  // prueba que fabrica la respuesta del servidor una capa por debajo de donde está el fallo
+  // no puede verlo. El tramo que faltaba vive ahora en `services/api.test.js`.
+  function comoLoDevuelveElServidor({ status, mensaje, motivos = [] }) {
+    return Object.assign(new Error([mensaje, ...motivos].join('\n')), {
+      status,
+      detalle: motivos.length ? { mensaje, motivos } : { mensaje },
+    });
+  }
+
   it('si el servidor la rechaza, enseña todos los motivos y deja reintentar', async () => {
-    changeOwnPassword.mockRejectedValue(
-      new Error('La contraseña no cumple la política del sistema.\n- es demasiado común'),
-    );
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Debe tener al menos 12 caracteres.', 'Es demasiado común.'],
+    }));
     const usuario = userEvent.setup();
     const { onCompletado } = montar();
     await rellenar(usuario, { actual: PRESTADA, nueva: PROPIA, repetida: PROPIA });
     await usuario.click(screen.getByRole('button', { name: 'Guardar y volver a entrar' }));
 
     const aviso = await screen.findByRole('alert');
-    expect(aviso).toHaveTextContent('no cumple la política');
-    expect(aviso).toHaveTextContent('es demasiado común');
+    expect(aviso).toHaveTextContent('Debe tener al menos 12 caracteres.');
+    expect(aviso).toHaveTextContent('Es demasiado común.');
     expect(screen.getByRole('button', { name: 'Guardar y volver a entrar' })).toBeEnabled();
     expect(onCompletado).not.toHaveBeenCalled();
+  });
+
+  it('y el aviso nombra el campo con su etiqueta, no con el nombre de la columna', async () => {
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Está en la lista de contraseñas filtradas: elija otra.'],
+    }));
+    const usuario = userEvent.setup();
+    montar();
+    await rellenar(usuario, { actual: PRESTADA, nueva: PROPIA, repetida: PROPIA });
+    await usuario.click(screen.getByRole('button', { name: 'Guardar y volver a entrar' }));
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso).toHaveTextContent('Revise el campo Contraseña nueva.');
+    expect(aviso.textContent).not.toContain('nueva_contrasena');
+  });
+
+  it('el rechazo de la política señala la contraseña nueva, y el foco va a ella', async () => {
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Es demasiado común.'],
+    }));
+    const usuario = userEvent.setup();
+    montar();
+    await rellenar(usuario, { actual: PRESTADA, nueva: PROPIA, repetida: PROPIA });
+    await usuario.click(screen.getByRole('button', { name: 'Guardar y volver a entrar' }));
+
+    const nueva = screen.getByLabelText(/Contraseña nueva/);
+    await waitFor(() => expect(nueva).toHaveAttribute('aria-invalid', 'true'));
+    expect(nueva).toHaveFocus();
+    // Y la que no tiene nada que ver no queda marcada.
+    expect(screen.getByLabelText('Contraseña actual')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('una contraseña actual incorrecta señala la actual, no la nueva', async () => {
+    // El 401 de esa puerta solo puede significar eso: la credencial que se pidió para
+    // comprobar que quien cambia la contraseña es quien dice ser no era la correcta.
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 401,
+      mensaje: 'La contraseña actual no es correcta.',
+    }));
+    const usuario = userEvent.setup();
+    montar();
+    await rellenar(usuario, { actual: 'la-que-no-es', nueva: PROPIA, repetida: PROPIA });
+    await usuario.click(screen.getByRole('button', { name: 'Guardar y volver a entrar' }));
+
+    const actual = screen.getByLabelText('Contraseña actual');
+    await waitFor(() => expect(actual).toHaveAttribute('aria-invalid', 'true'));
+    expect(actual).toHaveFocus();
+    expect(screen.getByLabelText(/Contraseña nueva/)).not.toHaveAttribute('aria-invalid');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Revise el campo Contraseña actual.');
+  });
+
+  it('al corregir el campo señalado se le quita la marca', async () => {
+    changeOwnPassword.mockRejectedValue(comoLoDevuelveElServidor({
+      status: 422,
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Es demasiado común.'],
+    }));
+    const usuario = userEvent.setup();
+    montar();
+    await rellenar(usuario, { actual: PRESTADA, nueva: PROPIA, repetida: PROPIA });
+    await usuario.click(screen.getByRole('button', { name: 'Guardar y volver a entrar' }));
+
+    const nueva = screen.getByLabelText(/Contraseña nueva/);
+    await waitFor(() => expect(nueva).toHaveAttribute('aria-invalid', 'true'));
+    await usuario.type(nueva, 'z');
+
+    expect(nueva).not.toHaveAttribute('aria-invalid');
   });
 
   it('no se puede enviar dos veces mientras el primer envío está en el aire', async () => {

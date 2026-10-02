@@ -4611,6 +4611,192 @@ jobs:
           print(f"y los {cuantos} except IntegrityError preguntan antes de contestar.")
           PY
 
+      # ------------------------------------------------------------------ control 57
+      # Un aviso esta en la pagina, y la caja la dibuja la hoja.
+      #
+      # El defecto del capitulo 43 tenia dos mitades, y §6.4 las contaba mal las dos.
+      #
+      # La primera: seis `alert()` y un `window.prompt` pedian y daban noticias por un cuadro
+      # del navegador. El punto 38 contaba «siete errores» y de los seis `alert()` dos no eran
+      # errores -uno anunciaba un exito- y uno no era de ningun recalculo; el `prompt` no lo
+      # mencionaba, y era el peor: pedia la contrasena de otra cuenta EN CLARO, sin repeticion
+      # y sin sitio donde enseñar los motivos de la politica.
+      #
+      # La segunda: diecinueve avisos escribian su caja a mano. El punto 37 decia que eran
+      # diez y que «no incumple ningun minimo». Un par de colores escrito en un `style` es un
+      # par que `contraste.test.js` no puede ver, y al derivarlos del codigo aparecieron cinco
+      # combinaciones sin medir: --text-muted sobre el relleno de un chip daba 4.47 y sobre el
+      # de una insignia 4.37, contra los 4.5 de §1.4.3.
+      #
+      # Lo que esta guarda vigila es la forma de las dos mitades: que no vuelva a entrar un
+      # cuadro del navegador, que la hoja siga siendo la que dibuja los avisos, las insignias
+      # y las cajas de un formulario, y que las dos piezas que el servidor ya decia -el campo
+      # y los motivos- sigan llegando a la pantalla.
+      - name: Ningun aviso sale por un cuadro del navegador
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          CLIENTE = pathlib.Path("frontend/src")
+          HOJA = (CLIENTE / "index.css").read_text(encoding="utf-8")
+
+          fuentes = [
+              ruta for ruta in sorted(CLIENTE.rglob("*"))
+              if ruta.suffix in {".js", ".jsx", ".css"} and ".test." not in ruta.name
+          ]
+          if len(fuentes) < 30:
+              sys.exit(f"FALLO: solo se han encontrado {len(fuentes)} archivos del cliente.")
+
+          def sin_comentarios(codigo):
+              # La misma regla que `pruebas/codigo.js`: las cabeceras de este proyecto
+              # mencionan `alert()` y `window.prompt` para explicar de donde vienen, y una
+              # cabecera no es codigo.
+              codigo = re.sub(r"/\*[\s\S]*?\*/", "", codigo)
+              return re.sub(r"^\s*//.*$", "", codigo, flags=re.M)
+
+          fallos = []
+
+          # 1. Ni un cuadro del navegador, en ningun archivo del cliente.
+          CUADROS = re.compile(r"(?<![\w.$])(?:window\s*\.\s*)?(alert|confirm|prompt)\s*\(")
+          for ruta in fuentes:
+              codigo = sin_comentarios(ruta.read_text(encoding="utf-8"))
+              for hallazgo in CUADROS.finditer(codigo):
+                  linea = codigo[: hallazgo.start()].count("\n") + 1
+                  fallos.append(
+                      f"{ruta.as_posix()}:{linea} vuelve a usar {hallazgo.group(1)}(): un "
+                      f"cuadro del navegador no lo anuncia ningun lector de pantalla, no se "
+                      f"puede señalar junto a nada y el `prompt` escribe en claro"
+                  )
+
+          # 2. El ambar que avisa y el ambar de un prospecto templado son dos familias.
+          for parte in ("bg", "border", "text"):
+              warm = re.search(rf"--warm-{parte}:\s*([^;]+);", HOJA)
+              warn = re.search(rf"--warn-{parte}:\s*([^;]+);", HOJA)
+              if warm is None or warn is None:
+                  fallos.append(f"la paleta ya no tiene --warm-{parte} y --warn-{parte}")
+                  continue
+              if warm.group(1).strip() != warn.group(1).strip():
+                  fallos.append(
+                      f"--warn-{parte} y --warm-{parte} han dejado de valer lo mismo: si es "
+                      f"a proposito, midalo en contraste.test.js antes de separarlos"
+                  )
+          regla_warn = re.search(r"\.alert-warn\s*\{([\s\S]*?)\}", HOJA)
+          if regla_warn is None or "--warn-" not in regla_warn.group(1):
+              fallos.append(".alert-warn vuelve a pintarse con la temperatura de una ficha")
+
+          # 3. La hoja dibuja los avisos, las insignias y los chips; y el cliente los pide.
+          marcado = "\n".join(
+              sin_comentarios(ruta.read_text(encoding="utf-8"))
+              for ruta in fuentes if ruta.suffix == ".jsx"
+          )
+          for clase in (".alert", ".alert-error", ".alert-warn", ".alert-ok", ".chip",
+                        ".badge-status", ".badge-ok", ".input-field"):
+              if clase not in HOJA:
+                  fallos.append(f"la hoja ya no define {clase}")
+              if clase.lstrip(".") not in marcado:
+                  fallos.append(
+                      f"ningun componente usa {clase}: una clase que la hoja define y el "
+                      f"marcado no pide es una clase que nadie ha visto dibujada"
+                  )
+
+          # 4. Ningun `style` del marcado vuelve a escribir el relleno de un chip o de una
+          #    insignia junto a un color: ahi es donde los pares se escapaban de la medida.
+          for ruta in (ruta for ruta in fuentes if ruta.suffix == ".jsx"):
+              codigo = sin_comentarios(ruta.read_text(encoding="utf-8"))
+              for relleno in ("var(--bg-chip)", "var(--bg-subtle)"):
+                  for hallazgo in re.finditer(re.escape(f"background: {relleno}"), codigo):
+                      vecindad = codigo[max(0, hallazgo.start() - 200): hallazgo.end() + 200]
+                      if re.search(r"(?<!border)(?<!Border)color:\s*'?var\(", vecindad):
+                          linea = codigo[: hallazgo.start()].count("\n") + 1
+                          fallos.append(
+                              f"{ruta.as_posix()}:{linea} vuelve a formar un par de colores "
+                              f"sobre {relleno} en un `style`, que es donde la suite de "
+                              f"contraste no lo ve (ahi estaban los 4.47 y los 4.37)"
+                          )
+
+          # 5. Las cajas de un formulario llevan la clase que la hoja mide.
+          def cajas(codigo):
+              for inicio in (m.start() for m in re.finditer(r"<(input|select|textarea)\b", codigo)):
+                  profundidad = 0
+                  for i in range(inicio, len(codigo)):
+                      if codigo[i] == "{":
+                          profundidad += 1
+                      elif codigo[i] == "}":
+                          profundidad -= 1
+                      elif codigo[i] == ">" and profundidad == 0:
+                          yield inicio, codigo[inicio:i + 1]
+                          break
+
+          NO_SON_CAJAS = {"checkbox", "radio", "hidden", "range", "file"}
+          # La unica que la hoja viste por su contenedor, `.interes-qr select`.
+          VESTIDA_POR_SU_CONTENEDOR = {"frontend/src/components/CompartirEnRedes.jsx"}
+          cuantas = 0
+          for ruta in (ruta for ruta in fuentes if ruta.suffix == ".jsx"):
+              codigo = sin_comentarios(ruta.read_text(encoding="utf-8"))
+              for inicio, etiqueta in cajas(codigo):
+                  tipo = re.search(r'type="(\w+)"', etiqueta)
+                  if tipo and tipo.group(1) in NO_SON_CAJAS:
+                      continue
+                  cuantas += 1
+                  if "input-field" in etiqueta or "interes-" in etiqueta:
+                      continue
+                  if ruta.as_posix() in VESTIDA_POR_SU_CONTENEDOR:
+                      continue
+                  linea = codigo[:inicio].count("\n") + 1
+                  fallos.append(
+                      f"{ruta.as_posix()}:{linea} es una caja de formulario sin "
+                      f"`.input-field`: sin el contorno medido del capitulo 39, sin aro de "
+                      f"foco y sin el borde rojo que el 40 pinta sobre [aria-invalid]"
+                  )
+          if cuantas < 50:
+              sys.exit(f"FALLO: solo se han encontrado {cuantas} cajas de formulario.")
+
+          # 6. Lo que el servidor ya decia sigue llegando: el campo, y los motivos.
+          api = (CLIENTE / "services" / "api.js").read_text(encoding="utf-8")
+          if re.search(r"\$\{\s*(field|campo)\s*\}\s*:", api):
+              fallos.append(
+                  "api.js vuelve a escribir el nombre de la columna delante del mensaje: "
+                  "`nueva_contrasena: ...` en un producto escrito en castellano"
+              )
+          if "err.detail.motivos" not in api:
+              fallos.append(
+                  "api.js vuelve a tirar la lista de motivos de la politica de contrasenas, "
+                  "que el servidor manda entera a proposito para no descubrirla a tientas"
+              )
+          formulario = (CLIENTE / "components" / "erroresDeFormulario.js").read_text(encoding="utf-8")
+          if "erroresDeLaContrasena" not in formulario:
+              fallos.append(
+                  "desaparecio el reparto del rechazo de una contrasena: ese 422 no trae "
+                  "`loc`, asi que el campo lo sabe el cliente por el contrato de la puerta"
+              )
+
+          # 7. El velo de una operacion larga sigue diciendo que esta ocupado.
+          app = (CLIENTE / "App.jsx").read_text(encoding="utf-8")
+          for pieza in ('aria-busy="true"', 'aria-live="polite"', 'role="alert"', 'role="status"'):
+              if pieza not in app:
+                  fallos.append(f"App.jsx ya no lleva {pieza}: el velo o las regiones vivas")
+
+          # 8. Y la guarda del cliente sigue derivando sus listas del codigo.
+          guarda = CLIENTE / "pruebas" / "avisos.test.js"
+          if not guarda.exists():
+              sys.exit("FALLO: desaparecio frontend/src/pruebas/avisos.test.js.")
+          contenido = guarda.read_text(encoding="utf-8")
+          for pieza in ("paresDelMarcado", "hastaLaLlaveQueCierra", "PARES", "CUADROS"):
+              if pieza not in contenido:
+                  fallos.append(f"avisos.test.js ya no deriva su lista del codigo: falta {pieza}")
+
+          if fallos:
+              print("FALLO: un aviso volvio a salir fuera de la pagina, o la caja a escribirse a mano.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Ni un cuadro del navegador, y las {cuantas} cajas de formulario llevan la")
+          print("clase que la hoja mide. El ambar que avisa tiene su propio token.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

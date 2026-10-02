@@ -396,7 +396,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
       </div>
 
       {aviso && (
-        <div role="status" style={{ padding: '8px 12px', margin: '12px 0', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-sm)', color: 'var(--success-text)', fontSize: '0.8rem' }}>
+        <div role="status" className="alert alert-ok" style={{ margin: '12px 0' }}>
           {aviso}
         </div>
       )}
@@ -412,25 +412,21 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
           puede caerse»— se convierte en parte del decorado en dos días y deja de leerse
           justo el día que sí pasa algo. */}
       {puedeGestionar && direccion && direccion.responde === false && (
-        <div
-          role="alert"
-          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--error-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
-        >
+        <div role="alert" className="alert alert-error" style={{ margin: '14px 0' }}>
           <strong>La dirección pública no responde.</strong>{' '}
           Quien abra un enlace de estas publicaciones no llega a ninguna parte. Si el túnel
           se reinició, su dirección es otra: hay que ponerla en{' '}
           <code>PUBLICACIONES_URL_BASE</code> y volver a levantar la pila.
-          <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '4px', wordBreak: 'break-all' }}>
+          {/* --text-secondary y no --text-muted: dentro de un aviso el fondo lleva el rojo
+              translúcido encima del panel, y el apagado se queda en 3.78 (§1.4.3). */}
+          <div style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '4px', wordBreak: 'break-all' }}>
             {direccion.base}{direccion.detalle ? ` · ${direccion.detalle}` : ''}
           </div>
         </div>
       )}
 
       {puedeGestionar && direccion && direccion.publicaciones_con_enlace_caducado > 0 && (
-        <div
-          role="alert"
-          style={{ padding: '10px 14px', margin: '14px 0', border: '1px solid var(--warm-text)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}
-        >
+        <div role="alert" className="alert alert-warn" style={{ margin: '14px 0' }}>
           <strong>
             {direccion.publicaciones_con_enlace_caducado}{' '}
             {direccion.publicaciones_con_enlace_caducado === 1 ? 'publicación repartió' : 'publicaciones repartieron'}{' '}
@@ -721,7 +717,7 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                       dirección era otra. Por eso el aviso va debajo del enlace y no lo
                       sustituye: no hay nada que arreglar aquí, hay que editar el post. */}
                   {publicacion.enlace_caducado && (
-                    <div style={{ color: 'var(--hot-text)', marginTop: '2px' }}>
+                    <div style={{ color: 'var(--warn-text)', marginTop: '2px' }}>
                       ⚠ El enlace que se repartió de esta publicación ya no lleva aquí: la
                       dirección pública cambió después de activarla. El de arriba es el
                       bueno; hay que volver a pegarlo en el post.

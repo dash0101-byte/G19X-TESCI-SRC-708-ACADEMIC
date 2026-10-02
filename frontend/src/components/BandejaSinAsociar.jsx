@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   descartarEventoSinAsociar,
   fetchEventosSinAsociar,
@@ -29,6 +29,13 @@ export default function BandejaSinAsociar() {
   const [candidatos, setCandidatos] = useState([]);
   const [prospectoElegido, setProspectoElegido] = useState('');
   const [trabajando, setTrabajando] = useState(false);
+  // Qué aviso está esperando confirmación para borrarse (capítulo 43). Era un
+  // `window.confirm`: un cuadro del navegador que ningún lector de pantalla anuncia como
+  // contenido de la página, que tapa el aviso del que está preguntando y que no se puede
+  // leer con calma porque no está en ninguna parte. Y decidía un borrado: la única
+  // operación de esta pantalla que no se puede deshacer.
+  const [enDescarte, setEnDescarte] = useState(null);
+  const botonDeDescarte = useRef(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -48,11 +55,19 @@ export default function BandejaSinAsociar() {
     cargar();
   }, [cargar]);
 
+  // El foco va al botón que confirma, que es lo que el cuadro del navegador hacía solo: al
+  // abrirse, quien navega con teclado estaba dentro del cuadro y quien usa un lector de
+  // pantalla lo oía. Sin esto, la pregunta aparecería en silencio y por debajo del foco.
+  useEffect(() => {
+    if (enDescarte !== null && botonDeDescarte.current) botonDeDescarte.current.focus();
+  }, [enDescarte]);
+
   const abrirVinculacion = (evento) => {
     setEnVinculacion(evento.id);
     setBusqueda(evento.contact_email || evento.contact_name || '');
     setCandidatos([]);
     setProspectoElegido('');
+    setEnDescarte(null);
     setAviso('');
     setError('');
   };
@@ -87,15 +102,24 @@ export default function BandejaSinAsociar() {
     }
   };
 
+  const pedirDescarte = (evento) => {
+    setEnDescarte(evento.id);
+    setEnVinculacion(null);
+    setAviso('');
+    setError('');
+  };
+
   const descartar = async (evento) => {
-    if (!window.confirm('¿Descartar este aviso? Se borra y no queda nada de él salvo el registro en la bitácora.')) return;
     setTrabajando(true);
     setError('');
     try {
       await descartarEventoSinAsociar(evento.id);
+      setEnDescarte(null);
       setAviso('Aviso descartado.');
       await cargar();
     } catch (err) {
+      // El aviso sigue ahí y la pregunta también: si el borrado no salió, cerrar la
+      // confirmación diría que algo se resolvió.
       setError(err.message);
     } finally {
       setTrabajando(false);
@@ -113,12 +137,12 @@ export default function BandejaSinAsociar() {
       </p>
 
       {aviso && (
-        <div role="status" style={{ padding: '8px 12px', marginBottom: '12px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 'var(--radius-sm)', color: 'var(--success-text)', fontSize: '0.8rem' }}>
+        <div role="status" className="alert alert-ok" style={{ marginBottom: '12px' }}>
           {aviso}
         </div>
       )}
       {error && (
-        <div role="alert" style={{ padding: '8px 12px', marginBottom: '12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--error-text)', fontSize: '0.8rem' }}>
+        <div role="alert" className="alert alert-error" style={{ marginBottom: '12px' }}>
           {error}
         </div>
       )}
@@ -148,11 +172,36 @@ export default function BandejaSinAsociar() {
                   <button type="button" className="btn btn-primary btn-sm" disabled={trabajando} onClick={() => abrirVinculacion(evento)}>
                     Vincular
                   </button>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={trabajando} onClick={() => descartar(evento)}>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={trabajando} onClick={() => pedirDescarte(evento)}>
                     Descartar
                   </button>
                 </div>
               </div>
+
+              {/* La pregunta que antes hacía el navegador, dentro de la página y pegada al
+                  aviso del que habla. Ámbar y no roja: todavía no ha pasado nada. */}
+              {enDescarte === evento.id && (
+                <div className="alert alert-warn" style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>
+                    ¿Descartar este aviso? Se borra y no queda nada de él salvo el registro
+                    en la bitácora.
+                  </span>
+                  <span style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      ref={botonDeDescarte}
+                      className="btn btn-danger btn-sm"
+                      disabled={trabajando}
+                      onClick={() => descartar(evento)}
+                    >
+                      {trabajando ? 'Descartando…' : 'Sí, descartar'}
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" disabled={trabajando} onClick={() => setEnDescarte(null)}>
+                      Cancelar
+                    </button>
+                  </span>
+                </div>
+              )}
 
               {enVinculacion === evento.id && (
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>

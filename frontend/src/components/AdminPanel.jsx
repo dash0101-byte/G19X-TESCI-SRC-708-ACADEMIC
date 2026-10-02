@@ -14,6 +14,7 @@ import MensajeDeCampo from './MensajeDeCampo.jsx';
 import {
   comoAviso,
   enfocarPrimerCampoConError,
+  erroresDeLaContrasena,
   erroresDelServidor,
   propiedadesDeCampo,
   resumenDeCampos,
@@ -34,6 +35,16 @@ const ETIQUETAS_DEL_ALTA = {
 };
 
 const PROPIOS_DEL_ALTA = { email: 'Escriba un correo con la forma nombre@plurione.com.' };
+
+// El restablecimiento de la contraseña de otra cuenta. `nueva_contrasena` es el nombre con
+// el que viaja —y el que el 422 de la política señala—; `repetida` no viaja a ninguna parte:
+// es la comprobación de la errata, que solo puede hacerse aquí.
+const CAMPOS_DEL_RESTABLECIMIENTO = ['nueva_contrasena', 'repetida'];
+
+const ETIQUETAS_DEL_RESTABLECIMIENTO = {
+  nueva_contrasena: 'Contraseña nueva',
+  repetida: 'Repetición',
+};
 
 // Roles del sistema, con el nombre que se enseña. Coinciden uno a uno con `UserRole` del
 // backend; no hay etiquetas inventadas como las que tenía antes este componente
@@ -87,6 +98,13 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
   const [destinoDe, setDestinoDe] = useState({});
   const [erroresDelAlta, setErroresDelAlta] = useState({});
   const formularioDelAltaRef = useRef(null);
+  // Qué cuenta está esperando una contraseña nueva, y lo que se ha escrito para ella.
+  const [enRestablecimiento, setEnRestablecimiento] = useState(null);
+  const [nuevaContrasena, setNuevaContrasena] = useState('');
+  const [repetida, setRepetida] = useState('');
+  const [erroresDelRestablecimiento, setErroresDelRestablecimiento] = useState({});
+  const campoDeLaContrasena = useRef(null);
+  const formularioDelRestablecimiento = useRef(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -118,6 +136,15 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // El foco al campo de la contraseña en cuanto el formulario aparece: es lo único que el
+  // cuadro del navegador hacía bien, y perderlo al quitarlo habría cambiado un defecto por
+  // otro. `CAMPOS_DEL_RESTABLECIMIENTO` dice el orden en que se recorren los dos campos.
+  useEffect(() => {
+    if (enRestablecimiento !== null && campoDeLaContrasena.current) {
+      campoDeLaContrasena.current.focus();
+    }
+  }, [enRestablecimiento]);
 
   // `alFallar` deja que quien llama se quede con el error si sabe hacer algo mejor que
   // volcarlo en el aviso de arriba —repartirlo por campos, por ejemplo—. Devuelve `true` si
@@ -211,21 +238,67 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
         : `${usuario.full_name} vuelve a tener acceso y deberá fijar una contraseña nueva.`,
     );
 
-  const restablecer = (usuario) => {
-    const nueva = window.prompt(
-      `Contraseña nueva para ${usuario.full_name}.\n\n` +
-        'Mínimo 12 caracteres. Una frase larga y fácil de recordar es mejor que una ' +
-        'palabra corta con símbolos.\n\n' +
-        'Se cerrarán todas sus sesiones y tendrá que cambiarla al entrar.',
-    );
-    if (!nueva) return;
-    conAviso(
-      () => {
+  // Restablecer la contraseña de otra persona (capítulo 43)
+  // ------------------------------------------------------
+  // Esto era un `window.prompt`, y de los tres cuadros del navegador que quedaban en el
+  // cliente era el peor de largo. No por accesibilidad —aunque también: no lo anuncia ningún
+  // lector de pantalla, no se puede señalar junto a nada y tapa la tabla de la que habla—,
+  // sino porque **un `prompt` escribe en claro**. Fijar la contraseña de una cuenta ajena
+  // obligaba a teclearla a la vista de cualquiera que pasara por detrás, sin repetición que
+  // comprobara la errata, sin los requisitos delante y sin que el 422 de la política pudiera
+  // señalar nada: lo que el servidor contestaba con **todos** los motivos acababa en un
+  // aviso de arriba, y para entonces el cuadro ya se había cerrado con la contraseña dentro.
+  const pedirRestablecimiento = (usuario) => {
+    setEnRestablecimiento(usuario.id);
+    setNuevaContrasena('');
+    setRepetida('');
+    setErroresDelRestablecimiento({});
+    setError(null);
+    setAviso(null);
+  };
+
+  const restablecer = async (usuario) => {
+    // La repetición no la comprueba el servidor —solo le llega una contraseña—, así que la
+    // errata de teclado se detecta aquí. Era lo que el `prompt` no podía ni intentar.
+    if (nuevaContrasena !== repetida) {
+      const soloLaRepeticion = { repetida: 'No coincide con la contraseña de arriba.' };
+      setErroresDelRestablecimiento(soloLaRepeticion);
+      enfocarPrimerCampoConError(
+        formularioDelRestablecimiento, soloLaRepeticion, CAMPOS_DEL_RESTABLECIMIENTO,
+      );
+      return;
+    }
+    let salioBien = false;
+    await conAviso(
+      async () => {
         setOcupado(usuario.id);
-        return resetUserPassword(usuario.id, nueva);
+        await resetUserPassword(usuario.id, nuevaContrasena);
+        salioBien = true;
       },
       `Contraseña de ${usuario.full_name} restablecida. Sus sesiones se han cerrado.`,
+      (err) => {
+        // El 422 de la política habla de la contraseña nueva y trae la lista entera de lo
+        // que incumple. Va debajo del campo, no en el aviso de arriba.
+        const repartidos = erroresDeLaContrasena(err);
+        if (!repartidos) return false;
+        setErroresDelRestablecimiento(repartidos.porCampo);
+        setError(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS_DEL_RESTABLECIMIENTO),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(
+          formularioDelRestablecimiento, repartidos.porCampo, CAMPOS_DEL_RESTABLECIMIENTO,
+        );
+        return true;
+      },
     );
+    // Si salió mal, el formulario se queda abierto y con lo escrito: cerrarlo obligaría a
+    // teclear de nuevo los doce caracteres por un motivo que ya está en pantalla.
+    if (salioBien) {
+      setEnRestablecimiento(null);
+      setNuevaContrasena('');
+      setRepetida('');
+    }
   };
 
   // La cartera de una cuenta dada de baja. La baja la conserva a su nombre a propósito
@@ -255,15 +328,17 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
     textTransform: 'uppercase',
     marginBottom: '4px',
   };
-  const campo = {
-    width: '100%',
-    padding: '8px 10px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border-subtle)',
-    background: 'var(--bg-base)',
-    color: 'var(--text-primary)',
-    fontSize: '0.85rem',
-  };
+  // Los ocho campos de esta pantalla eran una caja escrita a mano —ancho, relleno, radio,
+  // borde, fondo, color y tamaño— y no `.input-field` (capítulo 43). No era cosmético:
+  //
+  // * El borde era `--border-subtle`, el token de 1.12:1 que el capítulo 39 **dejó de usar
+  //   para los controles** justo por eso, y que §6.4 punto 32 cerró con `--border-control`.
+  //   Estos ocho se quedaron fuera de ese arreglo sin que nada lo dijera.
+  // * El capítulo 40 reparte aquí el 422 por campos y pone `aria-invalid` en el que falla,
+  //   y la hoja pinta el borde rojo sobre `[aria-invalid='true']` **de `.input-field`**.
+  //   Sin la clase, el atributo lo anunciaba el lector de pantalla y no se veía: las dos
+  //   verdades sobre el mismo campo que ese capítulo decía estar evitando.
+  // * El aro de foco de `.input-field:focus` tampoco llegaba.
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '32px' }}>
@@ -276,7 +351,7 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
             Cuentas, equipo comercial y mantenimiento del modelo de scoring
           </p>
         </div>
-        <span className="badge" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+        <span className="badge badge-status">
           🛡️ Área Restringida (Admin / Líder)
         </span>
       </div>
@@ -370,13 +445,9 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
         {!cargando && enBajas > 0 && (
           <div
             role="alert"
+            className="alert alert-warn"
             style={{
-              padding: '10px 14px',
               marginBottom: '12px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--warm-text)',
-              color: 'var(--warm-text)',
-              fontSize: '0.8rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -431,12 +502,7 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                       </td>
                       <td>
                         <span
-                          className="badge"
-                          style={
-                            rep.is_active
-                              ? { background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)' }
-                              : { background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }
-                          }
+                          className={`badge ${rep.is_active ? 'badge-ok' : 'badge-status'}`}
                         >
                           ● {rep.is_active ? 'Activo' : 'De baja'}
                         </span>
@@ -444,7 +510,7 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                           <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                             <select
                               aria-label={`Asesor que recibe la cartera de ${rep.full_name}`}
-                              style={{ ...campo, padding: '4px 6px', fontSize: '0.75rem' }}
+                              className="input-field" style={{ padding: '4px 6px', fontSize: '0.75rem' }}
                               value={destinoDe[rep.id] || ''}
                               disabled={ocupado === rep.id}
                               onChange={(e) => setDestinoDe({ ...destinoDe, [rep.id]: e.target.value })}
@@ -486,42 +552,42 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
             <form onSubmit={enviarAlta} ref={formularioDelAltaRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', alignItems: 'end' }}>
               <div>
                 <label style={etiqueta} htmlFor="alta-nombre">Nombre completo</label>
-                <input id="alta-nombre" style={campo} required minLength={2} value={alta.full_name}
+                <input id="alta-nombre" className="input-field" required minLength={2} value={alta.full_name}
                   onChange={(e) => setAlta({ ...alta, full_name: e.target.value })}
                   {...conErrorDelAlta('full_name')} />
                 {mensajeDelAlta('full_name')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-email">Correo institucional</label>
-                <input id="alta-email" type="email" style={campo} required value={alta.email}
+                <input id="alta-email" type="email" className="input-field" required value={alta.email}
                   onChange={(e) => setAlta({ ...alta, email: e.target.value })}
                   {...conErrorDelAlta('email')} />
                 {mensajeDelAlta('email')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-rol">Rol</label>
-                <select id="alta-rol" style={campo} value={alta.role}
+                <select id="alta-rol" className="input-field" value={alta.role}
                   onChange={(e) => setAlta({ ...alta, role: e.target.value })}>
                   {ROLES.map((r) => <option key={r.valor} value={r.valor}>{r.etiqueta}</option>)}
                 </select>
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-pass">Contraseña inicial (mín. 12)</label>
-                <input id="alta-pass" type="password" style={campo} required minLength={12} value={alta.password}
+                <input id="alta-pass" type="password" className="input-field" required minLength={12} value={alta.password}
                   onChange={(e) => setAlta({ ...alta, password: e.target.value })}
                   {...conErrorDelAlta('password')} />
                 {mensajeDelAlta('password')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-tel">Teléfono (opcional)</label>
-                <input id="alta-tel" style={campo} value={alta.phone}
+                <input id="alta-tel" className="input-field" value={alta.phone}
                   onChange={(e) => setAlta({ ...alta, phone: e.target.value })}
                   {...conErrorDelAlta('phone')} />
                 {mensajeDelAlta('phone')}
               </div>
               <div>
                 <label style={etiqueta} htmlFor="alta-cap">Capacidad de cartera</label>
-                <input id="alta-cap" type="number" min={1} max={1000} style={campo} disabled={!alta.is_sales_rep}
+                <input id="alta-cap" type="number" min={1} max={1000} className="input-field" disabled={!alta.is_sales_rep}
                   value={alta.capacity} onChange={(e) => setAlta({ ...alta, capacity: e.target.value })}
                   {...conErrorDelAlta('capacity')} />
                 {mensajeDelAlta('capacity')}
@@ -553,7 +619,8 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                 </thead>
                 <tbody>
                   {cuentas.map((usuario) => (
-                    <tr key={usuario.id}>
+                    <React.Fragment key={usuario.id}>
+                    <tr>
                       <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
                         {usuario.full_name}
                         {usuario.is_sales_rep && <span title="Atiende cartera"> 💼</span>}
@@ -561,7 +628,7 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{usuario.email}</td>
                       <td>
                         <select
-                          style={{ ...campo, padding: '4px 6px', fontSize: '0.78rem' }}
+                          className="input-field" style={{ padding: '4px 6px', fontSize: '0.78rem' }}
                           value={usuario.role}
                           disabled={ocupado === usuario.id}
                           onChange={(e) => cambiarRol(usuario, e.target.value)}
@@ -569,24 +636,19 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                           {ROLES.map((r) => <option key={r.valor} value={r.valor}>{r.etiqueta}</option>)}
                         </select>
                       </td>
-                      <td style={{ fontSize: '0.75rem', color: usuario.must_change_password ? 'var(--warm-text)' : 'var(--text-muted)' }}>
+                      <td style={{ fontSize: '0.75rem', color: usuario.must_change_password ? 'var(--warn-text)' : 'var(--text-muted)' }}>
                         {usuario.must_change_password ? 'Pendiente de cambio' : 'Propia'}
                       </td>
                       <td>
                         <span
-                          className="badge"
-                          style={
-                            usuario.is_active
-                              ? { background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)' }
-                              : { background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }
-                          }
+                          className={`badge ${usuario.is_active ? 'badge-ok' : 'badge-status'}`}
                         >
                           ● {usuario.is_active ? 'Activa' : 'De baja'}
                         </span>
                       </td>
                       <td style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button type="button" className="btn" style={{ fontSize: '0.72rem', padding: '4px 8px' }}
-                          disabled={ocupado === usuario.id} onClick={() => restablecer(usuario)}>
+                          disabled={ocupado === usuario.id} onClick={() => pedirRestablecimiento(usuario)}>
                           Restablecer contraseña
                         </button>
                         <button type="button" className="btn" style={{ fontSize: '0.72rem', padding: '4px 8px' }}
@@ -595,6 +657,79 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                         </button>
                       </td>
                     </tr>
+                    {/* El formulario que sustituye al `prompt`: en la página, debajo de la
+                        fila de la que habla, con la contraseña oculta como en cualquier
+                        campo de contraseña, con su repetición y con los requisitos a la
+                        vista antes de escribir nada. */}
+                    {enRestablecimiento === usuario.id && (
+                      <tr>
+                        <td colSpan={6}>
+                          <form
+                            onSubmit={(e) => { e.preventDefault(); restablecer(usuario); }}
+                            ref={formularioDelRestablecimiento}
+                            style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap', padding: '4px 0' }}
+                          >
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                              <label style={etiqueta} htmlFor={`reset-nueva-${usuario.id}`}>
+                                Contraseña nueva para {usuario.full_name}
+                              </label>
+                              <input
+                                id={`reset-nueva-${usuario.id}`}
+                                ref={campoDeLaContrasena}
+                                type="password"
+                                className="input-field"
+                                required
+                                minLength={12}
+                                autoComplete="new-password"
+                                value={nuevaContrasena}
+                                onChange={(e) => setNuevaContrasena(e.target.value)}
+                                {...propiedadesDeCampo('nueva_contrasena', erroresDelRestablecimiento, `reset-${usuario.id}`)}
+                              />
+                              <MensajeDeCampo
+                                nombre="nueva_contrasena"
+                                errores={erroresDelRestablecimiento}
+                                prefijo={`reset-${usuario.id}`}
+                              />
+                            </div>
+                            <div style={{ flex: 1, minWidth: '160px' }}>
+                              <label style={etiqueta} htmlFor={`reset-repetida-${usuario.id}`}>
+                                Repítala
+                              </label>
+                              <input
+                                id={`reset-repetida-${usuario.id}`}
+                                type="password"
+                                className="input-field"
+                                required
+                                minLength={12}
+                                autoComplete="new-password"
+                                value={repetida}
+                                onChange={(e) => setRepetida(e.target.value)}
+                                {...propiedadesDeCampo('repetida', erroresDelRestablecimiento, `reset-${usuario.id}`)}
+                              />
+                              <MensajeDeCampo
+                                nombre="repetida"
+                                errores={erroresDelRestablecimiento}
+                                prefijo={`reset-${usuario.id}`}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', paddingTop: '18px' }}>
+                              <button type="submit" className="btn btn-primary btn-sm" disabled={ocupado === usuario.id}>
+                                {ocupado === usuario.id ? 'Fijando…' : 'Fijar contraseña'}
+                              </button>
+                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEnRestablecimiento(null)}>
+                                Cancelar
+                              </button>
+                            </div>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexBasis: '100%', lineHeight: 1.5, margin: 0 }}>
+                              Mínimo 12 caracteres: una frase larga y fácil de recordar es
+                              mejor que una palabra corta con símbolos. Se cerrarán todas sus
+                              sesiones y tendrá que cambiarla al entrar.
+                            </p>
+                          </form>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

@@ -1,6 +1,24 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { changeOwnPassword } from '../services/api';
+import MensajeDeCampo from './MensajeDeCampo';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDeLaContrasena,
+  propiedadesDeCampo,
+  resumenDeCampos,
+  sinElCampo,
+} from './erroresDeFormulario';
 import { useVentanaModal } from './ventanaModal';
+
+// Las dos de la petición, con el nombre que este formulario les da. Aquí el nombre está en
+// el `placeholder` y no en una etiqueta —§6.4—, pero el resumen de arriba tiene que decir
+// «Contraseña actual» y no `contrasena_actual` en cualquier caso.
+const ETIQUETAS_DE_LA_CONTRASENA = {
+  contrasena_actual: 'Contraseña actual',
+  nueva_contrasena: 'Contraseña nueva',
+};
+const CAMPOS_DE_LA_CONTRASENA = ['contrasena_actual', 'nueva_contrasena'];
 
 // Descripción de cada rol, solo para mostrar al usuario qué puede hacer.
 // Los permisos reales los aplica el backend a partir del token; esto es informativo.
@@ -46,11 +64,14 @@ export default function SessionModal({ user, onLogout, onClose }) {
   const [repetida, setRepetida] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  const [errores, setErrores] = useState({});
   const [hecho, setHecho] = useState(null);
+  const formularioDeLaContrasena = useRef(null);
 
   const cambiar = async (evento) => {
     evento.preventDefault();
     setError(null);
+    setErrores({});
     if (nueva !== repetida) {
       setError('La contraseña nueva y su repetición no coinciden.');
       return;
@@ -63,24 +84,34 @@ export default function SessionModal({ user, onLogout, onClose }) {
       setNueva('');
       setRepetida('');
     } catch (err) {
-      // El backend devuelve la lista completa de motivos cuando la política la rechaza;
-      // enseñarlos todos evita que la persona tenga que descubrirla a base de intentos.
-      setError(err.message || 'No se pudo cambiar la contraseña.');
+      // El backend devuelve la lista completa de motivos cuando la política la rechaza, y
+      // este comentario decía desde el capítulo 23 que se enseñaban todos. No llegaba
+      // ninguno: `parseApiError` se quedaba con el titular del detalle estructurado y
+      // tiraba la lista (capítulo 43). Ahora llegan, y además cada respuesta va al campo
+      // del que habla: la actual con un 401, la nueva con un 422.
+      const repartidos = erroresDeLaContrasena(err);
+      if (repartidos) {
+        setErrores(repartidos.porCampo);
+        setError(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS_DE_LA_CONTRASENA),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(
+          formularioDeLaContrasena, repartidos.porCampo, CAMPOS_DE_LA_CONTRASENA,
+        );
+      } else {
+        setError(err.message || 'No se pudo cambiar la contraseña.');
+      }
     } finally {
       setEnviando(false);
     }
   };
 
-  const campo = {
-    width: '100%',
-    padding: '8px 10px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border-subtle)',
-    background: 'var(--bg-base)',
-    color: 'var(--text-primary)',
-    fontSize: '0.85rem',
-    marginBottom: '10px',
-  };
+  // Las tres cajas de contraseña eran `className="input-field" style={{ marginBottom: '10px' }}` y no `.input-field` (capítulo 43), con
+  // el mismo precio que en el panel de administración: el borde de 1.12:1 que el capítulo 39
+  // retiró de los controles, ningún aro de foco propio y, desde que este formulario reparte
+  // su error por campos, un `aria-invalid` que no se ve. Lo único que no estaba en la hoja
+  // era el margen de abajo, y eso es lo que queda escrito aquí.
 
   // Velo con `role="presentation"` y cierre según dónde se pulsó; `Escape` para el teclado.
   // El detalle está explicado en LeadDetailModal.jsx.
@@ -165,24 +196,34 @@ export default function SessionModal({ user, onLogout, onClose }) {
           )}
 
           {abriendoCambio && !hecho && (
-            <form onSubmit={cambiar}>
+            <form onSubmit={cambiar} ref={formularioDeLaContrasena}>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.5 }}>
                 Se pide la contraseña actual aunque ya haya iniciado sesión: es lo que impide
                 que quien se haga con una sesión abierta se quede con la cuenta cambiándola.
                 Al terminar se cerrarán <strong>todas</strong> sus sesiones, incluida esta.
               </p>
-              <input type="password" style={campo} placeholder="Contraseña actual" required autoComplete="current-password"
-                value={actual} onChange={(e) => setActual(e.target.value)} />
-              <input type="password" style={campo} placeholder="Contraseña nueva (mínimo 12 caracteres)" required minLength={12}
-                autoComplete="new-password" value={nueva} onChange={(e) => setNueva(e.target.value)} />
-              <input type="password" style={campo} placeholder="Repítala" required minLength={12}
+              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Contraseña actual" required autoComplete="current-password"
+                value={actual}
+                onChange={(e) => { setActual(e.target.value); setErrores(sinElCampo(errores, 'contrasena_actual')); }}
+                {...propiedadesDeCampo('contrasena_actual', errores, 'sesion')} />
+              <MensajeDeCampo nombre="contrasena_actual" errores={errores} prefijo="sesion" />
+              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Contraseña nueva (mínimo 12 caracteres)" required minLength={12}
+                autoComplete="new-password" value={nueva}
+                onChange={(e) => { setNueva(e.target.value); setErrores(sinElCampo(errores, 'nueva_contrasena')); }}
+                {...propiedadesDeCampo('nueva_contrasena', errores, 'sesion')} />
+              <MensajeDeCampo nombre="nueva_contrasena" errores={errores} prefijo="sesion" />
+              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Repítala" required minLength={12}
                 autoComplete="new-password" value={repetida} onChange={(e) => setRepetida(e.target.value)} />
               <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.5 }}>
                 Una frase larga y fácil de recordar es más segura que una palabra corta con
                 símbolos.
               </p>
+              {/* `role="alert"` no lo tenía: era el único aviso del panel que no lo
+                  llevaba, así que un lector de pantalla no decía nada al fallar el cambio
+                  de contraseña. Y `white-space: pre-line` sale ahora de `.alert`, que lo
+                  lleva por el mismo motivo por el que estaba aquí. */}
               {error && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--error-text)', marginBottom: '10px', whiteSpace: 'pre-line' }}>
+                <p role="alert" className="alert alert-error" style={{ marginBottom: '10px' }}>
                   {error}
                 </p>
               )}

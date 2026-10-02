@@ -140,7 +140,7 @@ export default function LoginScreen({ onAuthenticated, expiredNotice, notice }) 
             />
 
             {desafio.codigos_de_recuperacion_restantes === 0 && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--warm-text)', marginBottom: '14px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--warn-text)', marginBottom: '14px' }}>
                 No le quedan códigos de recuperación. Si pierde el teléfono, necesitará que
                 otra persona con administración le quite el segundo factor.
               </div>

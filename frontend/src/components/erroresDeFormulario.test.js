@@ -20,6 +20,7 @@ import {
   POR_TIPO,
   comoAviso,
   enfocarPrimerCampoConError,
+  erroresDeLaContrasena,
   erroresDelServidor,
   idDelMensaje,
   mensajeDelRenglon,
@@ -327,5 +328,56 @@ describe('corregir un campo lo saca de la lista', () => {
     const errores = { email: 'Falta este campo.' };
     expect(sinElCampo(errores, 'phone')).toBe(errores);
     expect(sinElCampo(null, 'phone')).toBeNull();
+  });
+});
+
+// ============================================================================
+// De qué campo habla el servidor cuando no lo dice con un `loc` (capítulo 43)
+// ============================================================================
+//
+// §6.4 punto 37 daba por hecho que repartir el 422 en las siete pantallas restantes era «el
+// mismo arreglo» que en las cuatro del capítulo 40. Al medirlo no lo era: en casi ninguna
+// hay un `loc` que repartir. Lo que esas puertas contestan son `HTTPException` escritas a
+// mano —un 401, un 422 con un detalle estructurado— y ahí el campo no se lee, se sabe.
+//
+// Los dos formularios de contraseña son el caso del propio punto 37, que lo ilustraba con
+// «nueva: La contraseña está en la lista de filtradas». Ese renglón no existe: ni el campo
+// se llama `nueva` —es `nueva_contrasena`— ni ese rechazo llega como un renglón por campo.
+describe('el rechazo de una contraseña, repartido por el contrato de la puerta', () => {
+  it('un 401 habla de la contraseña actual, que es lo único que ese código significa ahí', () => {
+    const err = Object.assign(new Error('La contraseña actual no es correcta.'), { status: 401 });
+    expect(erroresDeLaContrasena(err)).toEqual({
+      porCampo: { contrasena_actual: 'La contraseña actual no es correcta.' },
+      sueltos: [],
+    });
+  });
+
+  it('un 422 habla de la nueva, y los motivos van al aviso de arriba', () => {
+    // El primer renglón es el titular y cabe debajo del campo; los motivos son una lista y
+    // no caben ahí, así que suben al aviso, que es donde el capítulo 40 puso lo que no cabe.
+    const err = Object.assign(
+      new Error('La contraseña no cumple la política del sistema.\nDebe tener 12.\nEs común.'),
+      { status: 422 },
+    );
+    expect(erroresDeLaContrasena(err)).toEqual({
+      porCampo: { nueva_contrasena: 'La contraseña no cumple la política del sistema.' },
+      sueltos: ['Debe tener 12.', 'Es común.'],
+    });
+  });
+
+  it('lo que no es ni 401 ni 422 no se reparte: no se sabe de qué campo habla', () => {
+    // Un 500, un 403 o un fallo de red no dicen nada de ningún campo, y señalar uno sería
+    // inventarlo. Esos siguen yendo al aviso general, que es lo correcto para ellos.
+    for (const status of [403, 409, 500, 502]) {
+      expect(erroresDeLaContrasena(Object.assign(new Error('x'), { status }))).toBeNull();
+    }
+  });
+
+  it('ni un error sin código ni uno sin mensaje', () => {
+    // Sin `status` no hay contrato que leer: es un error del propio navegador —la red se
+    // cayó— y no una respuesta del servidor.
+    expect(erroresDeLaContrasena(new Error('La red falló'))).toBeNull();
+    expect(erroresDeLaContrasena(Object.assign(new Error(''), { status: 422 }))).toBeNull();
+    expect(erroresDeLaContrasena(null)).toBeNull();
   });
 });

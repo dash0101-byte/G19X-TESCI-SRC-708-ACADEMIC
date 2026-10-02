@@ -213,6 +213,97 @@ export const PARES = [
     donde: 'los avisos de que algo salió bien',
   },
 
+  // --- Los mismos cuatro colores SIN su fondo propio (capítulo 43) ---
+  //
+  // La insignia es el caso cómodo: trae su relleno, así que el par estaba escrito. Pero
+  // estos cuatro colores pintan además texto suelto sobre el panel desnudo —el score de
+  // una fila, el número de un KPI, el pie de una tarjeta de calibración, la nota de un
+  // enlace caducado— y esos pares **no estaban en esta lista**. No se notaba porque la
+  // comprobación de abajo pide que cada token de texto aparezca en `PARES` al menos una
+  // vez, y todos aparecían: en la fila de su insignia.
+  //
+  // Es el mismo defecto que esta tabla vigila en otros —medir el token y no el uso— una
+  // planta más arriba. Van sobrados los cuatro, lo que no quita que nadie lo supiera.
+  {
+    texto: '--hot-text',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    donde: 'el score por encima del umbral en LeadsTable y en la ficha, el KPI de los HOT '
+      + 'y el umbral de la tarjeta de calibración, sin relleno propio detrás',
+  },
+  {
+    texto: '--warm-text',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    donde: 'lo mismo para la temperatura templada, y el peso heurístico de la tarjeta de '
+      + 'calibración, que se dibuja sobre --bg-base',
+  },
+  {
+    texto: '--cold-text',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    donde: 'el score de una ficha fría, sin relleno propio detrás',
+  },
+  {
+    texto: '--success-text',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    donde: 'el «✓ copiado» y los demás textos de que algo salió bien que no llevan caja',
+  },
+
+  // --- La advertencia (capítulo 43) ---
+  //
+  // El tercer corte de la serie que empezó el 39: --warn-* es el ámbar que avisa, separado
+  // del ámbar que dice que un prospecto está templado. Mismos valores y dos tokens, porque
+  // lo que se separa no es el color sino la decisión de moverlo.
+  {
+    texto: '--warn-text',
+    fondo: { sobre: '--warn-bg', encima_de: ['--bg-base', '--bg-surface', '--bg-surface-elevated'] },
+    donde: '.alert-warn — el aviso ámbar de una pantalla, sobre su propio fondo translúcido',
+  },
+  {
+    texto: '--warn-text',
+    fondo: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'],
+    donde: 'las advertencias sin caja: «no le quedan códigos de recuperación», la columna '
+      + 'de las contraseñas prestadas, el enlace caducado de una publicación y el título '
+      + 'de la confirmación de una supresión',
+  },
+
+  // --- El texto de apoyo DENTRO de un aviso (capítulo 43) ---
+  //
+  // Dentro de una caja de aviso el fondo no es el panel: es el panel con el rojo o el
+  // ámbar translúcido encima, que lo **aclara**. Un texto claro pierde contraste ahí, y
+  // --text-muted se queda en 3.78 — por debajo de §1.4.3. Pasó en la nota del simulador y
+  // en la dirección pública que no responde, las dos escritas a mano dentro de la caja.
+  {
+    texto: '--text-secondary',
+    fondo: { sobre: '--error-bg', encima_de: ['--bg-base', '--bg-surface', '--bg-surface-elevated'] },
+    donde: 'la segunda línea de un .alert-error: la nota del simulador y la dirección que '
+      + 'no contesta',
+  },
+  {
+    texto: '--text-secondary',
+    fondo: { sobre: '--bg-chip', encima_de: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'] },
+    donde: '.chip — los datos sueltos de la ficha 360, donde --text-muted daba 4.47',
+  },
+  {
+    texto: '--text-secondary',
+    fondo: { sobre: '--bg-subtle', encima_de: ['--bg-base', '--bg-surface', '--bg-surface-elevated', '--bg-surface-hover'] },
+    donde: '.badge-status — la insignia de un estado, que tres pantallas reescribían a '
+      + 'mano con --text-muted encima del mismo relleno',
+  },
+
+  // --- Lo que se escribe dentro de un campo (capítulo 43) ---
+  //
+  // Estos dos los declara la propia hoja —`.input-field` y `.interes-boton` ponen el fondo y
+  // el color en la misma regla— y tampoco estaban aquí: `--bg-field` y `--bg-field-focus`
+  // subieron a la paleta en el capítulo 39 y nadie midió lo que se escribe encima. Van
+  // sobrados los dos; lo que importa es que ya se miden.
+  {
+    texto: '--text-primary', fondo: ['--bg-field', '--bg-field-focus'],
+    donde: 'el valor que se escribe en un .input-field, y el texto de la opción elegida',
+  },
+  {
+    texto: '--text-secondary', fondo: ['--bg-field', '--bg-field-focus'],
+    donde: '.interes-boton — una opción de la página pública sin elegir',
+  },
+
   // --- El estado de error (capítulo 40) ---
   //
   // Hasta este capítulo el rojo de los errores era `--hot-text`, el de la temperatura de

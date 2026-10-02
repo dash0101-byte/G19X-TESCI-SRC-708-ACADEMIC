@@ -43,6 +43,52 @@ function faltaElSegundoFactor(user) {
   return Boolean(user.segundo_factor_obligatorio && !user.totp_activo);
 }
 
+/**
+ * El aviso de una operación que no vive en ninguna pantalla (capítulo 43).
+ *
+ * La caja la dibuja `.alert` con su variante, que es lo que la hoja tiene escrito desde el
+ * capítulo 40 para esto; aquí solo se elige la variante y se añade el botón de cerrar.
+ *
+ * El botón existe porque este aviso no desaparece solo. Un error que se va a los cuatro
+ * segundos se va justo mientras se lee, y uno que no se puede quitar se queda en pantalla
+ * para siempre: lo cierra quien lo ha leído. Va dentro de la región viva, así que el lector
+ * de pantalla lo anuncia como parte del aviso y no como un botón suelto.
+ *
+ * No se exporta a propósito: un archivo que exporta dos componentes rompe la recarga en
+ * caliente de Vite, y el `linter` lo dice.
+ */
+/**
+ * La variante de `.alert` de cada clase de aviso, escrita y no compuesta.
+ *
+ * `alert-${aviso.tipo}` habría valido igual en el navegador y lo dijo `clases.test.js` en
+ * cuanto se escribió: una clase que el código **compone** no la puede leer la guarda que
+ * saca del marcado los nombres de clase, así que un día cualquiera `alert-aviso` sin
+ * definir se dibujaría con el estilo por omisión del navegador y nada lo diría. Las tres
+ * están aquí escritas enteras por eso, no por estilo.
+ */
+const VARIANTE_DEL_AVISO = {
+  error: 'alert-error',
+  ok: 'alert-ok',
+  warn: 'alert-warn',
+};
+
+function AvisoDelPanel({ aviso, onCerrar }) {
+  return (
+    <div
+      className={`alert ${VARIANTE_DEL_AVISO[aviso.tipo]}`}
+      style={{
+        marginBottom: '16px', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'flex-start', gap: '12px',
+      }}
+    >
+      <span>{aviso.texto}</span>
+      <button type="button" className="btn btn-secondary btn-sm" onClick={onCerrar}>
+        Cerrar
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('hoy');
   // La identidad y el rol vienen del servidor tras autenticarse; el cliente ya no los
@@ -69,6 +115,16 @@ export default function App() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalLoadingMsg, setGlobalLoadingMsg] = useState('');
+  // Lo que este archivo tiene que decir cuando acaba algo que no vive en ninguna pantalla
+  // (capítulo 43). `{ tipo, texto }`, con el tipo de las tres variantes de `.alert`.
+  //
+  // Hasta aquí lo decía un `alert()` del navegador, seis veces. Un cuadro del navegador no
+  // forma parte de la página: ningún lector de pantalla lo anuncia como contenido, no se
+  // puede señalar junto a nada, tapa lo que hay que mirar y se va al pulsar «Aceptar» sin
+  // dejar rastro de lo que decía. Y no era solo para errores: dos de los seis daban una
+  // buena noticia —«✅ 312 prospectos recalculados»— con el mismo cuadro con el que el
+  // navegador avisa de un fallo.
+  const [aviso, setAviso] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -174,7 +230,7 @@ export default function App() {
       setSelectedLead(fullLead);
       setModalStartEdit(startEdit);
     } catch (err) {
-      alert('Error al cargar detalle del lead: ' + err.message);
+      setAviso({ tipo: 'error', texto: `No se pudo abrir la ficha: ${err.message}` });
     }
   };
 
@@ -196,6 +252,10 @@ export default function App() {
     setIsRecalculating(true);
     setGlobalLoading(true);
     setGlobalLoadingMsg('Encolando el recálculo...');
+    // El resultado de la vez anterior no puede seguir en pantalla mientras corre esta: un
+    // «312 prospectos recalculados» de hace cinco minutos, al lado del velo, dice que ya
+    // terminó algo que está empezando.
+    setAviso(null);
     try {
       // 202: el servidor acepta el trabajo y devuelve su identificador. El recorrido
       // ocurre después, así que hay que esperar a que termine antes de recargar; si no,
@@ -214,17 +274,27 @@ export default function App() {
       }
 
       if (estado.status === 'FAILED') {
-        alert(`El recálculo no pudo completarse: ${estado.error_message || 'error desconocido'}`);
+        setAviso({
+          tipo: 'error',
+          texto: `El recálculo no pudo completarse: ${estado.error_message || 'error desconocido'}`,
+        });
       } else if (estado.status === 'COMPLETED') {
         const fallidos = estado.failed_leads
           ? ` (${estado.failed_leads} no se pudieron recalcular)`
           : '';
-        alert(`✅ ${estado.processed_leads} prospectos recalculados${fallidos}.`);
+        setAviso({
+          tipo: 'ok',
+          texto: `${estado.processed_leads} prospectos recalculados${fallidos}.`,
+        });
       } else {
-        alert(
-          'El recálculo sigue en curso; puede tardar unos minutos más. '
-          + 'Los scores se actualizarán solos: vuelva a cargar la vista en un rato.',
-        );
+        // Ni un fallo ni un final: el sondeo se agotó y el trabajo sigue. Es la variante
+        // ámbar, que hasta el capítulo 43 no tenía dónde salir —`.alert-warn` estaba
+        // escrita en la hoja desde el 40 y no la usaba ningún componente—.
+        setAviso({
+          tipo: 'warn',
+          texto: 'El recálculo sigue en curso; puede tardar unos minutos más. '
+            + 'Los scores se actualizarán solos: vuelva a cargar la vista en un rato.',
+        });
       }
 
       loadLeads();
@@ -239,9 +309,11 @@ export default function App() {
           ? ` Va por ${procesados} de ${total}.`
           : '';
         const quien = solicitadoPor ? ` Lo lanzó ${solicitadoPor}.` : '';
-        alert(`${err.message}${avance}${quien}`);
+        // Ámbar y no rojo: no ha fallado nada. Hay un recálculo en marcha y el servidor
+        // dice cuál y por dónde va, que es justo lo contrario de un error.
+        setAviso({ tipo: 'warn', texto: `${err.message}${avance}${quien}` });
       } else {
-        alert('Error en recálculo masivo: ' + err.message);
+        setAviso({ tipo: 'error', texto: `El recálculo masivo no se pudo lanzar: ${err.message}` });
       }
     } finally {
       setIsRecalculating(false);
@@ -319,9 +391,21 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Overlay de carga global para operaciones de red significativas */}
+      {/* El velo de una operación larga (capítulo 43 le puso lo que le faltaba)
+          ----------------------------------------------------------------------
+          Tapa la página entera —`position: fixed`, `inset: 0`— y escribe el avance del
+          recálculo masivo, que recorre la cartera completa y puede durar minutos. No
+          llevaba `role`, ni `aria-live`, ni `aria-busy`: para quien no ve la pantalla, la
+          aplicación se quedaba cubierta y muda, sin forma de saber si estaba trabajando o
+          colgada. El barrido de `axe` del capítulo 36 no lo encontró porque el velo es
+          condicional y ninguna prueba lo montaba encendido.
+
+          `aria-busy` va en el velo y no en `<main>` porque es el velo lo que aparece, y
+          `aria-live="polite"` en lugar de `assertive`: el avance cambia cada vez que el
+          sondeo contesta —cada segundo y medio—, y un anuncio que interrumpe a esa
+          cadencia no deja oír nada más. */}
       {globalLoading && (
-        <div style={{
+        <div role="status" aria-live="polite" aria-busy="true" style={{
           position: 'fixed', inset: 0, background: 'var(--overlay-loading)',
           zIndex: 9999, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '16px',
@@ -349,7 +433,29 @@ export default function App() {
       />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', width: '100%', padding: '24px 20px', flex: 1 }}>
-        
+
+        {/* Dos regiones vivas, siempre en el documento y vacías mientras no hay nada que
+            decir, con el mismo reparto que la pantalla de derechos: `role="alert"` para lo
+            que falló, `role="status"` para lo que no. Un error anunciado como estado espera
+            a que el lector de pantalla acabe lo que esté diciendo; un éxito anunciado como
+            alerta interrumpe para dar una buena noticia.
+
+            Son dos y no una con el `role` cambiante porque un lector de pantalla registra
+            la región cuando entra en el documento: cambiarle el papel la convierte en otra
+            región, y lo que aparece dentro de una región recién nacida no se anuncia. Por
+            eso también están aquí vacías en vez de montarse con el aviso dentro.
+
+            Y están en `<main>`, encima de la pestaña que sea: el botón del recálculo vive
+            en administración, pero el resultado llega minutos después y quien lo lanzó
+            puede estar mirando cualquier otra cosa. */}
+        <div role="alert">
+          {aviso && aviso.tipo === 'error' && <AvisoDelPanel aviso={aviso} onCerrar={() => setAviso(null)} />}
+        </div>
+        <div role="status">
+          {aviso && aviso.tipo !== 'error' && <AvisoDelPanel aviso={aviso} onCerrar={() => setAviso(null)} />}
+        </div>
+
+
         {/* Lo que hay que hacer hoy (capítulo 28). El líder ve además los HOT que se
             enfrían y con qué asesor están. */}
         {activeTab === 'hoy' && (

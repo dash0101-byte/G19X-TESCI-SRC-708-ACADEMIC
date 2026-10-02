@@ -158,6 +158,33 @@
   --error-border: rgba(239, 68, 68, 0.35);
   --error-text: #f05353;
 
+  /* La advertencia (capítulo 43)
+     ----------------------------
+     El ámbar que avisa de que algo va a ir mal, separado del ámbar que dice que un
+     prospecto está templado. Es el tercer corte de la misma serie —el 39 sacó --danger-*
+     de --hot-*, el 40 sacó --error-*— y el único que el capítulo 40 dejó sin hacer: lo
+     escribió en §6.4 y en el comentario de .alert-warn, «el token hace dos oficios y solo
+     uno tiene nombre», porque el ámbar de esta paleta era ese y no había otro.
+
+     Sigue sin haber otro, y **estos tres valen exactamente lo que valen los de WARM**. No
+     es un rediseño: es que una familia con dos oficios se parte aunque los dos oficios
+     coincidan hoy en el color, porque lo que no se puede hacer es moverla. El día que la
+     temperatura WARM necesite otro ámbar —o que un aviso lo necesite— habría que elegir
+     entre tocar el gráfico del tablero o dejar el aviso mal, y esa elección no debería
+     existir. Un token es un sitio donde se decide; dos oficios en un token son dos
+     decisiones atadas que nadie ató a propósito.
+
+     Las medidas, con el fondo translúcido ya compuesto: el texto va de 10.76 a 8.43 sobre
+     --warn-bg según la superficie que haya debajo, y de 11.85 a 9.64 sobre el fondo
+     desnudo, que es como se usa en los tres avisos que no llevan caja —el cartel de las
+     cuentas de baja, el «no le quedan códigos de recuperación» y la columna de las
+     contraseñas prestadas—. No hace falta elegir la primera parada de ninguna rampa: el
+     ámbar sobre fondo oscuro va sobrado, y el problema de este color nunca fue el
+     contraste sino el nombre. */
+  --warn-bg: rgba(245, 158, 11, 0.08);
+  --warn-border: rgba(245, 158, 11, 0.22);
+  --warn-text: #fbbf24;
+
   /* Los colores que vivían en un `style` del JSX (capítulo 40)
      ----------------------------------------------------------
      Ninguno de estos es un color nuevo: son los que ya se usaban, escritos a mano en
@@ -290,6 +317,49 @@ h1, h2, h3, h4, h5 {
 
 .badge-status {
   background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* Una cuenta activa frente a una dada de baja (capítulo 43)
+   ---------------------------------------------------------
+   Las dos tablas del panel de administración escribían estas dos insignias a mano, con los
+   tres colores de cada una en el `style` de un ternario. La de baja usaba --text-muted
+   sobre --bg-subtle: 4.37 contra los 4.5 de §1.4.3, y ya estaba escrita en la hoja como
+   `.badge-status` con --text-secondary, que pasa. La activa no tenía clase ninguna. */
+.badge-ok {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+/* Los datos sueltos de la ficha 360 (capítulo 43)
+   -----------------------------------------------
+   Cinco etiquetas con lo que trajo el formulario —el requerimiento, la urgencia, el
+   presupuesto, la modalidad, las marcas—, que son la misma cosa cinco veces y estaban
+   escritas cinco veces: seis propiedades a mano en cada una y **tres colores de texto
+   distintos** para el mismo objeto. Dos en --text-primary, dos en --text-secondary, uno en
+   --text-muted, sin que nada distinga a uno de otro.
+
+   Y el --text-muted no era solo una incoherencia: --bg-chip es blanco al 4 % sobre el
+   panel, así que **aclara el fondo** y baja el contraste de un texto claro. Ese par da
+   4.47 sobre el panel —la ficha 360 vive en un .modal-content, que es --bg-surface— y 4.18
+   sobre el elevado, por debajo de los 4.5 de §1.4.3. No lo medía nadie: `PARES` mide
+   --text-muted sobre las tres superficies desnudas, y el relleno del chip se escribía en
+   el mismo `style` que el color. Un par de colores escrito en un `style` es un par que la
+   suite de contraste no puede ver, y este es el primero que se encontró fallando.
+
+   Se unifican en --text-secondary, que es el token de un dato de apoyo y el que ya usaban
+   dos de los cinco: 5.61 en la peor de las cuatro superficies. El `strong` de dentro sigue
+   subiendo a --text-primary donde lo había, porque ahí el contraste no baja. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
 }
@@ -459,17 +529,18 @@ h1, h2, h3, h4, h5 {
   color: var(--error-text);
 }
 
-/* El ámbar y el verde de un aviso que no es un error. Estos dos **sí** reutilizan una
-   familia que ya existía, y el caso del ámbar no es cómodo: --warm-* es la temperatura
-   WARM de un prospecto, y por el argumento del capítulo 39 —el que separó --danger-* de
-   --hot-*— un aviso no debería pintarse con la temperatura de una ficha. Se reutiliza
-   porque el ámbar de esta paleta es ese y no hay otro, y queda anotado en §6.4: el token
-   hace dos oficios y solo uno tiene nombre. --success-* no tiene ese problema: ya era
-   semántico, «algo salió bien», y no la temperatura de nada. */
+/* El ámbar y el verde de un aviso que no es un error. El verde **sí** reutiliza una
+   familia que ya existía y no le pasa nada: --success-* ya era semántico, «algo salió
+   bien», y no la temperatura de nada.
+
+   El ámbar usaba --warm-*, la temperatura WARM de un prospecto, y eso quedó anotado en
+   §6.4 con la frase «el token hace dos oficios y solo uno tiene nombre». Ya tiene nombre
+   (capítulo 43): --warn-*, con los mismos valores, porque lo que había que separar no era
+   el color sino la decisión. */
 .alert-warn {
-  background: var(--warm-bg);
-  border-color: var(--warm-border);
-  color: var(--warm-text);
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+  color: var(--warn-text);
 }
 
 .alert-ok {

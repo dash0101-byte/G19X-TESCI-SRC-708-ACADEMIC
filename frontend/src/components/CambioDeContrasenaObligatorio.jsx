@@ -1,5 +1,23 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { changeOwnPassword } from '../services/api';
+import MensajeDeCampo from './MensajeDeCampo';
+import {
+  comoAviso,
+  enfocarPrimerCampoConError,
+  erroresDeLaContrasena,
+  propiedadesDeCampo,
+  resumenDeCampos,
+  sinElCampo,
+} from './erroresDeFormulario';
+
+// Cómo llama esta pantalla a cada campo, para el resumen de arriba. El nombre de la columna
+// —`nueva_contrasena`— no aparece en ninguna parte de lo que se lee: es el nombre que el
+// cuerpo de la petición usa, no el de la etiqueta que está pegada al campo.
+const ETIQUETAS = {
+  contrasena_actual: 'Contraseña actual',
+  nueva_contrasena: 'Contraseña nueva',
+};
+const CAMPOS = ['contrasena_actual', 'nueva_contrasena'];
 
 /**
  * Cambio de contraseña obligatorio.
@@ -20,10 +38,13 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
   const [repetida, setRepetida] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  const [errores, setErrores] = useState({});
+  const formulario = useRef(null);
 
   const enviar = async (evento) => {
     evento.preventDefault();
     setError(null);
+    setErrores({});
     if (nueva !== repetida) {
       setError('La contraseña nueva y su repetición no coinciden.');
       return;
@@ -39,7 +60,22 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
       // desaparece y un botón que se reactiva un instante invita a un segundo envío.
       await onCompletado(resultado?.mensaje || 'Contraseña actualizada. Entre con la nueva.');
     } catch (err) {
-      setError(err.message || 'No se pudo cambiar la contraseña.');
+      // El servidor dice de qué contraseña habla —la actual con un 401, la nueva con un
+      // 422— aunque no lo diga con un `loc`. Hasta el capítulo 43 las tres respuestas
+      // acababan en el mismo aviso de arriba, y había que adivinar cuál de los tres campos
+      // corregir; la política además devuelve **todos** los motivos y el cliente se quedaba
+      // con el titular.
+      const repartidos = erroresDeLaContrasena(err);
+      if (repartidos) {
+        setErrores(repartidos.porCampo);
+        setError(comoAviso([
+          resumenDeCampos(repartidos.porCampo, ETIQUETAS),
+          ...repartidos.sueltos,
+        ]));
+        enfocarPrimerCampoConError(formulario, repartidos.porCampo, CAMPOS);
+      } else {
+        setError(err.message || 'No se pudo cambiar la contraseña.');
+      }
       setEnviando(false);
     }
   };
@@ -82,14 +118,20 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
           sesiones y volverá a entrar con la nueva.
         </p>
 
-        <form onSubmit={enviar}>
+        <form onSubmit={enviar} ref={formulario}>
           <label htmlFor="cambio-actual" style={etiqueta}>Contraseña actual</label>
           <input id="cambio-actual" type="password" className="input-field" style={campo} required
-            autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
+            autoComplete="current-password" value={actual}
+            onChange={(e) => { setActual(e.target.value); setErrores(sinElCampo(errores, 'contrasena_actual')); }}
+            {...propiedadesDeCampo('contrasena_actual', errores, 'cambio')} />
+          <MensajeDeCampo nombre="contrasena_actual" errores={errores} prefijo="cambio" />
 
           <label htmlFor="cambio-nueva" style={etiqueta}>Contraseña nueva (mínimo 12 caracteres)</label>
           <input id="cambio-nueva" type="password" className="input-field" style={campo} required minLength={12}
-            autoComplete="new-password" value={nueva} onChange={(e) => setNueva(e.target.value)} />
+            autoComplete="new-password" value={nueva}
+            onChange={(e) => { setNueva(e.target.value); setErrores(sinElCampo(errores, 'nueva_contrasena')); }}
+            {...propiedadesDeCampo('nueva_contrasena', errores, 'cambio')} />
+          <MensajeDeCampo nombre="nueva_contrasena" errores={errores} prefijo="cambio" />
 
           <label htmlFor="cambio-repetida" style={etiqueta}>Repita la contraseña nueva</label>
           <input id="cambio-repetida" type="password" className="input-field" style={campo} required minLength={12}

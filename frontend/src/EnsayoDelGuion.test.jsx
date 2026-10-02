@@ -357,7 +357,12 @@ describe('A. Marketing', () => {
     await usuario.type(screen.getByLabelText('A quién va dirigida'), 'Directores de TI');
     await usuario.click(screen.getByRole('button', { name: 'Crear publicación' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('creada');
+    // `findAllByRole` y no `findByRole`: desde el capítulo 43 `App` mantiene dos regiones
+    // vivas vacías —una de alerta y otra de estado— para lo que diga una operación que no
+    // vive en ninguna pantalla, así que en el panel hay más de un `role="status"`. Lo que
+    // esta tarea comprueba es que el aviso de la publicación creada salga en una de ellas.
+    const avisos = await screen.findAllByRole('status');
+    expect(avisos.map((nodo) => nodo.textContent).join(' ')).toContain('creada');
 
     // Tarea 3: llevarse el texto listo, sin escribir el enlace a mano.
     const lista = await screen.findByRole('list', { name: 'Publicaciones' });

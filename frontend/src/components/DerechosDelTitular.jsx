@@ -249,14 +249,14 @@ export default function DerechosDelTitular() {
           anuncian lo que cambia dentro de una región que ya estaba. */}
       <div role="alert" style={{ marginBottom: error ? '12px' : 0 }}>
         {error && (
-          <div style={{ ...bloque, borderColor: 'var(--error-text)', color: 'var(--error-text)', fontSize: '0.82rem' }}>
+          <div className="alert alert-error">
             ⚠️ {error}
           </div>
         )}
       </div>
       <div role="status" style={{ marginBottom: aviso ? '12px' : 0 }}>
         {aviso && (
-          <div style={{ ...bloque, borderColor: 'var(--success-border)', background: 'var(--success-bg)', color: 'var(--success-text)', fontSize: '0.82rem' }}>
+          <div className="alert alert-ok">
             {aviso}
           </div>
         )}
@@ -379,9 +379,12 @@ export default function DerechosDelTitular() {
                 )}
               </div>
 
+              {/* El borde y el título de la confirmación eran --hot-text, la temperatura de
+                  un prospecto, y lo que esta caja dice es que algo no se puede deshacer:
+                  una advertencia. Desde el capítulo 43 eso tiene su propio token. */}
               {pidiendoSupresion && (
-                <div style={{ ...bloque, borderColor: 'var(--hot-text)' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--hot-text)', marginBottom: '8px' }}>
+                <div style={{ ...bloque, borderColor: 'var(--warn-text)' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--warn-text)', marginBottom: '8px' }}>
                     Suprimir los datos de {documento.datos_del_prospecto.first_name}{' '}
                     {documento.datos_del_prospecto.last_name}
                   </h4>

@@ -50,6 +50,7 @@ import {
   getCurrentUser,
   getCurrentUserRole,
   logout,
+  recalculateAllScores,
   restoreSession,
   setSessionExpiredHandler,
   changeOwnPassword,
@@ -81,7 +82,17 @@ vi.mock('./components/AnalyticsCharts', () => ({ default: () => <div data-testid
 vi.mock('./components/LeadsTable', () => ({ default: () => <div data-testid="tabla-de-prospectos" /> }));
 vi.mock('./components/LeadDetailModal', () => ({ default: () => <div data-testid="ficha" /> }));
 vi.mock('./components/ScoringSimulator', () => ({ default: () => <div data-testid="simulador" /> }));
-vi.mock('./components/AdminPanel', () => ({ default: () => <div data-testid="administracion" /> }));
+// El panel de administración, con el único botón que `App` le pasa: el del recálculo
+// masivo. Lo que se mide de él no es lo que pinta —tiene su propia prueba— sino lo que
+// `App` hace con el resultado, que desde el capítulo 43 es un aviso dentro de la página y
+// no un cuadro del navegador.
+vi.mock('./components/AdminPanel', () => ({
+  default: ({ onBatchRecalculate }) => (
+    <div data-testid="administracion">
+      <button type="button" onClick={onBatchRecalculate}>recalcular la cartera</button>
+    </div>
+  ),
+}));
 vi.mock('./components/BandejaSinAsociar', () => ({ default: () => <div data-testid="sin-asociar" /> }));
 vi.mock('./components/Publicaciones', () => ({ default: () => <div data-testid="publicaciones" /> }));
 vi.mock('./components/PanelDeDesenlaces', () => ({ default: () => <div data-testid="desenlaces" /> }));
@@ -388,5 +399,113 @@ describe('la pantalla de derechos del titular (§6.2, punto 16)', () => {
     expect(screen.queryByLabelText('Correo de la persona')).not.toBeInTheDocument();
     expect(screen.queryByTestId('administracion')).not.toBeInTheDocument();
     expect(screen.getByTestId('tabla-de-prospectos')).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Lo que el recálculo masivo contesta, dentro de la página (capítulo 43)
+// ============================================================================
+//
+// Este archivo no probaba el recálculo masivo, y era el único sitio del cliente donde
+// quedaban cuadros del navegador: seis `alert()`, todos aquí. §6.4 los contaba como «siete
+// errores», y de los seis dos no eran errores —uno anunciaba un éxito y otro que el trabajo
+// seguía en curso— y uno no era de ningún recálculo.
+//
+// Un cuadro del navegador no se puede probar porque no está en el documento: en `jsdom`,
+// `window.alert` existe y lanza «not implemented», que `userEvent` se traga. Así que el
+// defecto y la razón por la que nadie lo había notado son el mismo: lo que no está en la
+// página no lo ve ni una persona con lector de pantalla ni una prueba.
+describe('el resultado del recálculo masivo', () => {
+  /** Deja la sesión del líder abierta y pulsa el botón del recálculo en administración. */
+  async function recalcular() {
+    conSesionDe(LIDER);
+    render(<App />);
+    const usuario = await irA('admin');
+    await usuario.click(await screen.findByRole('button', { name: 'recalcular la cartera' }));
+    return usuario;
+  }
+
+  it('cuando termina, lo dice en la página y como un estado', async () => {
+    recalculateAllScores.mockResolvedValue({
+      id: 'j-1', status: 'COMPLETED', processed_leads: 312, failed_leads: 0,
+    });
+    const cuadroDelNavegador = vi.fn();
+    vi.stubGlobal('alert', cuadroDelNavegador);
+
+    await recalcular();
+
+    const avisos = await screen.findAllByRole('status');
+    const aviso = avisos.find((nodo) => nodo.textContent.includes('recalculados'));
+    expect(aviso).toBeDefined();
+    expect(aviso.textContent).toContain('312 prospectos recalculados');
+    // Un éxito no se anuncia como alerta: `role="status"` espera a que el lector de
+    // pantalla termine lo que esté diciendo.
+    expect(aviso.closest('[role="alert"]')).toBeNull();
+    expect(aviso.querySelector('.alert-ok')).not.toBeNull();
+    expect(cuadroDelNavegador).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('cuando falla, lo dice como alerta y con la variante del error', async () => {
+    recalculateAllScores.mockResolvedValue({
+      id: 'j-2', status: 'FAILED', error_message: 'el extractor se quedó sin memoria',
+    });
+
+    await recalcular();
+
+    // Varias regiones de alerta conviven en el panel —la de `App` y la de la pantalla de
+    // derechos, que también vive en administración—, así que se busca la que habla.
+    const avisos = await screen.findAllByRole('alert');
+    const aviso = avisos.find((nodo) => nodo.textContent.includes('extractor'));
+    expect(aviso, 'el fallo del recálculo no salió en ninguna región de alerta').toBeDefined();
+    expect(aviso.textContent).toContain('el extractor se quedó sin memoria');
+    expect(aviso.querySelector('.alert-error')).not.toBeNull();
+  });
+
+  it('con el turno ocupado avisa en ámbar, porque no ha fallado nada', async () => {
+    // El 409 trae el trabajo que ocupa el turno y por dónde va. Era un `alert()` con ese
+    // texto; ahora es la variante que la hoja tenía escrita desde el capítulo 40 y que no
+    // usaba ningún componente.
+    recalculateAllScores.mockRejectedValue(Object.assign(
+      new Error('Ya hay un recálculo masivo en curso.'),
+      { status: 409, detalle: { procesados: 40, total: 120, solicitado_por: 'ana@plurione.test' } },
+    ));
+
+    await recalcular();
+
+    const avisos = await screen.findAllByRole('status');
+    const aviso = avisos.find((nodo) => nodo.textContent.includes('en curso'));
+    expect(aviso.textContent).toContain('Va por 40 de 120');
+    expect(aviso.textContent).toContain('Lo lanzó ana@plurione.test');
+    expect(aviso.querySelector('.alert-warn')).not.toBeNull();
+  });
+
+  it('el aviso se queda hasta que quien lo ha leído lo cierra', async () => {
+    // No se va a los cuatro segundos: un error que desaparece mientras se lee no se ha
+    // leído. Y no se queda para siempre: lo cierra quien lo ha visto.
+    recalculateAllScores.mockResolvedValue({ id: 'j-3', status: 'COMPLETED', processed_leads: 5 });
+
+    const usuario = await recalcular();
+    await screen.findByText(/5 prospectos recalculados/);
+    await usuario.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+    expect(screen.queryByText(/prospectos recalculados/)).not.toBeInTheDocument();
+  });
+
+  it('mientras trabaja, el velo dice que está ocupado y no se queda mudo', async () => {
+    // Tapa la página entera durante minutos. Sin `role`, sin `aria-live` y sin `aria-busy`,
+    // para quien no ve la pantalla la aplicación se quedaba cubierta y en silencio.
+    let soltar;
+    recalculateAllScores.mockReturnValue(new Promise((resolve) => { soltar = resolve; }));
+
+    await recalcular();
+
+    const velo = (await screen.findByText('Encolando el recálculo...')).closest('[role="status"]');
+    expect(velo).not.toBeNull();
+    expect(velo).toHaveAttribute('aria-live', 'polite');
+    expect(velo).toHaveAttribute('aria-busy', 'true');
+
+    soltar({ id: 'j-4', status: 'COMPLETED', processed_leads: 1 });
+    await waitFor(() => expect(screen.queryByText('Encolando el recálculo...')).not.toBeInTheDocument());
   });
 });

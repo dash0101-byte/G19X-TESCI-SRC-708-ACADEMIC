@@ -265,22 +265,16 @@ export default function ScoringSimulator() {
             {loading && <span style={{ fontSize: '0.8rem', color: 'var(--color-primary-light)' }}>⏳ Evaluando...</span>}
           </div>
 
+          {/* Este aviso pintaba un error con el fondo y el borde de HOT —la temperatura de
+              un prospecto— y el rojo de --error-text encima: la mezcla que el capítulo 40
+              separó, sobreviviendo en el único sitio donde no se mira. El par daba 4.74
+              sobre el panel elevado: pasa, por 0,24, y nadie lo sabía. La nota de debajo
+              era --text-muted sobre ese relleno translúcido, 3.78 en el peor caso, y ahí
+              §1.4.3 no se cumplía. */}
           {error && (
-            <div
-              role="alert"
-              style={{
-                background: 'var(--hot-bg)',
-                border: '1px solid var(--hot-border)',
-                color: 'var(--error-text)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 12px',
-                marginBottom: '14px',
-                fontSize: '0.8rem',
-                lineHeight: 1.4,
-              }}
-            >
+            <div role="alert" className="alert alert-error" style={{ marginBottom: '14px' }}>
               {error}
-              <div style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: '0.72rem' }}>
+              <div style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '0.72rem' }}>
                 La puntuación de abajo es la de la última evaluación que sí funcionó.
               </div>
             </div>

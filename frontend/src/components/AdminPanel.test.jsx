@@ -25,7 +25,7 @@ vi.mock('../services/api', () => ({
 }));
 
 import {
-  createUser, fetchSalesReps, fetchUsers, getCurrentUserRole, transferPortfolio,
+  createUser, fetchSalesReps, fetchUsers, getCurrentUserRole, resetUserPassword, transferPortfolio,
 } from '../services/api';
 import AdminPanel from './AdminPanel.jsx';
 
@@ -189,5 +189,116 @@ describe('un 422 al dar de alta una cuenta', () => {
     const aviso = await screen.findByRole('alert');
     expect(aviso.textContent).toMatch(/Ese correo ya tiene cuenta/);
     expect(screen.getByLabelText('Correo institucional')).not.toHaveAttribute('aria-invalid');
+  });
+});
+
+// ============================================================================
+// La contraseña de otra cuenta ya no se teclea en un cuadro del navegador
+// ============================================================================
+//
+// Hasta el capítulo 43 esto era un `window.prompt`, y de los tres cuadros del navegador que
+// quedaban en el cliente era el peor: **un `prompt` escribe en claro**. Fijar la contraseña
+// de una cuenta ajena obligaba a teclearla a la vista de cualquiera, sin repetición que
+// comprobara la errata, sin los requisitos delante y sin que el 422 de la política pudiera
+// señalar nada —cuando llegaba, el cuadro ya se había cerrado con la contraseña dentro—.
+//
+// §6.4 contaba los `alert()` y no mencionaba este. Tampoco había prueba: un cuadro del
+// navegador no está en el documento, así que no hay nada que consultar.
+describe('restablecer la contraseña de otra cuenta', () => {
+  const ADMIN_Y_UNA_CUENTA = () => {
+    getCurrentUserRole.mockReturnValue('System_Admin');
+    fetchSalesReps.mockResolvedValue({ items: [ANA], prospectos_en_cuentas_de_baja: 0 });
+    fetchUsers.mockResolvedValue({ items: [ANA] });
+  };
+
+  /** Abre el formulario de restablecimiento de la única cuenta de la tabla. */
+  async function abrir() {
+    const usuario = userEvent.setup();
+    ADMIN_Y_UNA_CUENTA();
+    montar();
+    await usuario.click(await screen.findByRole('button', { name: 'Restablecer contraseña' }));
+    return usuario;
+  }
+
+  it('pide la contraseña en la página, oculta y con repetición', async () => {
+    const cuadroDelNavegador = vi.fn(() => 'la-que-sea');
+    vi.stubGlobal('prompt', cuadroDelNavegador);
+
+    await abrir();
+
+    const nueva = screen.getByLabelText(/Contraseña nueva para Ana Activa Soto/);
+    const repetida = screen.getByLabelText('Repítala');
+    expect(nueva).toHaveAttribute('type', 'password');
+    expect(repetida).toHaveAttribute('type', 'password');
+    expect(nueva.className).toContain('input-field');
+    // Y el foco está donde estaba al abrirse el cuadro, que era lo único que hacía bien.
+    expect(nueva).toHaveFocus();
+    expect(cuadroDelNavegador).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('los requisitos están a la vista antes de escribir nada', async () => {
+    await abrir();
+    expect(screen.getByText(/Mínimo 12 caracteres/)).toBeInTheDocument();
+    expect(screen.getByText(/Se cerrarán todas sus sesiones/)).toBeInTheDocument();
+  });
+
+  it('una errata al repetirla no gasta una llamada al servidor', async () => {
+    // El servidor no puede comprobar esto: solo le llega una contraseña. Con el `prompt` no
+    // había repetición que comprobar, así que la errata se descubría al no poder entrar.
+    const usuario = await abrir();
+    await usuario.type(screen.getByLabelText(/Contraseña nueva para/), 'una-frase-larga-y-buena');
+    await usuario.type(screen.getByLabelText('Repítala'), 'una-frase-larga-y-otra');
+    await usuario.click(screen.getByRole('button', { name: 'Fijar contraseña' }));
+
+    expect(screen.getByText('No coincide con la contraseña de arriba.')).toBeInTheDocument();
+    expect(resetUserPassword).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Repítala')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('con las dos iguales la fija y cierra el formulario', async () => {
+    resetUserPassword.mockResolvedValue({ id: 3 });
+    const usuario = await abrir();
+    await usuario.type(screen.getByLabelText(/Contraseña nueva para/), 'una-frase-larga-y-buena');
+    await usuario.type(screen.getByLabelText('Repítala'), 'una-frase-larga-y-buena');
+    await usuario.click(screen.getByRole('button', { name: 'Fijar contraseña' }));
+
+    await waitFor(() => expect(resetUserPassword).toHaveBeenCalledWith(3, 'una-frase-larga-y-buena'));
+    await waitFor(() => expect(screen.queryByLabelText('Repítala')).not.toBeInTheDocument());
+    expect(await screen.findByRole('status')).toHaveTextContent(/restablecida/);
+  });
+
+  it('si la política la rechaza, los motivos van debajo del campo y lo escrito se queda', async () => {
+    const rechazo = new Error('La contraseña no cumple la política del sistema.\nEs demasiado común.');
+    rechazo.status = 422;
+    rechazo.detalle = {
+      mensaje: 'La contraseña no cumple la política del sistema.',
+      motivos: ['Es demasiado común.'],
+    };
+    resetUserPassword.mockRejectedValue(rechazo);
+
+    const usuario = await abrir();
+    await usuario.type(screen.getByLabelText(/Contraseña nueva para/), 'plurione-plurione');
+    await usuario.type(screen.getByLabelText('Repítala'), 'plurione-plurione');
+    await usuario.click(screen.getByRole('button', { name: 'Fijar contraseña' }));
+
+    const nueva = screen.getByLabelText(/Contraseña nueva para/);
+    await waitFor(() => expect(nueva).toHaveAttribute('aria-invalid', 'true'));
+    const explicacion = document.getElementById(nueva.getAttribute('aria-describedby'));
+    expect(explicacion.textContent).toContain('no cumple la política');
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toContain('Revise el campo Contraseña nueva.');
+    expect(aviso.textContent).toContain('Es demasiado común.');
+    // El formulario sigue abierto y con lo escrito: cerrarlo obligaría a teclear otra vez
+    // doce caracteres por un motivo que ya está en pantalla.
+    expect(nueva).toHaveValue('plurione-plurione');
+  });
+
+  it('cancelar lo cierra sin llamar a nadie', async () => {
+    const usuario = await abrir();
+    await usuario.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByLabelText('Repítala')).not.toBeInTheDocument();
+    expect(resetUserPassword).not.toHaveBeenCalled();
   });
 });

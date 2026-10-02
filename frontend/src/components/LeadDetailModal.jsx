@@ -406,13 +406,8 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
         {saveSuccessMsg && (
           <div
             role="status"
+            className="alert alert-ok"
             style={{
-              padding: '10px 14px',
-              background: 'var(--success-bg)',
-              border: '1px solid var(--success-border)',
-              borderRadius: 'var(--radius-sm)',
-              color: 'var(--success-text)',
-              fontSize: '0.825rem',
               fontWeight: '600',
               marginBottom: '20px',
               display: 'flex',
@@ -762,30 +757,34 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                   Atributos y Requerimientos de la Oportunidad:
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {/* Las cinco etiquetas son `.chip` desde el capítulo 43: eran la misma
+                      cosa cinco veces con seis propiedades a mano y tres colores de texto
+                      distintos, y uno de los tres —--text-muted sobre el relleno del
+                      chip— daba 4.47 contra los 4.5 de §1.4.3. */}
                   {lead.raw_metadata?.profiles_needed ? (
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-primary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="chip">
                       💼 Requerimiento: <strong style={{ color: 'var(--text-primary)' }}>{lead.raw_metadata.profiles_needed}</strong>
                     </span>
                   ) : (
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sin perfiles específicos configurados.</span>
                   )}
                   {lead.raw_metadata?.urgency && (
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="chip">
                       ⏱️ Urgencia: {lead.raw_metadata.urgency}
                     </span>
                   )}
                   {lead.raw_metadata?.budget_range && (
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="chip">
                       💵 Presupuesto: {lead.raw_metadata.budget_range}
                     </span>
                   )}
                   {lead.raw_metadata?.work_modality && (
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="chip">
                       🏢 {lead.raw_metadata.work_modality}
                     </span>
                   )}
                   {lead.raw_metadata?.tags && (
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-chip)', color: 'var(--text-muted)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="chip">
                       🏷️ {lead.raw_metadata.tags}
                     </span>
                   )}
@@ -897,7 +896,7 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                 <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                   Diagnóstico y Explicabilidad con IA (XAI)
                 </h3>
-                <span className="badge" style={{ marginLeft: 'auto', background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+                <span className="badge badge-status" style={{ marginLeft: 'auto' }}>
                   {exp.engine === 'PluriOne_XAI_Engine' ? 'Motor XAI Institucional' : (exp.engine || 'Motor XAI Institucional')}
                 </span>
               </div>
@@ -1108,31 +1107,14 @@ export default function LeadDetailModal({ lead: initialLead, onClose, onLeadUpda
                   {cambioDeScore && (
                     <div
                       role="status"
-                      style={{
-                        padding: '8px 10px',
-                        marginBottom: '8px',
-                        background: 'var(--success-bg)',
-                        border: '1px solid var(--success-border)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: 'var(--success-text)',
-                        fontSize: '0.8rem',
-                      }}
+                      className="alert alert-ok"
+                      style={{ marginBottom: '8px' }}
                     >
                       Score: <strong style={{ fontFamily: 'var(--font-mono)' }}>{cambioDeScore}</strong>
                     </div>
                   )}
                   {errorDeActividad && (
-                    <div
-                      role="alert"
-                      style={{
-                        padding: '8px 10px',
-                        marginBottom: '8px',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: 'var(--error-text)',
-                        fontSize: '0.8rem',
-                      }}
-                    >
+                    <div role="alert" className="alert alert-error" style={{ marginBottom: '8px' }}>
                       {errorDeActividad}
                     </div>
                   )}

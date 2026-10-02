@@ -69,7 +69,7 @@ export default function Navbar({
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '500' }}>
                 Lead Scoring Enterprise
               </span>
-              <span className="badge" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)', fontSize: '0.65rem' }}>
+              <span className="badge badge-status" style={{ fontSize: '0.65rem' }}>
                 v1.0.0
               </span>
             </div>

@@ -94,8 +94,10 @@ export default function AsignarAsesor({ lead, onAsignado }) {
       >
         {guardando ? 'Asignando...' : 'Asignar'}
       </button>
+      {/* Era un `<span>` con un color y sin caja: el único aviso del panel que no tenía
+          forma de aviso. Desde el capítulo 43 la dibuja la hoja, como los demás. */}
       {error && (
-        <span role="alert" style={{ color: 'var(--error-text)' }}>{error}</span>
+        <span role="alert" className="alert alert-error">{error}</span>
       )}
     </div>
   );

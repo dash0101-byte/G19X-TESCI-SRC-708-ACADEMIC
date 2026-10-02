@@ -145,7 +145,7 @@ export default function Campana({ onSelectLead }) {
           </div>
 
           {error && (
-            <p role="alert" style={{ fontSize: '0.75rem', color: 'var(--error-text)', margin: '8px 0 0' }}>
+            <p role="alert" className="alert alert-error" style={{ margin: '8px 0 0' }}>
               {error}
             </p>
           )}

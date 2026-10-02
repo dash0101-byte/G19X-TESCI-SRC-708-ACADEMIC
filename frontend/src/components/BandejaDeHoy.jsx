@@ -200,17 +200,7 @@ export default function BandejaDeHoy({ onSelectLead, esDireccion = false }) {
       </div>
 
       {error && (
-        <div
-          role="alert"
-          style={{
-            padding: '8px 12px',
-            margin: '12px 0',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            color: 'var(--error-text)',
-            fontSize: '0.8rem',
-          }}
-        >
+        <div role="alert" className="alert alert-error" style={{ margin: '12px 0' }}>
           {error}
         </div>
       )}

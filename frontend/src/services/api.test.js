@@ -378,7 +378,13 @@ describe('traducción de errores de la API', () => {
     await expect(api.fetchLeads()).rejects.toThrow('Correo ya registrado');
   });
 
-  it('los errores de validación de Pydantic se leen campo a campo', async () => {
+  // El nombre de la columna ya no se escribe (capítulo 43)
+  // ------------------------------------------------------
+  // Esta función ponía `campo: mensaje` con el `campo` tal como viaja, que es el nombre de
+  // la columna: `company_size`, `nueva_contrasena`, `assigned_rep_id`. Las cuatro pantallas
+  // del capítulo 40 no lo veían porque reparten el 422 por campos antes de llegar aquí; las
+  // otras siete sí, y lo que lo escribía no estaba en ellas: estaba aquí, una vez.
+  it('los errores de validación de Pydantic llegan sin el nombre de la columna', async () => {
     fetchSimulado({
       '/leads': respuesta(422, {
         detail: [
@@ -388,8 +394,23 @@ describe('traducción de errores de la API', () => {
       }),
     });
     await expect(api.createLead({})).rejects.toThrow(
-      'email: no es un correo válido\ncompany_size: debe ser mayor que 0',
+      'no es un correo válido\ndebe ser mayor que 0',
     );
+  });
+
+  it('dos campos que fallan por lo mismo dicen una sola vez por qué', async () => {
+    // «Falta este campo.» repetido tres veces no dice qué tres campos faltan: dice tres
+    // veces lo mismo. Quien necesita saber cuál es el campo reparte el 422 por campos.
+    fetchSimulado({
+      '/leads': respuesta(422, {
+        detail: [
+          { loc: ['body', 'first_name'], msg: 'Field required' },
+          { loc: ['body', 'last_name'], msg: 'Field required' },
+          { loc: ['body', 'email'], msg: 'no es un correo válido' },
+        ],
+      }),
+    });
+    await expect(api.createLead({})).rejects.toThrow('Field required\nno es un correo válido');
   });
 
   it('«Value error,» no llega a la pantalla: es el nombre de la excepción, no el mensaje', async () => {
@@ -404,7 +425,42 @@ describe('traducción de errores de la API', () => {
       }),
     });
     await expect(api.enviarInteres('abc123', {})).rejects.toThrow(
-      'linkedin: El perfil tiene que ser una dirección de LinkedIn como https://www.linkedin.com/in/su-perfil',
+      'El perfil tiene que ser una dirección de LinkedIn como https://www.linkedin.com/in/su-perfil',
+    );
+  });
+
+  it('los motivos de una contraseña rechazada llegan todos, detrás del mensaje', async () => {
+    // El servidor manda la lista completa a propósito —su propio código lo explica: dar un
+    // motivo cada vez obliga a descubrir la política a base de intentos— y esta función se
+    // quedaba con el `mensaje` y tiraba la lista. En pantalla salía «La contraseña no
+    // cumple la política del sistema.» y nada que se pudiera corregir.
+    fetchSimulado({
+      '/auth/change-password': respuesta(422, {
+        detail: {
+          mensaje: 'La contraseña no cumple la política del sistema.',
+          motivos: [
+            'Debe tener al menos 12 caracteres.',
+            'Está en la lista de contraseñas filtradas: elija otra.',
+          ],
+        },
+      }),
+    });
+
+    await expect(api.changeOwnPassword('vieja', 'corta')).rejects.toThrow(
+      'La contraseña no cumple la política del sistema.\n'
+      + 'Debe tener al menos 12 caracteres.\n'
+      + 'Está en la lista de contraseñas filtradas: elija otra.',
+    );
+  });
+
+  it('un detalle estructurado sin motivos sigue siendo solo su mensaje', async () => {
+    fetchSimulado({
+      '/auth/change-password': respuesta(422, {
+        detail: { mensaje: 'La contraseña nueva no puede ser igual a la actual.' },
+      }),
+    });
+    await expect(api.changeOwnPassword('a', 'a')).rejects.toThrow(
+      'La contraseña nueva no puede ser igual a la actual.',
     );
   });
 

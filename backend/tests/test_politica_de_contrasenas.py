@@ -247,3 +247,95 @@ def test_el_endpoint_exige_estar_autenticado(client):
         json={"contrasena_actual": "x" * 12, "nueva_contrasena": "Girasol-Nocturno-31"},
     )
     assert respuesta.status_code == 401
+
+
+# ==============================================================================
+# La forma de cada rechazo, que es lo que la pantalla lee (capítulo 43)
+# ==============================================================================
+#
+# Las pruebas de arriba comprueban el código de estado y, en un caso, que el detalle lleve
+# `motivos`. Esta comprueba la **forma completa de las tres respuestas**, y existe porque el
+# cliente depende de ella de una manera que no se ve desde aquí.
+#
+# Ninguno de estos tres rechazos es un 422 de Pydantic, así que ninguno trae `loc`: son
+# `HTTPException` escritas en el endpoint. El panel necesita saber de qué campo habla cada
+# una para marcarlo y llevar el foco, y como no lo puede leer, lo sabe por el contrato:
+# `erroresDeLaContrasena` —en `frontend/src/components/erroresDeFormulario.js`— manda el 401
+# a la contraseña actual y el 422 a la nueva. Si alguien cambiara aquí un código o moviera
+# los motivos a otra clave, esa pantalla señalaría el campo equivocado o dejaría de enseñar
+# lo que falla, y nada de este lado se pondría rojo. Ahora sí.
+#
+# Y el motivo por el que esto no se descubrió antes vale la pena: la lista de `motivos`
+# **nunca llegó a la pantalla**. `parseApiError` se quedaba con el titular del detalle
+# estructurado y tiraba la lista, y las dos pruebas de cliente que decían comprobarlo
+# fabricaban el mensaje con los motivos ya dentro, una capa por debajo de donde estaba el
+# fallo. Las tres capas tienen hoy su prueba: aquí la forma, en `services/api.test.js` la
+# lectura, y en los dos formularios el reparto.
+
+def test_la_contrasena_actual_incorrecta_contesta_401_con_un_detalle_de_texto(
+    client, executive_headers
+):
+    respuesta = client.post(
+        CAMBIO,
+        headers=executive_headers,
+        json={"contrasena_actual": "loQueSea123!", "nueva_contrasena": "Girasol-Nocturno-31"},
+    )
+    assert respuesta.status_code == 401
+    detalle = respuesta.json()["detail"]
+    assert isinstance(detalle, str), "el cliente lo enseña tal cual: si fuera un objeto, no"
+    assert "actual" in detalle
+
+
+def test_la_politica_contesta_422_con_mensaje_y_motivos(client, executive_headers):
+    respuesta = client.post(
+        CAMBIO,
+        headers=executive_headers,
+        json={"contrasena_actual": TEST_PASSWORD, "nueva_contrasena": "plurione"},
+    )
+    assert respuesta.status_code == 422
+    detalle = respuesta.json()["detail"]
+    assert isinstance(detalle, dict)
+    # Las dos claves, con estos nombres: el cliente enseña el mensaje y, detrás, un renglón
+    # por motivo. Son los que explican qué hay que corregir.
+    assert isinstance(detalle["mensaje"], str) and detalle["mensaje"]
+    assert isinstance(detalle["motivos"], list) and detalle["motivos"]
+    assert all(isinstance(m, str) and m for m in detalle["motivos"])
+    # Y no trae `loc`: por eso el campo lo sabe el cliente y no lo lee.
+    assert "loc" not in detalle
+
+
+def test_repetir_la_misma_contesta_422_con_mensaje_y_sin_motivos(client, executive_headers):
+    respuesta = client.post(
+        CAMBIO,
+        headers=executive_headers,
+        json={"contrasena_actual": TEST_PASSWORD, "nueva_contrasena": TEST_PASSWORD},
+    )
+    assert respuesta.status_code == 422
+    detalle = respuesta.json()["detail"]
+    # Este llega como texto, no como objeto, y el cliente lo trata igual: un 422 de esta
+    # puerta habla de la contraseña nueva en los dos casos.
+    assert isinstance(detalle, str)
+    assert "igual a la actual" in detalle
+
+
+def test_el_restablecimiento_de_otra_cuenta_rechaza_con_la_misma_forma(
+    client, admin_headers, db_session
+):
+    """
+    El panel de administración fija la contraseña de otra persona por esta puerta.
+
+    Hasta el capítulo 43 la pedía con un `window.prompt` —en claro, sin repetición y sin
+    sitio donde enseñar estos motivos—. Ahora es un formulario de la página que los pone
+    debajo del campo, y para eso necesita que este rechazo tenga la misma forma que el otro.
+    """
+    usuario = _usuario(db_session, "Commercial_Executive")
+    respuesta = client.post(
+        f"/api/v1/users/{usuario.id}/reset-password",
+        headers=admin_headers,
+        json={"nueva_contrasena": "plurione"},
+    )
+    assert respuesta.status_code == 422
+    detalle = respuesta.json()["detail"]
+    assert isinstance(detalle, dict)
+    assert detalle["mensaje"]
+    assert detalle["motivos"]

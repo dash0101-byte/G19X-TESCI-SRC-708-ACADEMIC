@@ -95,25 +95,67 @@ describe('vincular', () => {
   });
 });
 
+// La confirmación de un borrado, dentro de la página (capítulo 43)
+// ----------------------------------------------------------------
+// Era un `window.confirm`, y lo que se comprobaba con él era que el `confirm` devolvía
+// `false` o `true`: un cuadro del navegador no se puede consultar, así que la prueba
+// hablaba con el doble en vez de con la pantalla. Ahora la pregunta está en el documento y
+// estas pruebas la leen y pulsan sus botones como lo haría cualquiera.
 describe('descartar', () => {
-  it('no borra nada si no se confirma', async () => {
+  it('pregunta antes de borrar, y no ha borrado nada mientras pregunta', async () => {
     const usuario = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<BandejaSinAsociar />);
 
     await usuario.click(await screen.findByRole('button', { name: 'Descartar' }));
 
+    expect(screen.getByText(/¿Descartar este aviso\?/)).toBeInTheDocument();
+    expect(descartarEventoSinAsociar).not.toHaveBeenCalled();
+  });
+
+  it('no borra nada si se cancela, y la pregunta se va', async () => {
+    const usuario = userEvent.setup();
+    render(<BandejaSinAsociar />);
+
+    await usuario.click(await screen.findByRole('button', { name: 'Descartar' }));
+    await usuario.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByText(/¿Descartar este aviso\?/)).not.toBeInTheDocument();
     expect(descartarEventoSinAsociar).not.toHaveBeenCalled();
   });
 
   it('borra el aviso confirmado y vuelve a cargar la bandeja', async () => {
     const usuario = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<BandejaSinAsociar />);
+
+    await usuario.click(await screen.findByRole('button', { name: 'Descartar' }));
+    await usuario.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+
+    expect(descartarEventoSinAsociar).toHaveBeenCalledWith(11);
+    await waitFor(() => expect(fetchEventosSinAsociar).toHaveBeenCalledTimes(2));
+  });
+
+  it('el foco acaba en el botón que confirma, que es lo que hacía el cuadro del navegador', async () => {
+    const usuario = userEvent.setup();
     render(<BandejaSinAsociar />);
 
     await usuario.click(await screen.findByRole('button', { name: 'Descartar' }));
 
-    expect(descartarEventoSinAsociar).toHaveBeenCalledWith(11);
-    await waitFor(() => expect(fetchEventosSinAsociar).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Sí, descartar' })).toHaveFocus();
+  });
+
+  it('nada de esta pantalla llama a un cuadro del navegador', async () => {
+    const usuario = userEvent.setup();
+    // En jsdom `window.confirm` existe y lanza «not implemented», que `userEvent` se come
+    // sin que nadie lo vea. El doble lo deja contado.
+    const cuadroDelNavegador = vi.fn(() => true);
+    vi.stubGlobal('confirm', cuadroDelNavegador);
+    vi.stubGlobal('alert', cuadroDelNavegador);
+    render(<BandejaSinAsociar />);
+
+    await usuario.click(await screen.findByRole('button', { name: 'Descartar' }));
+    await usuario.click(screen.getByRole('button', { name: 'Sí, descartar' }));
+
+    expect(cuadroDelNavegador).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
