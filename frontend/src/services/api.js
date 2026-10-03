@@ -1,3 +1,5 @@
+import { textoDelRenglon } from './rechazos';
+
 const API_BASE = '/api/v1';
 
 // ============================================================================
@@ -50,12 +52,6 @@ function clearSession() {
   refreshPromise = null;
 }
 
-// Pydantic antepone «Value error, » a lo que dice el validador: es el nombre interno de su
-// excepción y no significa nada para quien lo lee. En la página pública dejaba en pantalla
-// «linkedin: Value error, El perfil tiene que ser...» delante de una frase que ya estaba
-// escrita para leerse. Se quita el prefijo, no el mensaje.
-const RUIDO_DE_PYDANTIC = /^(Value error|Assertion failed),\s*/;
-
 /**
  * Los renglones de un 422, sin el nombre de la columna (capítulo 43).
  *
@@ -75,11 +71,22 @@ const RUIDO_DE_PYDANTIC = /^(Value error|Assertion failed),\s*/;
  *
  * Los repetidos se colapsan: dos campos que fallan por lo mismo producen el mismo renglón
  * —«Falta este campo.» dos veces— y repetirlo no añade información, solo ruido.
+ *
+ * Y en castellano, desde el capítulo 45. Esta función entregaba el `msg` de Pydantic tal
+ * cual: quitaba el prefijo —eso es lo que el 43 arregló— y dejaba el texto de la biblioteca,
+ * que está en inglés. Medido en los dos formularios del panel que no reparten su 422 por
+ * campos, **seis de nueve rechazos llegaban en inglés**: «Field required» al no elegir el
+ * tipo de una actividad, «Input should be a valid date or datetime» en la fecha de una
+ * reunión, la lista de las catorce claves del `enum` al mandar un tipo que no existe. Cinco
+ * de los seis eran de un tipo que `POR_TIPO` ya traducía desde el capítulo 40, para las
+ * cuatro pantallas que sí reparten. La traducción estaba escrita; no la veía quien la
+ * necesitaba, y por eso las dos constantes viven ya en `services/rechazos.js` en vez de
+ * estar copiadas en este archivo y en `components/erroresDeFormulario.js`.
  */
 function renglonesDelCuerpo(detalle) {
   const vistos = [];
   for (const item of detalle) {
-    const mensaje = String(item.msg || '').replace(RUIDO_DE_PYDANTIC, '');
+    const mensaje = textoDelRenglon(item);
     if (mensaje && !vistos.includes(mensaje)) vistos.push(mensaje);
   }
   return vistos.join('\n');

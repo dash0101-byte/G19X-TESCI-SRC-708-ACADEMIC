@@ -3,7 +3,105 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 44)
+**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 45)
+
+> **Revisión del capítulo 45.** La congelación se mantiene, y este capítulo la abrió **para
+> el punto 46 de §6.4 y para nada más**. El punto decía, de los validadores de modelo que
+> rechazan sin poder nombrar el campo: «**los dos** validan con `model_validator`». Todo lo
+> que afirmaba es verdad, incluida su observación fina de que el docstring del cierre dice lo
+> contrario de lo que hace. Lo que no era cierto es la cuenta: en los esquemas hay **cinco**,
+> y los tres que el punto no contaba son los de las **ediciones parciales** —el capítulo 33
+> escribió el primero y el 41 lo repartió a los otros dos, los dos después de que este punto
+> se escribiera—.
+>
+> **Y los tres que faltaban eran los únicos que tenían un defecto.** `PUT /users/{id}` con
+> `{"full_name": null}` contestaba «La cuenta no existe sin estos campos, así que no se pueden
+> dejar vacíos: **full_name**»: el nombre de la columna de la base dentro de una frase en
+> castellano. Es exactamente lo que el capítulo 43 le quitó a `parseApiError` —y lo quitó del
+> **prefijo**, que es donde una expresión regular lo alcanza; dentro de la frase no lo alcanza
+> nada—, y con `loc: ['body']` el cliente no puede repartir ese renglón por campos, así que
+> cae entero en el aviso de arriba con la columna dentro. El 43 cerró el punto 37 y esta línea
+> se quedó en pantalla.
+>
+> **Por qué estaba ahí, que es lo que vale.** Tres funciones más arriba, en el mismo archivo,
+> el capítulo 41 había escrito la regla: «el mensaje no dice qué campo es: lo dice el `loc` del
+> 422… repetir el nombre de la columna en el texto es lo que hacía que la pantalla dijera
+> `source`». Lo que nadie escribió es **qué hacer cuando no hay `loc`**. Un validador de modelo
+> ve el cuerpo entero y responde `loc: ['body']`, así que su autor hizo lo único que quedaba
+> —decirlo en el texto—, y las dos mitades no son evitables por separado. Una regla que no dice
+> qué hacer en el caso que no cumple su condición es una regla que ese caso incumple con razón.
+>
+> El arreglo separa las dos cosas que ese mensaje mezclaba: **la frase** dice qué pasa y se lee
+> sola —ya no termina en dos puntos y una lista—, y **los campos viajan en el `ctx`** del
+> renglón, que es dato estructurado y no prosa, como ya hacen el 409 del recálculo masivo y los
+> `motivos` de la política de contraseñas. El cliente los reparte debajo de cada campo con **la
+> etiqueta que esa pantalla tiene al lado de su `input`**, que es la decisión del 43: una tabla
+> de columna a etiqueta sería una segunda verdad. Y van nombres **del esquema** y no de la
+> tabla, aunque salgan de cruzar con `__table__`: `vacios_prohibidos` recorre
+> `model_fields_set`, así que lo que vuelve es lo que el cliente envió.
+>
+> **El `loc` no cambia, y eso es la mitad del punto que sigue abierta.** Pasar los cinco a
+> validadores de campo permitiría repartirlos por campos de verdad, y cambia lo que la API
+> contesta a un cliente que ya existe. El punto 46 queda **reescrito y partido**, no cerrado.
+>
+> **Lo que apareció al medirlo fue otra cosa, y más grande.** Los dos formularios del panel
+> que no reparten su 422 —el de actividad de la ficha 360 y el de cierre— tienen nueve
+> rechazos alcanzables, y **seis de los nueve llegaban en inglés**: «Field required», «Input
+> should be a valid datetime or date», la lista de las catorce claves del `enum`. Cinco de los
+> seis eran de un tipo que el cliente **ya sabía traducir** desde el capítulo 40, en una tabla
+> que usan las cuatro pantallas que reparten; la función que ve todas las demás entregaba el
+> `msg` de Pydantic tal cual. No faltaba la traducción: faltaba que la viera quien la
+> necesitaba. Y la razón de que se separaran es que esa tabla, junto con la expresión regular
+> del prefijo, estaba escrita **dos veces**, una en cada archivo, y la copia sin tabla era la
+> que lo veía todo. Las dos viven ya en `services/rechazos.js`.
+>
+> Derivado de las rutas: **diecisiete** esquemas son cuerpo de una petición y entre todos
+> pueden contestar **diecinueve** clases de rechazo, de las que la tabla cubría **once**. Los
+> ocho que faltaban no los provoca un formulario —son «lo que llegó no es de la clase del
+> campo», y un `<input>` manda siempre una cadena—, pero sí cualquier cliente de la API: la
+> tabla se escribió mirando lo que un formulario rompe. Más un noveno que es una errata con
+> forma: Pydantic nombra la conversión de fecha en **las dos direcciones** y la tabla tenía dos
+> de los tres nombres, así que la misma errata de teclado contestaba en castellano en la fecha
+> de un cierre y en inglés en la de una reunión, en el mismo panel.
+>
+> **Dos guardas nuevas, las dos derivadas y las dos con su propia cifra.** Una pregunta **a
+> Pydantic** por los validadores que va a ejecutar —no al texto del archivo: el de las
+> publicaciones lo heredan cuatro clases, así que contar por clase daría ocho donde hay
+> cinco— y comprueba que ninguno de los 152 nombres de columna aparece en la frase de ningún
+> `raise` de los esquemas. La otra deriva las puertas de las rutas, provoca los diecinueve
+> tipos, **lee la tabla del archivo del cliente** y exige que los cubra; vive en el servidor
+> porque la lista de tipos la decide quien los manda. El control **59** del CI vigila las dos
+> y, desde que el arnés lo demostró, también **sus umbrales**: bajar un `>= 5` a `>= 0` es la
+> forma en que una guarda deja de mirar sin dejar de existir. **25 defectos reintroducidos, 25
+> detectados.**
+>
+> Dos cosas que este capítulo encontró y no son suyas. **La red de los campos obligatorios no
+> atrapa ningún blanco**: medido campo a campo, de los quince que la alcanzan, el `null` llega
+> en catorce y el blanco en **cero** —a todos los atrapa antes su mínimo, su tipo o su
+> validador, y mejor, porque esos nombran el campo en el `loc`—. El capítulo 41 escribió en un
+> docstring que esa red «no depende de que cada campo se acuerde de declarar un mínimo», y en
+> el docstring de su propia prueba había escrito lo contrario y exacto. Se corrige la frase, no
+> el código: la red es para la columna obligatoria que alguien añada sin mínimo. Y **dos
+> pruebas de `api.test.js` tenían el inglés escrito como valor esperado** —`'Field required'`—
+> porque sus renglones del 422 no traían `type`, que es el único campo por el que se sabe de
+> qué clase de error se trata. Pasaban documentando el defecto. Es la forma del 43 y del 44 en
+> una capa más: un renglón del 422 escrito a mano no es la respuesta del servidor.
+>
+> Y una corrección del punto **45**, que el capítulo 43 escribió: decía que el simulador
+> era «el único de los formularios que quedan donde un rechazo por campo es alcanzable», y
+> el de actividad recibe tres tipos con el campo en su `loc`. El argumento del punto sigue
+> siendo bueno —un 422 sobre una lista cerrada que el propio desplegable ofrece es un fallo
+> de programación— y vale para los tres; lo que no era cierto es la exclusividad.
+>
+> Entran dos puntos nuevos, el **49** y el **50**: el reparto por campos de esos dos
+> formularios, que ya no es un problema de idioma sino de dónde cae el renglón, y el hueco del
+> tipo que la tabla no conozca, que sale como «No se admite este valor» —mejor que el inglés y
+> peor que una frase—.
+>
+> §6.4 pasa de **quince entradas abiertas de veintiocho a diecisiete de treinta**: el 46 se
+> reescribe y sigue abierto por su mitad de contrato, y entran la **49** y la **50**. Las
+> abiertas son hoy la 19, 20, 21, 23, 27, 28, 29, 34, 41, 42, 43, 45, 46, 47, 48, 49 y 50,
+> contadas leyendo la tabla.
 
 > **Revisión del capítulo 44.** La congelación se mantiene, y este capítulo la abrió **para
 > el punto 44 de §6.4 y para la mitad medible del punto 18 de §6.3**, y para nada más. El
@@ -1120,10 +1218,12 @@ defectos reintroducidos y 22 detectados.
 | 42 | **La atribución de una ficha no se puede corregir.** `LeadUpdate` no acepta `campaign_id`, y desde el capítulo 42 lo **rechaza** con su motivo en vez de responder 200 y no hacer nada. Una ficha dada de alta a mano con la publicación equivocada —o sin ninguna— se queda así, y el informe de rendimiento por campaña la cuenta donde está. Que se pueda cambiar es una frase nueva: ninguna pantalla la pide, y decidir si la atribución es un dato editable o es cómo llegó el prospecto es una decisión de producto, no una corrección | R40 §42.9 |
 | 43 | **El alta de una ficha contesta 400 y 409 para el mismo conflicto.** Cuando el correo repetido lo encuentra su comprobación, responde **400**; cuando lo encuentra la red del `IntegrityError` —la carrera—, responde **409**, que es lo que contesta la edición en los dos casos. Es la misma situación con dos códigos, y el 400 lleva ahí desde el capítulo 10. Cambiarlo es tocar lo que un cliente ya recibe sin corregir ningún dato | R40 §42.14 |
 | 44 | ~~**Los tres campos del cambio de contraseña se nombran con un `placeholder`.** No con una etiqueta: el marcador desaparece al escribir, así que quien vuelve al campo ya no sabe cuál es, y no es lo mismo que un `<label>` para quien navega con lector de pantalla. No es un incumplimiento claro de AA —el marcador da nombre accesible al campo— y ponerles etiqueta cambia la maquetación de un modal, así que no entró con el capítulo que sí les dio la clase de la hoja y el reparto de su error~~ — **cerrado en el capítulo 44**, y el punto era correcto en todo, incluido lo que parecía su parte débil. Al montar ese panel en la auditoría, `axe` da **cero infracciones**: un marcador sí da nombre accesible, así que ningún motor se queja de un nombre que se va en cuanto se usa el campo. Son tres cajas de contraseña seguidas, idénticas en cuanto hay algo escrito —una fila de puntos—, y con el marcador como único nombre quien vuelve a la segunda no puede saber si es la nueva o la repetición. Las tres llevan ya su `<label>` con la clase que la hoja define, no un `style` nuevo, y el marcador se queda solo donde dice algo que la etiqueta no dice: «Mínimo 12 caracteres». Sus pruebas dejan de buscar los campos por el marcador y los buscan por su etiqueta, con una nueva que comprueba lo que el punto describía: que el nombre **sigue ahí con el campo lleno** (R42 §44.8) | R41 §43.12 |
-| 45 | **El simulador de scoring no reparte su 422 por campos.** Es el único de los formularios que quedan donde un rechazo por campo es alcanzable —veintisiete campos en el cuerpo—, y todos sus valores salen de deslizadores y listas cerradas, así que un 422 ahí es un fallo de programación y no un dato mal escrito. Con el nombre de la columna ya fuera, lo que se ve es el mensaje del servidor; repartir veintisiete campos para eso es trabajo sin ningún número que corregir | R41 §43.12 |
-| 46 | **El cierre de un prospecto y el registro de una actividad rechazan sin nombrar el campo.** Los dos validan con `model_validator(mode="after")`, así que su 422 lleva `loc: ['body']` y nunca puede señalar un campo —el docstring del cierre dice lo contrario, «la convierte en un 422 que señala el campo», y no es cierto para un validador de modelo—. Pasarlos a validadores de campo permitiría repartirlos en la pantalla, y cambia lo que la API contesta a un cliente que ya existe | R41 §43.10, §43.12 |
+| 45 | **El simulador de scoring no reparte su 422 por campos.** Es el formulario con más campos en el cuerpo —veintisiete—, y todos sus valores salen de deslizadores y listas cerradas, así que un 422 ahí es un fallo de programación y no un dato mal escrito. Con el nombre de la columna ya fuera, lo que se ve es el mensaje del servidor; repartir veintisiete campos para eso es trabajo sin ningún número que corregir. **Este punto decía «el único de los formularios que quedan donde un rechazo por campo es alcanzable» y no es cierto**: el de actividad de la ficha 360 recibe `missing`, `enum` y `string_too_long` con el campo en su `loc`, y el de cierre también podría si sus validadores dejaran de ser de modelo. Son los del punto 49, y el argumento de este punto —que un 422 ahí no es un dato mal escrito— es el que vale para los tres (R43 §45.7) | R41 §43.12 |
+| 46 | **Los cinco validadores de modelo rechazan sin poder nombrar el campo, y pasarlos a validadores de campo cambia el contrato.** El punto decía «los **dos**» —el cierre de un prospecto y el registro de una actividad— y en los esquemas hay **cinco**: los tres que faltaban son los de las ediciones parciales, que el capítulo 33 escribió para una tabla y el 41 repartió a las otras dos, los dos **después** de que este punto se escribiera. Un `model_validator(mode="after")` ve el cuerpo entero y responde `loc: ['body']`, así que su 422 no cabe debajo de ningún campo —y el docstring del cierre dice lo contrario, «la convierte en un 422 que señala el campo», que no es cierto para un validador de modelo—. **La mitad que era una corrección se cerró en el capítulo 45**: los tres de las ediciones parciales escribían el nombre de la columna de la base **dentro de la frase** —«no se pueden dejar vacíos: `full_name`»—, que es lo que el 43 le quitó a `parseApiError` del prefijo y dentro de la frase no alcanza ninguna expresión regular; ahora la frase se lee sola y los campos viajan en el `ctx`, donde el cliente los reparte con la etiqueta de cada pantalla (R43 §45.5, §45.6). **Lo que sigue abierto es el `loc`**: moverlo a `['body', 'campo']` permitiría repartir también los otros dos —que no tienen el defecto del nombre, porque nombran su campo en castellano y entre comillas— y es un cambio en lo que la API contesta a un cliente que ya existe, no una corrección | R41 §43.10, §43.12 · R43 §45.4 |
 | 47 | **El recorrido con teclado mira 2 de las 18 pantallas, y los anuncios a un lector de pantalla 5.** La auditoría con `axe` pasa desde el capítulo 44 por las dieciocho que llevan controles, y su lista sale del código; las otras dos suites de accesibilidad siguen tomando la suya a mano, y son las que miden lo que `axe` no puede: el **orden real del foco** al tabular y si lo que falla **llega** a un lector de pantalla. No se derivan del código como la de `axe` porque cada pantalla tiene su propio orden esperado y hay que escribirlo —trece recorridos es más trabajo que el capítulo entero—. Lo que sí es cierto es que lo estructural ya lo mira un motor en todas | R42 §44.13 |
 | 48 | **Cuarenta y ocho etiquetas escriben a mano un estilo que la hoja ya define.** En diez componentes, mientras `.form-label` existe en `index.css` y ocho la usan. Es la misma forma que el punto 37 que cerró el capítulo 43 —la hoja lo tiene y el marcado lo reescribe—, una planta más abajo, y **no** es un incumplimiento: ninguna de esas etiquetas forma un par de colores sin medir, porque ninguna escribe su propio fondo. Lo que hay es un tamaño y un color que dependen del archivo, con `--text-muted` en unas y `--text-secondary` en otras, y unificarlo toca diez componentes sin corregir ningún número | R42 §44.15 |
+| 49 | **El formulario de actividad y el de cierre no reparten su 422 por campos.** Son los dos del panel que no lo hacen, y desde el capítulo 45 ya **no** es un problema de idioma —los seis de nueve rechazos que llegaban en inglés llegan en castellano— sino de **dónde cae el renglón**: en el aviso de arriba y no debajo de su campo. Repartiría poco: los dos tienen pocos campos y casi todos sus rechazos son de listas cerradas que el propio desplegable ofrece, así que un 422 ahí es un fallo de programación y no un dato mal escrito —el mismo argumento que el punto 45—. Y el del cierre depende de la mitad abierta del punto 46, porque todos sus rechazos salen de un validador de modelo | R43 §45.7, §45.14 |
+| 50 | **Un tipo de rechazo que la tabla del cliente no conozca sale como «No se admite este valor».** Mejor que el inglés y peor que una frase. La tabla cubre hoy los diecinueve tipos que las diecisiete puertas con cuerpo pueden contestar, y `test_lo_que_el_cliente_sabe_decir_de_un_rechazo.py` los deriva de los esquemas y exige que los cubra, así que el hueco no se puede llenar en silencio: un tipo nuevo nace en rojo. Lo que no tiene arreglo sin una segunda fuente de verdad es que el cliente diga algo sensato de un tipo que nadie ha visto todavía | R43 §45.9, §45.14 |
 
 ---
 

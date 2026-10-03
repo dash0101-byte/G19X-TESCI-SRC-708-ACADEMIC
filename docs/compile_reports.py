@@ -119,6 +119,13 @@ REPORT_FILES = [
     # lo admite —con una prueba verde encima que lo buscaba por ese nombre— y dos pantallas
     # enteras fuera de toda región. El defecto seguía la lista.
     ("Reporte_42_Las_Pantallas_que_Nadie_Auditaba_Tres_Deslizadores_sin_Nombre_el_Selector_que_Cambia_Permisos_y_Dos_Pantallas_Fuera_de_Toda_Region.md", "Capítulo 44: Las Pantallas que Nadie Auditaba — Tres Deslizadores sin Nombre, el Selector que Cambia Permisos y Dos Pantallas Fuera de Toda Región"),
+    # El capítulo 45 abre el punto 46 de §6.4, y lo que encuentra es que el punto —que
+    # describía con precisión por qué un validador de modelo no puede señalar un campo—
+    # contaba dos de cinco. Los tres que no contaba escribían el nombre de la columna de la
+    # base dentro de una frase en castellano, que es lo que el 43 había quitado del prefijo.
+    # Tercera vez seguida que una medición correcta descansa en un inventario escrito a mano,
+    # y la primera en que el inventario es un punto de la propia deuda técnica.
+    ("Reporte_43_El_Campo_que_el_Servidor_Nombraba_en_Ingles_Un_Punto_que_Contaba_Dos_de_Cinco_y_Seis_de_Nueve_Rechazos_sin_Traducir.md", "Capítulo 45: El Campo que el Servidor Nombraba en Inglés — Un Punto que Contaba Dos de Cinco y Seis de Nueve Rechazos sin Traducir"),
 ]
 
 

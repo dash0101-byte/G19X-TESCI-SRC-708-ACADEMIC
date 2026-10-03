@@ -9,6 +9,7 @@ from app.core.texto import (
     ENTRADA_DE_TEXTO,
     campos_sin_los_que_no_existe,
     exigir_texto,
+    rechazo_de_vacios,
     texto_o_nada,
     vacios_prohibidos,
 )
@@ -234,14 +235,18 @@ class LeadUpdate(BaseModel):
         intactos. Para la mayoría de los campos el recorte del `model_config` y el `min_length`
         ya lo resuelven antes de llegar aquí; esto es la red que no depende de que cada campo
         se acuerde de declarar un mínimo.
+
+        El capítulo 45 midió esa última frase y es más débil de lo que suena: de los **seis**
+        campos de esta entrada que la tabla declara obligatorios, un blanco no llega a esta
+        red en **ninguno** —los dos nombres tienen `min_length`, `email` lo rechaza su tipo,
+        las dos listas cerradas su enumeración y `source` su propio validador—. Lo que esta
+        red atrapa de verdad es el `null` explícito, en cinco de los seis; el blanco lo
+        atrapa siempre alguien antes, y mejor, porque quien lo atrapa **sí nombra el campo
+        en `loc`**. La red no sobra: lo que no es cierto es que haga falta por los blancos.
         """
         prohibidos = vacios_prohibidos(self, CAMPOS_QUE_NO_ADMITEN_VACIO)
         if prohibidos:
-            raise ValueError(
-                "La ficha no existe sin estos campos, así que no se pueden dejar vacíos: "
-                + ", ".join(prohibidos)
-                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
-            )
+            raise rechazo_de_vacios("La ficha", prohibidos)
         return self
 
 

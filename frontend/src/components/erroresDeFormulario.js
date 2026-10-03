@@ -34,51 +34,41 @@
 // componente y además funciones rompe la recarga en caliente de Vite, y el `linter` lo
 // dice. Las dos mitades comparten `idDelMensaje`, que es la que importa que no se separe.
 
-/**
- * Pydantic antepone «Value error, » a lo que dice un validador propio.
- *
- * Es el nombre interno de su excepción y no significa nada para quien lo lee, pero sirve
- * para algo mejor que quitarlo: **distingue nuestros mensajes de los suyos**. Un
- * `value_error` con este prefijo lo escribió alguien de este repositorio, en castellano y
- * para leerse —«El teléfono no es un número válido: revise la lada…»—. Uno sin prefijo
- * viene de una biblioteca y está en inglés —«value is not a valid email address»—.
- */
-const RUIDO_DE_PYDANTIC = /^(Value error|Assertion failed),\s*/;
+// Las dos constantes que dicen cómo se lee un rechazo del servidor —el prefijo de Pydantic y
+// la tabla por tipo del capítulo 40— viven desde el 45 en `services/rechazos.js`. Estaban
+// escritas aquí y otra vez en `api.js`, y la copia de allí no tenía la tabla: seis de nueve
+// rechazos de los dos formularios que no reparten llegaban en inglés, con la traducción ya
+// escrita en este archivo.
+import { POR_TIPO, RUIDO_DE_PYDANTIC } from '../services/rechazos';
 
-/**
- * Lo que se dice de cada clase de error, por el `type` que manda Pydantic y no por su
- * texto en inglés.
- *
- * Por el tipo y no por el texto porque el texto es de ellos: cambia entre versiones, y una
- * tabla que compare cadenas en inglés se queda muda en la primera actualización sin que
- * ninguna prueba lo note. El tipo es parte del contrato de la API.
- */
-export const POR_TIPO = {
-  missing: () => 'Falta este campo.',
-  string_too_short: (item) => (item.ctx && item.ctx.min_length
-    ? `Tiene que tener al menos ${item.ctx.min_length} caracteres.`
-    : 'Es demasiado corto.'),
-  string_too_long: (item) => (item.ctx && item.ctx.max_length
-    ? `No puede pasar de ${item.ctx.max_length} caracteres.`
-    : 'Es demasiado largo.'),
-  string_pattern_mismatch: () => 'No tiene la forma que se espera.',
-  greater_than_equal: (item) => `Tiene que ser ${item.ctx.ge} o más.`,
-  less_than_equal: (item) => `Tiene que ser ${item.ctx.le} o menos.`,
-  int_parsing: () => 'Escriba un número entero.',
-  float_parsing: () => 'Escriba un número.',
-  bool_parsing: () => 'Tiene que ser sí o no.',
-  enum: () => 'Elija una de las opciones de la lista.',
-  literal_error: () => 'Elija una de las opciones de la lista.',
-  date_from_datetime_parsing: () => 'Escriba una fecha válida.',
-  datetime_parsing: () => 'Escriba una fecha válida.',
-  url_parsing: () => 'Escriba una dirección web completa, con https://.',
-  extra_forbidden: () => 'Este dato no se admite aquí.',
-};
+export { POR_TIPO };
 
 /** El último tramo de `loc`: `['body', 'email']` → `email`. */
 function campoDe(item) {
   if (!Array.isArray(item.loc) || !item.loc.length) return null;
   return String(item.loc[item.loc.length - 1]);
+}
+
+/**
+ * De qué campos habla un renglón que no puede señalarlos con su `loc` (capítulo 45).
+ *
+ * Un `model_validator` de Pydantic responde `loc: ['body']`: ve el cuerpo entero y no un
+ * campo, así que su rechazo no cabe debajo de ninguno. Los tres del servidor que comprueban
+ * los campos sin los que una fila no existe mandan la lista en `ctx.campos` —dato
+ * estructurado, no prosa— precisamente para que sí quepa.
+ *
+ * Y mandan **nombres de campo**, no nombres de columna: lo que el servidor devuelve ahí es lo
+ * que el cliente le envió. Por eso se pueden cruzar con los campos de la pantalla sin
+ * ninguna tabla de traducción, que es lo que el capítulo 43 decidió no escribir.
+ *
+ * Se devuelve `null` —y no una lista vacía— cuando el renglón no trae campos, para que quien
+ * pregunta distinga «no habla de ningún campo» de «habla de estos».
+ */
+function camposDelContexto(item) {
+  const campos = item && item.ctx && item.ctx.campos;
+  if (!Array.isArray(campos)) return null;
+  const limpios = campos.filter((c) => typeof c === 'string' && c);
+  return limpios.length ? limpios : null;
 }
 
 /**
@@ -121,6 +111,12 @@ export function mensajeDelRenglon(item, propios = {}) {
  * que no está en la pantalla no se puede señalar en la pantalla, y dejarlo en el reparto lo
  * haría desaparecer. Esos se devuelven aparte, en `sueltos`, para que el aviso de arriba
  * los diga. Es la diferencia entre repartir y perder.
+ *
+ * Desde el capítulo 45 hay dos maneras de saber de qué campo habla un renglón: su `loc`, y
+ * —cuando el `loc` dice `body` porque lo escribió un validador de modelo— la lista de
+ * `ctx.campos`. Un renglón de esos se reparte entre **todos** los campos que nombra, con la
+ * frase corta de su tipo debajo de cada uno; si la pantalla no pinta ninguno, al aviso de
+ * arriba va la frase larga del servidor, que se lee sola.
  */
 export function erroresDelServidor(detalle, { propios = {}, campos = null, renombres = {} } = {}) {
   if (!Array.isArray(detalle)) return null;
@@ -131,9 +127,30 @@ export function erroresDelServidor(detalle, { propios = {}, campos = null, renom
     // mismo: el formulario de publicaciones tiene un campo «fecha de cierre» que el
     // servidor conoce como `end_date`, y sin la traducción el error de esa fecha acabaría
     // en el aviso de arriba —o peor, en ningún sitio— en vez de debajo de su campo.
-    const bruto = campoDe(item);
-    const campo = bruto && renombres[bruto] ? renombres[bruto] : bruto;
+    const traducir = (nombre) => (nombre && renombres[nombre] ? renombres[nombre] : nombre);
     const mensaje = mensajeDelRenglon(item, propios);
+
+    // Un renglón que trae sus campos en el `ctx` habla de varios a la vez, y se reparte
+    // entre todos (capítulo 45). Los que esta pantalla no pinta no se pierden: el aviso de
+    // arriba dice **la frase del servidor**, que es la larga y no nombra ninguna columna. La
+    // corta —«No puede quedar vacío»— solo tiene sentido debajo de un campo.
+    const delContexto = camposDelContexto(item);
+    if (delContexto) {
+      let alguno = false;
+      for (const bruto of delContexto) {
+        const campo = traducir(bruto);
+        if (campos && !campos.includes(campo)) continue;
+        // Sigue mandando la regla 1 de `mensajeDelRenglon`: si la pantalla tiene su propia
+        // frase para ese campo, esa. Aquí hay que repetirla porque el `loc` de este renglón
+        // dice `body`, así que esa función no puede saber de qué campo se trata.
+        if (!porCampo[campo]) porCampo[campo] = propios[campo] || mensaje;
+        alguno = true;
+      }
+      if (!alguno) sueltos.push(String(item.msg || mensaje));
+      continue;
+    }
+
+    const campo = traducir(campoDe(item));
     if (!campo || (campos && !campos.includes(campo))) {
       sueltos.push(mensaje);
       continue;

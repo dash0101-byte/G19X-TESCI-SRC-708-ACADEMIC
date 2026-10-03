@@ -39,6 +39,7 @@ from typing import Annotated, Any, FrozenSet, List, Optional
 
 import sqlalchemy as sa
 from pydantic import ConfigDict, StringConstraints
+from pydantic_core import PydanticCustomError
 
 # La configuración que lleva **toda** entrada con texto. Recorta antes de medir, que es la
 # mitad del arreglo; la otra mitad es que la lleven todas.
@@ -166,4 +167,50 @@ def vacios_prohibidos(enviados: Any, obligatorios: FrozenSet[str]) -> List[str]:
         campo
         for campo in enviados.model_fields_set
         if campo in obligatorios and en_blanco(getattr(enviados, campo, None))
+    )
+
+
+def rechazo_de_vacios(sujeto: str, campos: List[str]) -> PydanticCustomError:
+    """
+    El rechazo de los campos que la fila no admite vacíos, sin escribir su nombre en la frase.
+
+    Lo que corrige el capítulo 45. Los tres validadores de modelo que usan `vacios_prohibidos`
+    construían el mensaje uniendo la lista con comas, así que en la pantalla salía «no se
+    pueden dejar vacíos: **full_name**»: el nombre de la columna de la base, en una frase en
+    castellano. Es lo que el capítulo 43 le quitó a `parseApiError` —y lo quitó del prefijo,
+    que es donde una expresión regular alcanza; dentro de la frase no lo alcanza nada—.
+
+    La regla estaba escrita tres líneas más arriba, en `exigir_texto`, desde el 41: «el
+    mensaje no dice qué campo es: lo dice el `loc` del 422». Lo que no estaba escrito es qué
+    hacer cuando **no hay `loc`**. Un validador de modelo responde `loc: ['body']` y no puede
+    señalar un campo, así que su autor hizo lo único que quedaba —decirlo en el texto— y
+    ninguna de las dos mitades es evitable por separado.
+
+    Lo que se hace es separar las dos cosas que ese mensaje mezclaba:
+
+    * **La frase** dice qué pasa, y se lee sola: ya no termina en dos puntos y una lista.
+    * **Los campos** viajan en el `ctx` del renglón, que es dato estructurado y no prosa. El
+      cliente los reparte debajo de cada campo con **la etiqueta que esa pantalla tiene al
+      lado de su `input`**, que es la decisión del 43: una tabla de columna a etiqueta en el
+      cliente sería una segunda verdad sobre cómo se llama cada campo.
+
+    Los nombres que van en `ctx` son nombres **del esquema** y no de la tabla, aunque salgan
+    de cruzar con `__table__`: `vacios_prohibidos` recorre `model_fields_set`, así que lo que
+    devuelve es siempre un campo que el cliente envió. Esa es la razón de que se le puedan
+    dar: no se le está contando la forma de la base, se le está devolviendo lo que mandó.
+
+    `loc` no cambia —sigue siendo `['body']`—, y eso es a propósito: el punto 46 de §6.4
+    advierte que pasar estos validadores a validadores de campo cambia lo que la API contesta
+    a un cliente que ya existe, y esa mitad del punto sigue abierta. El `type` sí cambia, de
+    `value_error` al nombre de arriba, y es lo que el cliente mira: un tipo es parte del
+    contrato y una cadena en castellano no.
+    """
+    return PydanticCustomError(
+        "campos_vacios_prohibidos",
+        # Sin el nombre de los campos y sin los dos puntos: la frase tiene que poder leerse
+        # entera en el aviso de arriba de una pantalla que no reparta por campos, y ahí no
+        # hay nada que la complete.
+        f"{sujeto} no existe sin alguno de los campos que llegaron vacíos. Envíe un valor, "
+        "o no envíe el campo si no quiere cambiarlo.",
+        {"campos": list(campos)},
     )

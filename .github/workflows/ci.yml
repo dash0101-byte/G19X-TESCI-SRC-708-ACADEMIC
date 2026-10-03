@@ -5009,6 +5009,252 @@ jobs:
           print("apagadas salvo el contraste, que se mide sobre la paleta.")
           PY
 
+      # ------------------------------------------------------------------ control 59
+      # Ningun rechazo del servidor nombra una columna de la base ni llega en ingles.
+      #
+      # `PUT /users/{id}` con `{"full_name": null}` contestaba, en castellano:
+      #
+      #     La cuenta no existe sin estos campos, asi que no se pueden dejar vacios:
+      #     full_name. Envie un valor, o no envie el campo si no quiere cambiarlo.
+      #
+      # El capitulo 43 le quito el nombre de la columna a `parseApiError` -y lo quito del
+      # PREFIJO, que es donde una expresion regular lo alcanza-. Estos tres mensajes lo
+      # escriben DENTRO de la frase, y con `loc: ['body']` el cliente no puede repartirlos
+      # por campos: caen enteros en el aviso de arriba.
+      #
+      # §6.4 punto 46 contaba DOS validadores de modelo y en los esquemas hay CINCO. Los
+      # tres que no contaba son los de las ediciones parciales -el 33 escribio el primero,
+      # el 41 lo repartio a las otras dos- y son justo los tres que nombraban la columna.
+      # Tercera vez seguida que una observacion correcta descansa sobre un inventario
+      # escrito a mano, y tercera vez que el defecto sigue a la lista.
+      #
+      # Lo que se midio al arreglarlo: de los 19 tipos de rechazo que las 17 puertas con
+      # cuerpo pueden contestar, la tabla del cliente traducia ONCE. Los ocho que faltaban
+      # no los ve un formulario -son «lo que llego no es de la clase del campo», y un
+      # `<input>` manda siempre una cadena-, pero si cualquier cliente de la API. Y la
+      # funcion que ve todas las pantallas que NO reparten su 422 por campos no consultaba
+      # esa tabla: seis de nueve rechazos de los dos formularios del panel que no reparten
+      # llegaban en ingles, con la traduccion ya escrita en el otro archivo.
+      - name: Ningun rechazo nombra una columna ni llega en ingles
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import pathlib
+          import re
+          import sys
+
+          TEXTO = pathlib.Path("backend/app/core/texto.py")
+          ESQUEMAS = pathlib.Path("backend/app/schemas")
+          RECHAZOS = pathlib.Path("frontend/src/services/rechazos.js")
+          API = pathlib.Path("frontend/src/services/api.js")
+          REPARTO = pathlib.Path("frontend/src/components/erroresDeFormulario.js")
+          GUARDAS = [
+              pathlib.Path("backend/tests/test_el_nombre_de_la_columna_no_viaja_en_la_frase.py"),
+              pathlib.Path("backend/tests/test_lo_que_el_cliente_sabe_decir_de_un_rechazo.py"),
+          ]
+
+          for ruta in [TEXTO, RECHAZOS, API, REPARTO, *GUARDAS]:
+              if not ruta.exists():
+                  sys.exit(f"FALLO: desaparecio {ruta.as_posix()}.")
+
+          # Las lecturas van SIN comentarios, y es la leccion del control 58: alli esta
+          # comprobacion encontro tres veces su propia respuesta en el comentario que
+          # explicaba por que la respuesta tenia que estar. Aqui pasaria igual: el docstring
+          # de `rechazo_de_vacios` cita el mensaje viejo entero, con `full_name` dentro.
+          def sin_comentarios_py(codigo):
+              codigo = re.sub(r'"""[\s\S]*?"""', '""', codigo)
+              return re.sub(r"^\s*#.*$", "", codigo, flags=re.M)
+
+          def sin_comentarios_js(codigo):
+              codigo = re.sub(r"/\*[\s\S]*?\*/", "", codigo)
+              return re.sub(r"^\s*//.*$", "", codigo, flags=re.M)
+
+          texto = sin_comentarios_py(TEXTO.read_text(encoding="utf-8"))
+          rechazos = sin_comentarios_js(RECHAZOS.read_text(encoding="utf-8"))
+          api = sin_comentarios_js(API.read_text(encoding="utf-8"))
+          reparto = sin_comentarios_js(REPARTO.read_text(encoding="utf-8"))
+          fallos = []
+
+          # 1. El rechazo compartido existe, levanta un error con TIPO -no un ValueError, que
+          #    no puede llevar contexto- y su frase no interpola ninguna lista de campos.
+          if "def rechazo_de_vacios(" not in texto:
+              fallos.append("app/core/texto.py ya no tiene rechazo_de_vacios")
+          else:
+              cuerpo = texto[texto.index("def rechazo_de_vacios("):]
+              cuerpo = cuerpo[: cuerpo.index("\n\n\n")] if "\n\n\n" in cuerpo else cuerpo
+              if "PydanticCustomError" not in cuerpo:
+                  fallos.append(
+                      "rechazo_de_vacios ya no levanta un PydanticCustomError: un ValueError "
+                      "no puede llevar los campos en el contexto, y entonces el unico sitio "
+                      "donde caben es la frase"
+                  )
+              if '"campos_vacios_prohibidos"' not in cuerpo:
+                  fallos.append("el tipo del rechazo ya no es campos_vacios_prohibidos")
+              # La forma exacta del defecto: unir la lista de campos y meterla en el texto.
+              trozo_del_mensaje = cuerpo[cuerpo.index("PydanticCustomError"):]
+              for forma in ('", ".join(campos)', "{campos}", "', '.join(campos)"):
+                  if forma in trozo_del_mensaje:
+                      fallos.append(
+                          f"la frase del rechazo vuelve a escribir los campos ({forma}): "
+                          "eso es el nombre de la columna de la base en una frase en castellano"
+                      )
+
+          # 2. Los tres validadores de modelo de las ediciones parciales usan ese rechazo.
+          #    Se cuentan los que LLAMAN a `vacios_prohibidos(`, que es lo que los define, y
+          #    no los que estan en una lista escrita aqui.
+          con_la_red = []
+          for ruta in sorted(ESQUEMAS.glob("*.py")):
+              codigo = sin_comentarios_py(ruta.read_text(encoding="utf-8"))
+              if "vacios_prohibidos(self" not in codigo:
+                  continue
+              for trozo in codigo.split("vacios_prohibidos(self")[1:]:
+                  siguiente = trozo[:400]
+                  con_la_red.append((ruta.name, siguiente))
+                  if "rechazo_de_vacios(" not in siguiente:
+                      fallos.append(
+                          f"{ruta.name}: un validador comprueba los campos obligatorios y no "
+                          f"usa rechazo_de_vacios; su 422 vuelve a no poder repartirse"
+                      )
+          if len(con_la_red) != 3:
+              sys.exit(
+                  f"FALLO: el barrido encontro {len(con_la_red)} validadores de los campos "
+                  f"obligatorios y son tres. La comprobacion esta mirando donde no es."
+              )
+
+          # 3. La tabla del cliente, con su cuenta. Vive en UN archivo: la copia que `api.js`
+          #    tenia es la razon de que la mitad de las pantallas no la viera.
+          claves = re.findall(r"^\s{2}([a-z_]+):", rechazos, re.M)
+          if len(claves) < 25:
+              fallos.append(
+                  f"la tabla de tipos del cliente trae {len(claves)} entradas y eran 25: "
+                  "un tipo sin frase se enseña en ingles o no se enseña"
+              )
+          if "campos_vacios_prohibidos" not in claves:
+              fallos.append("la tabla no sabe que decir del rechazo de los campos vacios")
+          if "TIPOS_PROPIOS" not in rechazos or "campos_vacios_prohibidos" not in rechazos:
+              fallos.append(
+                  "rechazos.js ya no distingue los mensajes propios: el aviso de arriba "
+                  "enseñaria la frase corta -«No puede quedar vacio»- sin decir de que"
+              )
+          for ruta, codigo, quien in ((API, api, "api.js"), (REPARTO, reparto, "erroresDeFormulario.js")):
+              if re.search(r"^\s*const POR_TIPO\s*=", codigo, re.M):
+                  fallos.append(f"{quien} vuelve a declarar su propia tabla de tipos")
+              if re.search(r"^\s*const RUIDO_DE_PYDANTIC\s*=", codigo, re.M):
+                  fallos.append(f"{quien} vuelve a declarar su propio prefijo de Pydantic")
+
+          # 4. Y quien veia el ingles la USA. Se comprueba la llamada y no el nombre: dejar
+          #    el `import` y volver a `item.msg` deja la palabra en el archivo y la pantalla
+          #    en ingles. Es la memoria del capitulo 38, que el 44 volvio a necesitar.
+          if "textoDelRenglon(item)" not in api:
+              fallos.append(
+                  "api.js ya no traduce los renglones del 422: lo que llegue a las pantallas "
+                  "que no reparten por campos sera el texto de Pydantic, en ingles"
+              )
+          if "camposDelContexto(item)" not in reparto:
+              fallos.append(
+                  "el reparto por campos ya no lee ctx.campos: un rechazo con loc ['body'] "
+                  "volveria entero al aviso de arriba"
+              )
+
+          # 5. Las dos guardas siguen derivando sus listas en vez de escribirlas.
+          derivaciones = {
+              GUARDAS[0]: ("_validadores_de_modelo(", "_campos_alcanzables("),
+              GUARDAS[1]: ("_esquemas_de_cuerpo(", "_tabla_del_cliente("),
+          }
+          for ruta, piezas in derivaciones.items():
+              codigo = sin_comentarios_py(ruta.read_text(encoding="utf-8"))
+              for pieza in piezas:
+                  if codigo.count(pieza) < 2:
+                      fallos.append(
+                          f"{ruta.name}: {pieza} ya no se usa; esa lista volvio a estar escrita"
+                      )
+
+          #    Y siguen comprobandose a si mismas. Esto lo añadio el arnes: con lo anterior
+          #    solo, cambiar `validadores = _validadores_de_modelo()` por `validadores = {}`
+          #    deja la funcion usada en otra prueba del mismo archivo, la afirmacion comparando
+          #    un diccionario vacio con una lista, y las dos cosas en verde. Un umbral que baja
+          #    a cero es la forma en que una guarda deja de mirar sin dejar de existir, y es el
+          #    capitulo 44 otra vez: lo que delata una lista corta no es el verde, es la cifra.
+          AUTOCOMPROBACIONES = {
+              GUARDAS[0]: [
+                  "assert sorted(validadores) == [",
+                  "assert len(_validadores_de_modelo()) >= 5",
+                  "assert len(_nombres_de_columna()) > 100",
+                  "assert alcanzables >= 14",
+              ],
+              GUARDAS[1]: [
+                  "assert len(tabla) >= 19",
+                  "assert len(esquemas) == 17",
+                  "assert len(tipos) >= 19",
+              ],
+          }
+          for ruta, afirmaciones in AUTOCOMPROBACIONES.items():
+              codigo = sin_comentarios_py(ruta.read_text(encoding="utf-8"))
+              for afirmacion in afirmaciones:
+                  if afirmacion not in codigo:
+                      fallos.append(
+                          f"{ruta.name}: falta su propia comprobacion «{afirmacion}»; sin ella "
+                          f"la guarda puede quedarse sin mirar nada y seguir en verde"
+                      )
+
+          # 6. Lo ultimo, que es lo que el capitulo encontro: NINGUN mensaje de un validador
+          #    de modelo nombra una columna. Se pregunta a los modelos por sus columnas en
+          #    vez de buscar una lista de palabras, y se mira la frase con la que cada
+          #    validador rechaza, no todo el archivo.
+          sys.path.insert(0, "backend")
+          from app.models import entities  # noqa: E402
+
+          columnas = set()
+          for tabla in entities.Base.metadata.tables.values():
+              columnas.update(c.name for c in tabla.columns)
+          # Las que ademas son una palabra del castellano, nombradas con su motivo: no se
+          # pueden buscar dentro de una frase escrita en castellano.
+          columnas -= {
+              "id", "estado", "motivo", "notas", "tramo", "resultado", "ingresos",
+              "necesidades", "redes", "cerrado_el", "inicio_de_la_reunion", "fecha",
+              "categoria_al_cierre", "texto",
+          }
+          if len(columnas) < 100:
+              sys.exit(f"FALLO: solo se leyeron {len(columnas)} columnas; falta el esquema.")
+
+          #    Y se buscan en los `raise`, no en el archivo: un `Field(description=...)` es
+          #    documentacion de la API, donde el nombre de la columna es el dato correcto.
+          rechazos_mirados = 0
+          for ruta in sorted(ESQUEMAS.glob("*.py")):
+              fuente = ruta.read_text(encoding="utf-8")
+              for nodo in ast.walk(ast.parse(fuente)):
+                  if not isinstance(nodo, ast.Raise) or nodo.exc is None:
+                      continue
+                  frase = ast.get_source_segment(fuente, nodo.exc) or ""
+                  rechazos_mirados += 1
+                  # Lo que va entre comillas españolas es un valor que el cliente envio o un
+                  # nombre que su propio formulario usa, y se dice a proposito.
+                  frase = re.sub(r"«[^»]*»", "", frase)
+                  dentro = sorted(c for c in columnas if re.search(rf"\b{re.escape(c)}\b", frase))
+                  if dentro:
+                      fallos.append(
+                          f"{ruta.name}: un rechazo nombra {dentro} -«{frase[:70]}…»-; "
+                          "ese es el nombre de la columna de la base"
+                      )
+          if rechazos_mirados < 20:
+              sys.exit(
+                  f"FALLO: solo se leyeron {rechazos_mirados} rechazos de los esquemas; "
+                  f"el recorrido esta roto."
+              )
+
+          if fallos:
+              print("FALLO: un rechazo del servidor volvio a nombrar una columna, o a llegar")
+              print("a la pantalla en ingles.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Los tres validadores de los campos obligatorios rechazan con un tipo y un")
+          print(f"contexto, ninguna frase de los esquemas nombra una de las {len(columnas)}")
+          print(f"columnas, y las {len(claves)} clases de rechazo tienen frase en castellano")
+          print("en un solo archivo, que es el que ven todas las pantallas.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

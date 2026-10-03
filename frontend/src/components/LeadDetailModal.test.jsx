@@ -405,6 +405,36 @@ describe('un 422 al guardar la ficha', () => {
     expect(aviso.textContent).not.toMatch(/first_name/);
   });
 
+  // Capítulo 45: el renglón que no trae el campo en el `loc` acaba igualmente debajo del campo
+  // ------------------------------------------------------------------------------------------
+  // Este es el 422 que `PUT /leads/{id}` contesta al vaciar un apellido, y hasta el capítulo
+  // 45 llegaba con `last_name` escrito **dentro de la frase**: un validador de modelo responde
+  // `loc: ['body']`, así que el reparto lo mandaba entero al aviso de arriba, con el nombre de
+  // la columna de la base en una pantalla en castellano. El trabajo del 43 —quitar ese nombre—
+  // llegaba hasta el prefijo y no hasta aquí.
+  it('vaciar un apellido se dice debajo del apellido, y sin nombrar la columna', async () => {
+    const usuario = userEvent.setup();
+    await guardarYFallar(usuario, [
+      {
+        type: 'campos_vacios_prohibidos',
+        loc: ['body'],
+        msg: 'La ficha no existe sin alguno de los campos que llegaron vacíos. '
+          + 'Envíe un valor, o no envíe el campo si no quiere cambiarlo.',
+        ctx: { campos: ['last_name'] },
+      },
+    ]);
+
+    const apellidos = screen.getByLabelText('Apellidos');
+    await waitFor(() => expect(apellidos).toHaveAttribute('aria-invalid', 'true'));
+    const explicacion = document.getElementById(apellidos.getAttribute('aria-describedby'));
+    expect(explicacion.textContent).toBe('No puede quedar vacío.');
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso.textContent).toMatch(/Revise el campo Apellidos./);
+    expect(aviso.textContent).not.toMatch(/last_name/);
+    expect(document.body.textContent).not.toMatch(/last_name/);
+  });
+
   it('y la pantalla se queda en modo edición, con los datos escritos', async () => {
     // Un formulario que se cierra al fallar obliga a volver a escribirlo todo. Antes no se
     // cerraba —el `alert` no cambiaba el modo—, así que esto es una propiedad que había que

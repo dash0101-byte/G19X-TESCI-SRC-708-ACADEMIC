@@ -47,6 +47,16 @@ const TELEFONO_INVALIDO = {
   msg: 'Value error, El teléfono no es un número válido: revise la lada y el número de dígitos.',
   ctx: { error: 'El teléfono no es un número válido: revise la lada y el número de dígitos.' },
 };
+// El cuarto, del capítulo 45: el que no puede decir de qué campo habla con su `loc`. Sale de
+// `LeadUpdate.model_validate({'first_name': None, 'last_name': None})`, con el `body` que
+// FastAPI le pone delante.
+const VACIOS = {
+  type: 'campos_vacios_prohibidos',
+  loc: ['body'],
+  msg: 'La ficha no existe sin alguno de los campos que llegaron vacíos. '
+    + 'Envíe un valor, o no envíe el campo si no quiere cambiarlo.',
+  ctx: { campos: ['first_name', 'last_name'] },
+};
 
 describe('qué se dice de un renglón del 422', () => {
   it('un campo que falta se dice en castellano, no «Field required»', () => {
@@ -165,6 +175,76 @@ describe('el reparto por campos', () => {
     });
     expect(porCampo).toEqual({});
     expect(sueltos).toEqual(['No existe ninguna cuenta con ese identificador.']);
+  });
+
+  // El renglón que no puede señalar su campo con el `loc` (capítulo 45)
+  // --------------------------------------------------------------------
+  // Un `model_validator` de Pydantic contesta `loc: ['body']`: ve el cuerpo entero y no un
+  // campo. Los tres del servidor que comprueban los campos sin los que una fila no existe
+  // mandan la lista en `ctx.campos` para que sí se pueda repartir, y mandan **nombres de
+  // campo** y no de columna, porque lo que devuelven ahí es lo que el cliente les envió.
+  it('un renglón con sus campos en el ctx se reparte entre todos ellos', () => {
+    const repartido = erroresDelServidor([VACIOS], {
+      campos: ['first_name', 'last_name', 'email'],
+    });
+    expect(repartido.porCampo).toEqual({
+      first_name: 'No puede quedar vacío.',
+      last_name: 'No puede quedar vacío.',
+    });
+    expect(repartido.sueltos).toEqual([]);
+  });
+
+  it('debajo del campo va la frase corta, no el párrafo del servidor', () => {
+    const repartido = erroresDelServidor([VACIOS], { campos: ['first_name', 'last_name'] });
+    expect(repartido.porCampo.first_name).not.toMatch(/Envíe un valor/);
+  });
+
+  it('si la pantalla no pinta ninguno de esos campos, el aviso dice la frase entera', () => {
+    // Y no la corta: «No puede quedar vacío» en el aviso de arriba no dice qué no puede
+    // quedar vacío. La frase del servidor se lee sola, que es para lo que está escrita.
+    const repartido = erroresDelServidor([VACIOS], { campos: ['source', 'status'] });
+    expect(repartido.porCampo).toEqual({});
+    expect(repartido.sueltos).toEqual([VACIOS.msg]);
+  });
+
+  it('y si la pantalla pinta unos y no otros, no se pierde nada ni se dice dos veces', () => {
+    const repartido = erroresDelServidor([VACIOS], { campos: ['last_name'] });
+    expect(repartido.porCampo).toEqual({ last_name: 'No puede quedar vacío.' });
+    expect(repartido.sueltos).toEqual([]);
+  });
+
+  it('sin lista de campos se reparte entre todos los que el renglón nombra', () => {
+    const repartido = erroresDelServidor([VACIOS]);
+    expect(Object.keys(repartido.porCampo)).toEqual(['first_name', 'last_name']);
+  });
+
+  it('el nombre que viaja en el ctx también se traduce al que la pantalla usa', () => {
+    const repartido = erroresDelServidor(
+      [{ ...VACIOS, ctx: { campos: ['end_date'] } }],
+      { campos: ['fecha_de_cierre'], renombres: { end_date: 'fecha_de_cierre' } },
+    );
+    expect(repartido.porCampo).toEqual({ fecha_de_cierre: 'No puede quedar vacío.' });
+  });
+
+  it('la frase que la pantalla tenga escrita para ese campo sigue ganando', () => {
+    // Es la regla 1 de `mensajeDelRenglon`, que aquí hay que repetir porque el `loc` de este
+    // renglón dice `body` y esa función no puede saber de qué campo se trata.
+    const repartido = erroresDelServidor([VACIOS], {
+      campos: ['first_name', 'last_name'],
+      propios: { last_name: 'Los apellidos hacen falta para buscar la ficha.' },
+    });
+    expect(repartido.porCampo).toEqual({
+      first_name: 'No puede quedar vacío.',
+      last_name: 'Los apellidos hacen falta para buscar la ficha.',
+    });
+  });
+
+  it('un ctx con campos que no son cadenas se ignora, y el renglón vuelve a su loc', () => {
+    // Un `ctx` con otra forma viene de un servidor que no es este. Lo que no puede pasar es
+    // que el formulario se quede sin decir nada.
+    const raro = { ...VACIOS, loc: ['body', 'first_name'], ctx: { campos: [null, 7] } };
+    const repartido = erroresDelServidor([raro], { campos: ['first_name'] });
+    expect(repartido.porCampo.first_name).toBeTruthy();
   });
 
   it('un detalle que no es una lista no se interpreta', () => {

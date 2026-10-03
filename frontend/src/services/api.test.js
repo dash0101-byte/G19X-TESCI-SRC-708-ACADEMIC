@@ -384,17 +384,35 @@ describe('traducción de errores de la API', () => {
   // la columna: `company_size`, `nueva_contrasena`, `assigned_rep_id`. Las cuatro pantallas
   // del capítulo 40 no lo veían porque reparten el 422 por campos antes de llegar aquí; las
   // otras siete sí, y lo que lo escribía no estaba en ellas: estaba aquí, una vez.
+  //
+  // Y en castellano (capítulo 45)
+  // ------------------------------
+  // Los renglones de estas dos pruebas **no traían `type`**, que es el único campo del 422
+  // por el que se puede saber qué clase de error es, y su valor esperado era el texto en
+  // inglés de Pydantic: `'Field required'` estaba escrito aquí como lo correcto. Pasaban, y
+  // lo que documentaban era que la pantalla enseña inglés. Ahora los renglones son los que
+  // manda el servidor —con su `type`— y lo esperado es la frase de la tabla del capítulo 40,
+  // que esta función no consultaba.
   it('los errores de validación de Pydantic llegan sin el nombre de la columna', async () => {
     fetchSimulado({
       '/leads': respuesta(422, {
         detail: [
-          { loc: ['body', 'email'], msg: 'no es un correo válido' },
-          { loc: ['body', 'company_size'], msg: 'debe ser mayor que 0' },
+          {
+            type: 'value_error',
+            loc: ['body', 'email'],
+            msg: 'Value error, no es un correo válido',
+          },
+          {
+            type: 'greater_than_equal',
+            loc: ['body', 'company_size'],
+            msg: 'Input should be greater than or equal to 1',
+            ctx: { ge: 1 },
+          },
         ],
       }),
     });
     await expect(api.createLead({})).rejects.toThrow(
-      'no es un correo válido\ndebe ser mayor que 0',
+      'no es un correo válido\nTiene que ser 1 o más.',
     );
   });
 
@@ -404,13 +422,75 @@ describe('traducción de errores de la API', () => {
     fetchSimulado({
       '/leads': respuesta(422, {
         detail: [
-          { loc: ['body', 'first_name'], msg: 'Field required' },
-          { loc: ['body', 'last_name'], msg: 'Field required' },
-          { loc: ['body', 'email'], msg: 'no es un correo válido' },
+          { type: 'missing', loc: ['body', 'first_name'], msg: 'Field required' },
+          { type: 'missing', loc: ['body', 'last_name'], msg: 'Field required' },
+          {
+            type: 'value_error',
+            loc: ['body', 'email'],
+            msg: 'Value error, no es un correo válido',
+          },
         ],
       }),
     });
-    await expect(api.createLead({})).rejects.toThrow('Field required\nno es un correo válido');
+    await expect(api.createLead({})).rejects.toThrow(
+      'Falta este campo.\nno es un correo válido',
+    );
+  });
+
+  // Los seis de nueve que llegaban en inglés (capítulo 45)
+  // ------------------------------------------------------
+  // Renglones copiados de los de verdad: salen de `ActivityCreate` y `CierreDelProspecto`,
+  // que son los dos esquemas de los dos formularios del panel que no reparten su 422 por
+  // campos. El de la lista cerrada es el que mejor se ve: catorce claves en inglés, mayúsculas
+  // y con comillas simples, dentro del aviso de un formulario cuyo desplegable las ofrece
+  // todas traducidas.
+  it('los rechazos que la biblioteca escribe en inglés salen en castellano', async () => {
+    fetchSimulado({
+      '/leads/7/activities': respuesta(422, {
+        detail: [
+          { type: 'missing', loc: ['body', 'activity_type'], msg: 'Field required' },
+          {
+            type: 'datetime_from_date_parsing',
+            loc: ['body', 'inicio_de_la_reunion'],
+            msg: 'Input should be a valid datetime or date, input is too short',
+          },
+          {
+            type: 'enum',
+            loc: ['body', 'activity_type'],
+            msg: "Input should be 'PAGE_VIEW', 'FORM_SUBMIT' or 'CUSTOM'",
+            ctx: { expected: "'PAGE_VIEW', 'FORM_SUBMIT' or 'CUSTOM'" },
+          },
+        ],
+      }),
+    });
+    const fallo = await api.addLeadActivity(7, {}).catch((e) => e);
+    expect(fallo.message).toBe(
+      'Falta este campo.\nEscriba una fecha válida.\nElija una de las opciones de la lista.',
+    );
+    expect(fallo.message).not.toMatch(/Field required|PAGE_VIEW|valid datetime/);
+  });
+
+  // La frase larga del validador de modelo (capítulo 45)
+  // -----------------------------------------------------
+  // Este renglón trae sus campos en `ctx` y no en `loc`, así que una pantalla que reparta lo
+  // pone debajo de cada campo con la frase corta. Aquí no se reparte nada: lo que se enseña
+  // es la frase del servidor, que se lee sola y no nombra ninguna columna.
+  it('el rechazo de un validador de modelo enseña su frase entera, no la corta', async () => {
+    fetchSimulado({
+      '/leads/7': respuesta(422, {
+        detail: [
+          {
+            type: 'campos_vacios_prohibidos',
+            loc: ['body'],
+            msg: 'La ficha no existe sin alguno de los campos que llegaron vacíos. Envíe un valor, o no envíe el campo si no quiere cambiarlo.',
+            ctx: { campos: ['last_name'] },
+          },
+        ],
+      }),
+    });
+    const fallo = await api.updateLead(7, { last_name: null }).catch((e) => e);
+    expect(fallo.message).toMatch(/^La ficha no existe sin alguno de los campos/);
+    expect(fallo.message).not.toMatch(/last_name|No puede quedar vacío/);
   });
 
   it('«Value error,» no llega a la pantalla: es el nombre de la excepción, no el mensaje', async () => {

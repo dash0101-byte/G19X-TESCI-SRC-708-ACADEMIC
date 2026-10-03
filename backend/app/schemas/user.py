@@ -47,6 +47,7 @@ from app.core.texto import (
     ENTRADA_DE_TEXTO,
     Contrasena,
     campos_sin_los_que_no_existe,
+    rechazo_de_vacios,
     texto_o_nada,
     vacios_prohibidos,
 )
@@ -191,11 +192,7 @@ class UsuarioUpdate(BaseModel):
         """
         prohibidos = vacios_prohibidos(self, campos_sin_los_que_no_existe(User))
         if prohibidos:
-            raise ValueError(
-                "La cuenta no existe sin estos campos, así que no se pueden dejar vacíos: "
-                + ", ".join(prohibidos)
-                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
-            )
+            raise rechazo_de_vacios("La cuenta", prohibidos)
         return self
 
 
@@ -277,11 +274,7 @@ class _CamposDePublicacion(BaseModel):
         """
         prohibidos = vacios_prohibidos(self, campos_sin_los_que_no_existe(Campaign))
         if prohibidos:
-            raise ValueError(
-                "La publicación no existe sin estos campos, así que no se pueden dejar "
-                "vacíos: " + ", ".join(prohibidos)
-                + ". Envíe un valor, o no envíe el campo si no quiere cambiarlo."
-            )
+            raise rechazo_de_vacios("La publicación", prohibidos)
         return self
 
     @field_validator("estado", check_fields=False)
