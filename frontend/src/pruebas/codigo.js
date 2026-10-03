@@ -53,3 +53,35 @@ export function sinComentarios(codigo) {
 export function lineaDe(texto, posicion) {
   return texto.slice(0, posicion).split('\n').length;
 }
+
+/**
+ * Cada `<input|select|textarea …>` del marcado, con su etiqueta completa.
+ *
+ * Cierra por el `>` que **no** está dentro de llaves. Un `<input[^>]*?>` se queda corto y
+ * no se nota: el primer `>` de un atributo es el de la flecha de `onChange={(e) => …}`, así
+ * que el recorte deja fuera todo lo que venga después —la clase, el `id`, el `type`— y la
+ * guarda contesta sobre media etiqueta. Con eso una cuenta de 19 de 103 pasó por buena
+ * hasta el capítulo 43, cuando la de verdad eran 11 de 88.
+ *
+ * Vivía dentro de `avisos.test.js`. Está aquí desde el capítulo 44 porque la guarda de las
+ * pantallas auditadas necesita el mismo recorrido con **otro** filtro: a la de la clase un
+ * deslizador no le interesa —no tiene contorno que medir— y a la de la auditoría sí, porque
+ * un control sin nombre accesible es un control sin nombre accesible. Dos filtros, un
+ * barrido; dos barridos serían dos ideas distintas de qué es un control.
+ */
+export function cajasDeFormulario(codigo) {
+  const encontradas = [];
+  for (const inicio of [...codigo.matchAll(/<(input|select|textarea)\b/g)]) {
+    let profundidad = 0;
+    for (let i = inicio.index; i < codigo.length; i += 1) {
+      const c = codigo[i];
+      if (c === '{') profundidad += 1;
+      else if (c === '}') profundidad -= 1;
+      else if (c === '>' && profundidad === 0) {
+        encontradas.push({ etiqueta: codigo.slice(inicio.index, i + 1), en: inicio.index });
+        break;
+      }
+    }
+  }
+  return encontradas;
+}

@@ -54,7 +54,11 @@ export default function AltaDelSegundoFactor({ user, onActivado, onSalir }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '40px 24px', background: 'var(--bg-base)' }}>
+    // `<main>` por lo mismo que el cambio obligatorio y que `LoginScreen`: es la pantalla
+    // entera, `App.jsx` la devuelve en lugar del panel y no hay ninguna región alrededor.
+    // El propio texto de abajo lo dice —«esta es la única pantalla disponible»—, y aun así
+    // era un `<div>`: la auditoría no la montaba.
+    <main style={{ minHeight: '100vh', padding: '40px 24px', background: 'var(--bg-base)' }}>
       <div style={caja}>
         <h1 style={{ fontSize: '1.15rem', marginBottom: '6px' }}>Active su segundo factor</h1>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
@@ -81,7 +85,15 @@ export default function AltaDelSegundoFactor({ user, onActivado, onSalir }) {
                 geometría, no texto: el contenido lo genera `app/core/codigo_qr.py` a partir
                 de la URI que el propio servidor acaba de construir, no de nada que haya
                 escrito nadie de fuera. */}
+            {/* `role="img"` junto al `aria-label`, y no el `aria-label` suelto que había:
+                ARIA **prohíbe** nombrar un `div` sin rol, así que el nombre se ignoraba y
+                el único dibujo de esta pantalla no tenía ninguno. Lo delicado es que la
+                prueba de este componente lo buscaba por ese nombre y pasaba: `getByLabelText`
+                lee el atributo tal cual, sin preguntar si ARIA lo admite ahí. Verde sobre un
+                marcado que un lector de pantalla no usa. `CompartirEnRedes` lo escribe con
+                su rol desde el capítulo 39; esto es del 35 y se quedó a medias. */}
             <div
+              role="img"
               aria-label="Código QR para la aplicación de autenticación"
               style={{ background: '#fff', padding: '12px', borderRadius: 'var(--radius-sm)', width: 'fit-content', marginBottom: '14px' }}
               dangerouslySetInnerHTML={{ __html: alta.qr_svg }}
@@ -141,6 +153,6 @@ export default function AltaDelSegundoFactor({ user, onActivado, onSalir }) {
           Cerrar sesión
         </button>
       </div>
-    </div>
+    </main>
   );
 }

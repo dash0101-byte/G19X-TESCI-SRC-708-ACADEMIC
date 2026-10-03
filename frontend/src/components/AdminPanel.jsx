@@ -627,7 +627,14 @@ export default function AdminPanel({ onBatchRecalculate, isRecalculating }) {
                       </td>
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{usuario.email}</td>
                       <td>
+                        {/* El nombre va en un `aria-label` y nombra a la persona: en una
+                            tabla la cabecera «Rol» no llega al control —un lector de
+                            pantalla anunciaba «lista desplegable, Asesor Comercial» sin
+                            decir de quién—, y hay una por fila, así que un texto fijo las
+                            haría indistinguibles. Es el mismo criterio que el formulario de
+                            restablecer de más abajo. */}
                         <select
+                          aria-label={`Rol de ${usuario.full_name}`}
                           className="input-field" style={{ padding: '4px 6px', fontSize: '0.78rem' }}
                           value={usuario.role}
                           disabled={ocupado === usuario.id}

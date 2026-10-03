@@ -11,9 +11,11 @@ import {
 } from './erroresDeFormulario';
 import { useVentanaModal } from './ventanaModal';
 
-// Las dos de la petición, con el nombre que este formulario les da. Aquí el nombre está en
-// el `placeholder` y no en una etiqueta —§6.4—, pero el resumen de arriba tiene que decir
-// «Contraseña actual» y no `contrasena_actual` en cualquier caso.
+// Las dos de la petición, con el nombre que este formulario les da. Desde el capítulo 44
+// ese nombre está además en una `<label>` de verdad al lado del campo, así que esta tabla y
+// la pantalla dicen lo mismo; antes el nombre vivía solo en el `placeholder` y esto era la
+// única forma de que el resumen de arriba dijera «Contraseña actual» y no
+// `contrasena_actual`.
 const ETIQUETAS_DE_LA_CONTRASENA = {
   contrasena_actual: 'Contraseña actual',
   nueva_contrasena: 'Contraseña nueva',
@@ -202,17 +204,27 @@ export default function SessionModal({ user, onLogout, onClose }) {
                 que quien se haga con una sesión abierta se quede con la cuenta cambiándola.
                 Al terminar se cerrarán <strong>todas</strong> sus sesiones, incluida esta.
               </p>
-              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Contraseña actual" required autoComplete="current-password"
+              {/* Las tres se nombraban con el `placeholder` y nada más —§6.4 punto 44—.
+                  `axe` no se queja de eso: un marcador sí da nombre accesible al control,
+                  así que la auditoría daba cero infracciones aquí. Lo que no hace es
+                  quedarse: desaparece en cuanto se teclea, de modo que quien vuelve al
+                  segundo campo ya no sabe si es la nueva o la repetición, y con tres cajas
+                  idénticas de puntos eso no es un detalle. El marcador se queda donde dice
+                  algo que la etiqueta no dice —el mínimo de doce—. */}
+              <label htmlFor="sesion-actual" className="form-label">Contraseña actual</label>
+              <input id="sesion-actual" type="password" className="input-field" style={{ marginBottom: '10px' }} required autoComplete="current-password"
                 value={actual}
                 onChange={(e) => { setActual(e.target.value); setErrores(sinElCampo(errores, 'contrasena_actual')); }}
                 {...propiedadesDeCampo('contrasena_actual', errores, 'sesion')} />
               <MensajeDeCampo nombre="contrasena_actual" errores={errores} prefijo="sesion" />
-              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Contraseña nueva (mínimo 12 caracteres)" required minLength={12}
+              <label htmlFor="sesion-nueva" className="form-label">Contraseña nueva</label>
+              <input id="sesion-nueva" type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Mínimo 12 caracteres" required minLength={12}
                 autoComplete="new-password" value={nueva}
                 onChange={(e) => { setNueva(e.target.value); setErrores(sinElCampo(errores, 'nueva_contrasena')); }}
                 {...propiedadesDeCampo('nueva_contrasena', errores, 'sesion')} />
               <MensajeDeCampo nombre="nueva_contrasena" errores={errores} prefijo="sesion" />
-              <input type="password" className="input-field" style={{ marginBottom: '10px' }} placeholder="Repítala" required minLength={12}
+              <label htmlFor="sesion-repetida" className="form-label">Repita la contraseña nueva</label>
+              <input id="sesion-repetida" type="password" className="input-field" style={{ marginBottom: '10px' }} required minLength={12}
                 autoComplete="new-password" value={repetida} onChange={(e) => setRepetida(e.target.value)} />
               <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.5 }}>
                 Una frase larga y fácil de recordar es más segura que una palabra corta con

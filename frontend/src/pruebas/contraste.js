@@ -289,6 +289,37 @@ export const PARES = [
       + 'mano con --text-muted encima del mismo relleno',
   },
 
+  // --- La caja del decaimiento del simulador (capítulo 44) ---
+  //
+  // Tres pares más que la extracción del capítulo 43 **no puede ver**, y por un motivo
+  // distinto al de entonces: allí el par estaba dentro de un `style` y la lista se escribía
+  // a mano; aquí el relleno lo pone el `style` del `div` de fuera y el color el del `div` de
+  // dentro. Un extractor que recorre cada objeto por separado no ve ningún par: ve un fondo
+  // sin texto y un texto sin fondo. Juntarlos exige el árbol del marcado, no el archivo.
+  //
+  // Aparecieron al meter el simulador en la auditoría, que es la otra lista escrita a mano
+  // de este directorio: la pantalla que ningún motor miraba era también la pantalla cuyos
+  // colores nadie había declarado. Los tres pasan —el peor, 4.64— y entran para que sigan
+  // midiéndose: el de la nota es --text-muted, que es el token que en el capítulo 43 falló
+  // dos veces encima de este mismo relleno.
+  {
+    texto: '--warm-text',
+    fondo: { sobre: '--bg-subtle', encima_de: ['--bg-surface'] },
+    donde: 'el rótulo de los días de inactividad del simulador cuando pasan de catorce, '
+      + 'dentro de la caja del decaimiento',
+  },
+  {
+    texto: '--text-primary',
+    fondo: { sobre: '--bg-subtle', encima_de: ['--bg-surface'] },
+    donde: 'el mismo rótulo mientras el decaimiento no ha empezado',
+  },
+  {
+    texto: '--text-muted',
+    fondo: { sobre: '--bg-subtle', encima_de: ['--bg-surface'] },
+    donde: 'la nota de la vida media debajo del deslizador, el único --text-muted que '
+      + 'queda encima de este relleno: 4.64, que pasa por 0,14',
+  },
+
   // --- Lo que se escribe dentro de un campo (capítulo 43) ---
   //
   // Estos dos los declara la propia hoja —`.input-field` y `.interes-boton` ponen el fondo y

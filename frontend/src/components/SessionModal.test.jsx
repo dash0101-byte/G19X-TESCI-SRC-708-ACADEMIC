@@ -34,9 +34,9 @@ function montar(props = {}) {
 /** Abre el formulario y rellena los tres campos. */
 async function rellenar(usuario, { actual, nueva, repetida }) {
   await usuario.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
-  await usuario.type(screen.getByPlaceholderText('Contraseña actual'), actual);
-  await usuario.type(screen.getByPlaceholderText(/Contraseña nueva/), nueva);
-  await usuario.type(screen.getByPlaceholderText('Repítala'), repetida);
+  await usuario.type(screen.getByLabelText('Contraseña actual'), actual);
+  await usuario.type(screen.getByLabelText('Contraseña nueva'), nueva);
+  await usuario.type(screen.getByLabelText('Repita la contraseña nueva'), repetida);
 }
 
 beforeEach(() => {
@@ -165,7 +165,7 @@ describe('cambio de la contraseña propia', () => {
     expect(await screen.findByText(/Todas sus sesiones se han cerrado/)).toBeInTheDocument();
     // El formulario desaparece: dejarlo con los campos vacíos invita a repetir la
     // operación sobre una contraseña que ya no es la actual.
-    expect(screen.queryByPlaceholderText('Contraseña actual')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Contraseña actual')).not.toBeInTheDocument();
   });
 
   // El error, construido como lo construye `api.js`: con su código y con los motivos ya
@@ -196,7 +196,7 @@ describe('cambio de la contraseña propia', () => {
     expect(await screen.findByText(/al menos 12 caracteres/)).toBeInTheDocument();
     expect(screen.getByText(/contraseña conocida/)).toBeInTheDocument();
     // El formulario sigue ahí para corregir, con lo escrito intacto.
-    expect(screen.getByPlaceholderText('Contraseña actual')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña actual')).toBeInTheDocument();
   });
 
   it('el aviso es una alerta: antes no lo anunciaba ningún lector de pantalla', async () => {
@@ -229,9 +229,9 @@ describe('cambio de la contraseña propia', () => {
 
     await usuario.click(screen.getByRole('button', { name: 'Guardar' }));
 
-    const actual = screen.getByPlaceholderText('Contraseña actual');
+    const actual = screen.getByLabelText('Contraseña actual');
     await waitFor(() => expect(actual).toHaveAttribute('aria-invalid', 'true'));
-    expect(screen.getByPlaceholderText(/Contraseña nueva/)).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByLabelText('Contraseña nueva')).not.toHaveAttribute('aria-invalid');
   });
 
   it('y los tres campos llevan ya la clase que la hoja mide', async () => {
@@ -242,8 +242,25 @@ describe('cambio de la contraseña propia', () => {
     montar();
     await usuario.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
 
-    for (const marcador of ['Contraseña actual', 'Contraseña nueva (mínimo 12 caracteres)', 'Repítala']) {
-      expect(screen.getByPlaceholderText(marcador).className).toContain('input-field');
+    for (const etiqueta of ['Contraseña actual', 'Contraseña nueva', 'Repita la contraseña nueva']) {
+      expect(screen.getByLabelText(etiqueta).className).toContain('input-field');
+    }
+  });
+
+  // El capítulo 44: las tres se nombraban solo con el `placeholder`, que desaparece al
+  // teclear. Se busca la etiqueta **asociada** —`getByLabelText` no mira el marcador— y se
+  // comprueba además que el nombre sigue ahí con el campo lleno, que es el estado en que el
+  // marcador ya no está.
+  it('cada caja tiene una etiqueta de verdad, y el nombre no se va al escribir', async () => {
+    const usuario = userEvent.setup();
+    montar();
+    await rellenar(usuario, { actual: 'a-larga', nueva: 'b-larga', repetida: 'b-larga' });
+
+    for (const etiqueta of ['Contraseña actual', 'Contraseña nueva', 'Repita la contraseña nueva']) {
+      const caja = screen.getByLabelText(etiqueta);
+      expect(caja.value).not.toBe('');
+      expect(caja.id).toBeTruthy();
+      expect(document.querySelector(`label[for="${caja.id}"]`)).not.toBeNull();
     }
   });
 
@@ -303,8 +320,8 @@ describe('cambio de la contraseña propia', () => {
     montar();
     await usuario.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
 
-    const actual = screen.getByPlaceholderText('Contraseña actual');
-    const nueva = screen.getByPlaceholderText(/Contraseña nueva/);
+    const actual = screen.getByLabelText('Contraseña actual');
+    const nueva = screen.getByLabelText('Contraseña nueva');
     expect(actual).toHaveAttribute('type', 'password');
     expect(actual).toHaveAttribute('autoComplete', 'current-password');
     // `new-password` es lo que impide que el gestor rellene la nueva con la vieja.

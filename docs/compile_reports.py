@@ -112,6 +112,13 @@ REPORT_FILES = [
     # es un par que la suite de contraste no puede ver, y dos de los que aparecieron al
     # derivarlos del código no llegaban al mínimo de §1.4.3.
     ("Reporte_41_Los_Avisos_que_no_Estaban_en_la_Pagina_El_Cuadro_que_Pedia_una_Contrasena_en_Claro_el_Par_que_Nadie_Media_y_los_Motivos_que_el_Cliente_Tiraba.md", "Capítulo 43: Los Avisos que no Estaban en la Página — El Cuadro que Pedía una Contraseña en Claro, el Par que Nadie Medía y los Motivos que el Cliente Tiraba"),
+    # El capítulo 44 cierra el punto 44 de §6.4 y la mitad medible del 18 de §6.3, pero su
+    # punto de partida es otro: la auditoría de accesibilidad del cliente medía bien y la
+    # lista de pantallas que medía estaba escrita a mano. Ocho de dieciocho, y en las nueve
+    # que ningún motor miraba había dos infracciones críticas, un `aria-label` donde ARIA no
+    # lo admite —con una prueba verde encima que lo buscaba por ese nombre— y dos pantallas
+    # enteras fuera de toda región. El defecto seguía la lista.
+    ("Reporte_42_Las_Pantallas_que_Nadie_Auditaba_Tres_Deslizadores_sin_Nombre_el_Selector_que_Cambia_Permisos_y_Dos_Pantallas_Fuera_de_Toda_Region.md", "Capítulo 44: Las Pantallas que Nadie Auditaba — Tres Deslizadores sin Nombre, el Selector que Cambia Permisos y Dos Pantallas Fuera de Toda Región"),
 ]
 
 

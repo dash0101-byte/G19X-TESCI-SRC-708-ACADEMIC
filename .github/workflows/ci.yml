@@ -4797,6 +4797,218 @@ jobs:
           print("clase que la hoja mide. El ambar que avisa tiene su propio token.")
           PY
 
+      # ------------------------------------------------------------------ control 58
+      # La auditoria de accesibilidad mira TODAS las pantallas, y la lista no se escribe.
+      #
+      # Desde el capitulo 36 el cliente tiene una auditoria con `axe-core` sobre cada
+      # pantalla montada, nivel AA. Su cabecera decia «las ocho pantallas» y era verdad:
+      # ocho, de las DIECIOCHO que llevan cajas de formulario. La lista estaba escrita a
+      # mano, igual que la de pares de `contraste.test.js` antes del capitulo 43, y lo que
+      # la suite medía no era el cliente sino el inventario que alguien escribio.
+      #
+      # Lo que habia en las diez que faltaban -39 de las 105 cajas-:
+      #   * los tres deslizadores del simulador sin NINGUN nombre accesible (critico);
+      #   * el selector del rol de cada cuenta tambien sin nombre (critico), que es el
+      #     control que cambia los permisos de una persona;
+      #   * un `aria-label` sobre un `div` sin rol en el alta del segundo factor: ARIA lo
+      #     prohibe, asi que el unico dibujo de esa pantalla no tenia nombre -y la prueba
+      #     del componente lo buscaba por ese nombre y pasaba, porque `getByLabelText` lee
+      #     el atributo sin preguntar si ARIA lo admite ahi-;
+      #   * y dos pantallas enteras -el cambio obligatorio de contrasena y el alta del
+      #     segundo factor- fuera de toda region, cuando `LoginScreen` lleva escrito desde
+      #     el capitulo 36 que la pantalla entera va en un `<main>`. El defecto no estaba
+      #     repartido al azar: seguia la lista.
+      #
+      # Esta guarda vigila las dos cosas: que la lista siga derivandose del codigo y que no
+      # se arregle apagando la regla que estorbe.
+      - name: Ninguna pantalla con controles se queda sin auditar
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          CLIENTE = pathlib.Path("frontend/src")
+          AUDITORIA = CLIENTE / "pruebas" / "accesibilidad.test.jsx"
+          GUARDA = CLIENTE / "pruebas" / "pantallas.test.js"
+          AYUDA = CLIENTE / "pruebas" / "accesibilidad.js"
+
+          for ruta in (AUDITORIA, GUARDA, AYUDA):
+              if not ruta.exists():
+                  sys.exit(f"FALLO: desaparecio {ruta.as_posix()}.")
+
+          def sin_comentarios(codigo):
+              codigo = re.sub(r"/\*[\s\S]*?\*/", "", codigo)
+              return re.sub(r"^\s*//.*$", "", codigo, flags=re.M)
+
+          auditoria = sin_comentarios(AUDITORIA.read_text(encoding="utf-8"))
+          guarda = GUARDA.read_text(encoding="utf-8")
+          ayuda = AYUDA.read_text(encoding="utf-8")
+          fallos = []
+
+          # 1. El inventario: cada componente con un control de formulario se monta en la
+          #    auditoria. Es el mismo recorrido que la guarda del cliente, repetido aqui
+          #    para que el CI no dependa de que esa guarda siga existiendo.
+          def controles(codigo):
+              for inicio in (m.start() for m in re.finditer(r"<(input|select|textarea)\b", codigo)):
+                  profundidad = 0
+                  for i in range(inicio, len(codigo)):
+                      if codigo[i] == "{":
+                          profundidad += 1
+                      elif codigo[i] == "}":
+                          profundidad -= 1
+                      elif codigo[i] == ">" and profundidad == 0:
+                          yield codigo[inicio:i + 1]
+                          break
+
+          pantallas = 0
+          cuantos = 0
+          for ruta in sorted(CLIENTE.rglob("*.jsx")):
+              if ".test." in ruta.name or ruta == AUDITORIA:
+                  continue
+              codigo = sin_comentarios(ruta.read_text(encoding="utf-8"))
+              # Un campo oculto no se ve, no se enfoca y no hay nada que nombrar. Todo lo
+              # demas cuenta, INCLUIDOS los deslizadores: la guarda de `.input-field` los
+              # excluye a proposito -no tienen contorno que medir- y por ese hueco pasaron
+              # los tres del simulador sin nombre y sin que nada lo dijera.
+              propios = [c for c in controles(codigo) if 'type="hidden"' not in c]
+              if not propios:
+                  continue
+              pantallas += 1
+              cuantos += len(propios)
+              nombre = ruta.stem
+              if not re.search(rf"<{nombre}[\s/>]", auditoria):
+                  fallos.append(
+                      f"{nombre} tiene {len(propios)} control(es) de formulario y "
+                      f"accesibilidad.test.jsx no lo monta: ningun motor mira su marcado"
+                  )
+
+          if pantallas < 12 or cuantos < 80:
+              sys.exit(
+                  f"FALLO: el barrido solo encontro {pantallas} pantallas y {cuantos} "
+                  f"controles; el recorrido del marcado esta roto."
+              )
+
+          # 2. El nivel que se exige sigue siendo AA de WCAG 2.1, con las tres reglas de
+          #    `best-practice` que se piden por su nombre.
+          #
+          #    Sobre el codigo SIN comentarios, y es la leccion del capitulo 37 otra vez: la
+          #    cabecera de `accesibilidad.js` explica que «wcag2a/wcag2aa son WCAG 2.0 y
+          #    wcag21a/wcag21aa lo que añadio la 2.1», y nombra las tres reglas de
+          #    `best-practice` una por una con su motivo. Buscandolas en el archivo entero,
+          #    esta comprobacion se las encuentra en su propia documentacion y contesta que
+          #    si aunque la constante se haya quedado en WCAG 2.0. Lo vio el arnes.
+          codigo_ayuda = sin_comentarios(ayuda)
+          for pieza in ("wcag2a", "wcag2aa", "wcag21a", "wcag21aa"):
+              if pieza not in codigo_ayuda:
+                  fallos.append(f"la auditoria ya no exige {pieza}")
+          for regla in ("region", "aria-allowed-role", "heading-order"):
+              if regla not in codigo_ayuda:
+                  fallos.append(f"la auditoria dejo de pedir la regla {regla}")
+
+          # 3. Y no se arregla apagando reglas. `color-contrast` es la unica apagada, y
+          #    tiene su motivo escrito: necesita pixeles, y se mide en contraste.test.js.
+          apagadas = re.search(r"REGLAS_APAGADAS\s*=\s*\{([\s\S]*?)\n\};", codigo_ayuda)
+          if apagadas is None:
+              fallos.append("desaparecio la lista de reglas apagadas de la auditoria")
+          else:
+              # La clave de un objeto de JavaScript vale entrecomillada y sin entrecomillar:
+              # `'color-contrast':` necesita las comillas porque lleva un guion, pero `label:`
+              # no, y una lista que solo mire las entrecomilladas deja pasar justo las que se
+              # pueden escribir sin ellas. Tambien lo vio el arnes.
+              claves = re.findall(r"^\s*'?([\w-]+)'?\s*:", apagadas.group(1), flags=re.M)
+              sobrantes = [c for c in claves if c != "color-contrast"]
+              if sobrantes:
+                  fallos.append(
+                      "la auditoria apago reglas nuevas en vez de arreglar el marcado: "
+                      + ", ".join(sobrantes)
+                  )
+          if re.search(r"reglas:\s*\{[^}]*enabled:\s*false", auditoria):
+              fallos.append(
+                  "una prueba de la auditoria apaga una regla para si misma: eso deja la "
+                  "pantalla verde y la regla sin mirar"
+              )
+
+          # 4. Las dos pantallas que la aplicacion devuelve EN LUGAR del panel traen su
+          #    propia region. No hay ningun `<main>` alrededor de ellas.
+          for archivo, quien in (
+              ("CambioDeContrasenaObligatorio.jsx", "el cambio obligatorio de contrasena"),
+              ("AltaDelSegundoFactor.jsx", "el alta del segundo factor"),
+              ("LoginScreen.jsx", "la pantalla de acceso"),
+          ):
+              # Sin comentarios, por tercera vez en este mismo control: las tres pantallas
+              # llevan escrito arriba «`<main>` y no un `<div>`», explicando por que, asi
+              # que la comprobacion se encontraba la etiqueta en la explicacion de por que
+              # tiene que estar. Tres veces el mismo error en una guarda recien escrita, y
+              # las tres las vio el arnes y no la lectura.
+              codigo = sin_comentarios(
+                  (CLIENTE / "components" / archivo).read_text(encoding="utf-8")
+              )
+              if "<main" not in codigo:
+                  fallos.append(
+                      f"{quien} vuelve a ser un `<div>`: es la pantalla entera y se queda "
+                      f"fuera de toda region, sin nada adonde saltar"
+                  )
+
+          # 5. Los controles que el capitulo 44 nombro siguen con su nombre.
+          simulador = (CLIENTE / "components" / "ScoringSimulator.jsx").read_text(encoding="utf-8")
+          for deslizador in ("sim-page-views", "sim-email-clicks", "sim-days-inactive"):
+              if f'htmlFor="{deslizador}"' not in simulador or f'id="{deslizador}"' not in simulador:
+                  fallos.append(
+                      f"el deslizador {deslizador} se quedo sin etiqueta asociada: un "
+                      f"lector de pantalla dice «control de deslizamiento» y no de que"
+                  )
+          admin = (CLIENTE / "components" / "AdminPanel.jsx").read_text(encoding="utf-8")
+          # El atributo entero y no el texto suelto: «Rol de ${usuario.full_name}» aparece
+          # tambien en el aviso de que el rol se cambio, asi que buscando solo esa frase la
+          # comprobacion se la encuentra en una cadena que no tiene nada que ver y contesta
+          # que si con el selector ya sin nombre. Lo vio el arnes.
+          if "aria-label={`Rol de ${usuario.full_name}`}" not in admin:
+              fallos.append(
+                  "el selector del rol volvio a quedarse sin nombre: hay uno por fila y "
+                  "sin el nombre de la persona son indistinguibles"
+              )
+          # Sin comentarios por lo mismo: el de arriba de ese `div` explica que `role="img"`
+          # va junto al `aria-label` y nombra el atributo al explicarlo.
+          segundo = sin_comentarios(
+              (CLIENTE / "components" / "AltaDelSegundoFactor.jsx").read_text(encoding="utf-8")
+          )
+          if 'role="img"' not in segundo:
+              fallos.append(
+                  "el QR del segundo factor vuelve a llevar `aria-label` sobre un `div` sin "
+                  "rol: ARIA lo prohibe y el nombre se ignora"
+              )
+          sesion = (CLIENTE / "components" / "SessionModal.jsx").read_text(encoding="utf-8")
+          for caja in ("sesion-actual", "sesion-nueva", "sesion-repetida"):
+              if f'htmlFor="{caja}"' not in sesion:
+                  fallos.append(
+                      f"la caja {caja} vuelve a nombrarse solo con el `placeholder`, que "
+                      f"desaparece en cuanto se teclea (§6.4 punto 44)"
+                  )
+
+          # 6. Y la guarda del cliente sigue derivando su lista del codigo en vez de
+          #    escribirla, que es lo unico que impide que vuelva a quedarse corta.
+          #
+          #    Se comprueba que LLAMA al barrido y no que lo nombra: dejar el `import` y
+          #    cambiar la llamada por un `match(/<input/g)` deja la palabra en el archivo y
+          #    la guarda mirando media cosa. Es la diferencia entre buscar un nombre y
+          #    buscar un uso, que es §6.4 convertido en memoria desde el capitulo 38.
+          for pieza in ("cajasDeFormulario(", "pantallasConControles(", "sinAuditar"):
+              if pieza not in guarda:
+                  fallos.append(f"pantallas.test.js ya no deriva su lista del codigo: falta {pieza}")
+
+          if fallos:
+              print("FALLO: una pantalla con controles se quedo sin auditar, o la auditoria se")
+              print("arreglo apagando lo que la miraba.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+          print(f"Las {pantallas} pantallas con controles del cliente -{cuantos} controles-")
+          print("se montan en la auditoria, y la lista sale del codigo. Nivel AA, sin reglas")
+          print("apagadas salvo el contraste, que se mide sobre la paleta.")
+          PY
+
   # ============================================================================
   # Migraciones de base de datos
   # ============================================================================

@@ -31,7 +31,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { fuentes, lineaDe, sinComentarios } from './codigo.js';
+import { cajasDeFormulario, fuentes, lineaDe, sinComentarios } from './codigo.js';
 import { HOJA, PARES } from './contraste.js';
 
 const ARCHIVOS = fuentes('src');
@@ -279,23 +279,10 @@ describe('las cajas de un formulario llevan la clase de la hoja', () => {
   // punto 32 cerró. Y las ocho del alta de una cuenta son de las que el capítulo 40 marca
   // con `aria-invalid`: el lector de pantalla lo anunciaba y en la pantalla no se veía.
 
-  /** Cada `<input|select|textarea …>`, cerrando por el `>` que no está dentro de llaves. */
-  function cajas(codigo) {
-    const encontradas = [];
-    for (const inicio of [...codigo.matchAll(/<(input|select|textarea)\b/g)]) {
-      let profundidad = 0;
-      for (let i = inicio.index; i < codigo.length; i += 1) {
-        const c = codigo[i];
-        if (c === '{') profundidad += 1;
-        else if (c === '}') profundidad -= 1;
-        else if (c === '>' && profundidad === 0) {
-          encontradas.push({ etiqueta: codigo.slice(inicio.index, i + 1), en: inicio.index });
-          break;
-        }
-      }
-    }
-    return encontradas;
-  }
+  // El barrido vive en `codigo.js` desde el capítulo 44: lo comparten esta guarda y la de
+  // las pantallas auditadas, cada una con su filtro. Lo que esta deja fuera —entre otros,
+  // un deslizador, porque no tiene contorno que medir— es la razón por la que los tres del
+  // simulador llegaron hasta el 44 sin nombre accesible y sin que nada lo dijera.
 
   // Lo que no es una caja de texto: una casilla, un botón de radio, un deslizador y un
   // campo oculto no tienen contorno que medir ni valor que rechazar por campo.
@@ -312,7 +299,7 @@ describe('las cajas de un formulario llevan la clase de la hoja', () => {
     let total = 0;
     for (const [ruta, codigo] of codigoLimpio()) {
       if (!ruta.endsWith('.jsx')) continue;
-      for (const { etiqueta, en } of cajas(codigo)) {
+      for (const { etiqueta, en } of cajasDeFormulario(codigo)) {
         const tipo = /type="(\w+)"/.exec(etiqueta);
         if (tipo && NO_SON_CAJAS.includes(tipo[1])) continue;
         total += 1;

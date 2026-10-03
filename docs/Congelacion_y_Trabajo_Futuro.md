@@ -3,7 +3,74 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 43)
+**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 44)
+
+> **Revisión del capítulo 44.** La congelación se mantiene, y este capítulo la abrió **para
+> el punto 44 de §6.4 y para la mitad medible del punto 18 de §6.3**, y para nada más. El
+> punto de partida no fue ninguno de los dos, sino una frase de la cabecera de la auditoría
+> de accesibilidad del cliente, escrita en el capítulo 36: «las **ocho** pantallas». Era
+> verdad. Lo que no decía es de cuántas: el cliente tiene **dieciocho** componentes con
+> controles de formulario, 105 controles entre todos, y la auditoría montaba ocho —más la
+> tabla y la campana, que caen dentro del tablero—. **Nueve pantallas con 39 de las 105
+> cajas no las había mirado ningún motor nunca.**
+>
+> Es la misma forma que el capítulo 43 encontró en `PARES`: una comprobación real, que mide
+> bien, sobre **un inventario escrito a mano**. Lo que la suite medía no era el cliente, era
+> la lista. Y el defecto la seguía: `LoginScreen` lleva escrito desde el capítulo 36
+> «`<main>` y no un `<div>`: es la pantalla entera y no estaba dentro de ninguna región»; el
+> cambio obligatorio de contraseña y el alta del segundo factor son **también** la pantalla
+> entera —`App.jsx` las devuelve en lugar del panel—, no se montaban aquí, y las dos seguían
+> siendo un `<div>`. De las tres pantallas obligatorias y sin salida del sistema, dos estaban
+> enteras fuera de cualquier región.
+>
+> Lo que había en las nueve, con `axe` pasado por encima: **tres deslizadores del simulador
+> sin ningún nombre accesible** —ni `<label>`, ni `aria-label`, ni `title`, ni `placeholder`:
+> un lector de pantalla decía «control de deslizamiento, 6, mínimo 0, máximo 25» y de qué, no;
+> infracción **crítica**, §4.1.2 y §1.3.1—; **el selector del rol de cada cuenta tampoco**
+> —otra crítica, y es el control que cambia los permisos de una persona: la cabecera de la
+> columna nombra la celda, no el control que hay dentro—; y un **`aria-label` sobre un `div`
+> sin rol** en el alta del segundo factor, que ARIA prohíbe, así que el nombre se ignoraba y
+> el único dibujo de esa pantalla no tenía ninguno.
+>
+> **Ninguna de las tres guardas que debían verlo lo vio, y por tres motivos distintos.** La
+> regla del `linter` —`label-has-associated-control`— empieza por la `<label>`: un control sin
+> ninguna etiqueta en ningún sitio no aparece en su recorrido. La guarda de `.input-field` del
+> capítulo 43 excluye los deslizadores a propósito y con su motivo escrito —no tienen contorno
+> que medir—. Y `axe` sí lo caza, en la pantalla que la lista no incluía. No faltaba una
+> herramienta: faltaba que la lista incluyera la pantalla.
+>
+> **Lo más instructivo es lo del QR.** La prueba de ese componente lo buscaba por su nombre
+> accesible —`findByLabelText(/Código QR/)`— y pasaba desde el capítulo 35, porque
+> `getByLabelText` lee el atributo tal cual sin preguntar si ARIA lo admite ahí. Verde sobre
+> un marcado que ningún lector de pantalla usa, y documentando como comprobado justo lo que no
+> lo estaba. Es la forma del capítulo 43 en otra capa: no un doble puesto por encima del
+> fallo, sino **una consulta más permisiva que la norma que se quiere cumplir**. De ahí sale la
+> regla que este capítulo deja escrita: una consulta de la biblioteca de pruebas no es una
+> medición de accesibilidad, y por eso la auditoría tiene que pasar por **todas** las
+> pantallas.
+>
+> Lo que impide que vuelva a pasar no es haber montado las nueve: es que la lista **sale del
+> código**. `frontend/src/pruebas/pantallas.test.js` deriva el inventario de los componentes
+> con controles y se pone roja cuando uno no aparece montado en la auditoría, igual que
+> `tokens.test.js` con la paleta desde el capítulo 39. Y el control **58** del CI vigila
+> además que el arreglo no sea apagar lo que mira: el nivel sigue siendo AA de WCAG 2.1, la
+> única regla apagada sigue siendo el contraste —que necesita píxeles y se mide sobre la
+> paleta— y ninguna prueba se apaga una regla para sí misma. **24 defectos reintroducidos, 24
+> detectados**, y tres de ellos los encontró el arnés dentro del control recién escrito: la
+> comprobación buscaba su respuesta en un comentario o en una cadena que no venía al caso, y
+> pasaba con el defecto puesto. Ninguna la vio una lectura.
+>
+> Entran dos puntos nuevos, el **47** y el **48**, los dos con su cuenta: las otras dos suites
+> de accesibilidad —el recorrido con teclado y los anuncios a un lector de pantalla— miran 2 y
+> 5 de las 18 pantallas, y cuarenta y ocho etiquetas escriben a mano un estilo que la hoja ya
+> define.
+>
+> §6.4 pasa de **catorce entradas abiertas de veintiséis a quince de veintiocho**: se cierra
+> la 44 y entran la **47** y la **48**. Y una corrección de la cuenta anterior: el bloque del
+> capítulo 43 escribió «once de veintiséis», y eran **catorce**, porque dio el número después
+> de cerrar sus tres puntos y antes de sumar los tres que él mismo abría. Las abiertas son hoy
+> la 19, 20, 21, 23, 27, 28, 29, 34, 41, 42, 43, 45, 46, 47 y 48, y están contadas leyendo la
+> tabla y no de memoria.
 
 > **Revisión del capítulo 43.** La congelación se mantiene, y este capítulo la abrió **para
 > tres puntos de §6.4 y para ninguno más**: el **37**, el **38** y el **39**, que eran los
@@ -1021,7 +1088,7 @@ defectos reintroducidos y 22 detectados.
 | # | Qué | Por qué no se hizo | Origen |
 | :---: | :--- | :--- | :---: |
 | 17 | ~~**El código QR no se ha escaneado con un teléfono**~~ | Se comprueban las propiedades matemáticas y estructurales que exige la norma, que es lo verificable sin lector. **Es lo primero que habría que hacer antes de repartir material impreso**. **Hecho el 01-10-2026, y no lo leyó**: la información de formato iba transpuesta desde el capítulo 27, así que ningún lector podía empezar a decodificar. Las diecinueve pruebas del QR estaban verdes porque todas miden propiedades **simétricas respecto de la diagonal**. Corregido, con un lector escrito dentro de la suite y el control 48 del CI (R36 §38.10a) | R27 §27.13 · R36 §38.10 |
-| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable** —las nueve pantallas pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36)—, **el 39 la acercó más** —todo lo que el marcado nombra, clases y variables de la paleta, existe ahora en la hoja, y el contorno de los controles llega al mínimo de §1.4.11 sin que el foco deje de distinguirse (R37)— y **el 40 cerró el último hueco medible**: ningún color del cliente se escribe fuera de la paleta, que es el único sitio donde se mide, y cuando el servidor rechaza un campo la pantalla lo señala, lo explica en castellano y lleva el foco hasta él (R38). Lo que sigue sin responder es si **lo que se ve y lo que ese lector dice se entienden**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 · R37 §39.14 |
+| 18 | **El panel no se ha recorrido con una persona dentro** | Entrar exige iniciar sesión. La suite del cliente y el ensayo automático cubren las pantallas; una persona, no. **El capítulo 36 acercó la mitad verificable** —las pantallas que ese capítulo listó pasan WCAG 2.1 AA medido por `axe`, se recorren con teclado y sus errores llegan a un lector de pantalla (R36)—, **el 39 la acercó más** —todo lo que el marcado nombra, clases y variables de la paleta, existe ahora en la hoja, y el contorno de los controles llega al mínimo de §1.4.11 sin que el foco deje de distinguirse (R37)—, **el 40 dio por cerrado el último hueco medible** —ningún color del cliente se escribe fuera de la paleta, que es el único sitio donde se mide, y cuando el servidor rechaza un campo la pantalla lo señala, lo explica en castellano y lleva el foco hasta él (R38)— **y el 44 enseñó que quedaba uno**, que era la propia lista: esa mitad verificable eran **ocho pantallas de las dieciocho** que llevan controles, y en las nueve que nadie montaba había tres deslizadores sin nombre accesible, un selector de rol sin nombre, un `aria-label` que ARIA no admite donde estaba y dos pantallas enteras fuera de toda región. Hoy la auditoría pasa por las dieciocho y **su lista sale del código** (R42 §44.1, §44.10). Del capítulo 36 queda abierto lo que el punto 47 cuenta: el recorrido con teclado mira 2 y los anuncios 5. Lo que sigue sin responder es si **lo que se ve y lo que ese lector dice se entienden**, y eso no lo contesta ninguna herramienta | R28 §28.13 · R36 §36.8 · R37 §39.14 · R42 §44.1 |
 | 19 | **Nadie ha visto una solicitud de Dependabot en este repositorio** | `.github/dependabot.yml` está bien formado y el control 45 comprueba que cubre los seis ecosistemas y que la renovación a mano sigue mandando. Lo que ninguna prueba sustituye es el **primer lunes** que abra solicitudes de verdad: qué propone, si el CI las deja verdes y si alguna choca con la guarda `--solo-fijacion` | R37 §37.10 |
 | 20 | **La comprobación de contraseñas filtradas no se ha ejecutado nunca contra el servicio real** | La suite usa una sonda simulada a propósito: una suite que depende de un tercero se pone roja los días que ese tercero tiene un mal día. Lo que falta por saber es si el contexto TLS del sistema basta desde la máquina del despliegue — y si no bastara, **el síntoma sería silencioso**: la política ante «no se pudo preguntar» es seguir adelante, así que la comprobación estaría apagada de hecho mientras el código afirma tenerla. **Es lo primero que hay que mirar en la bitácora el día del despliegue**, buscando el `WARNING` de `app.core.filtradas_remotas` | R37 §37.4 · §37.10 |
 
@@ -1052,9 +1119,11 @@ defectos reintroducidos y 22 detectados.
 | 41 | **La suite no se ejecuta nunca contra PostgreSQL.** El capítulo 42 encendió `PRAGMA foreign_keys` en el motor, así que SQLite exige ya lo mismo que PostgreSQL en las tres clases de restricción que importan —única, obligatoria y ajena—, y eso cubrió el defecto de ese capítulo. No cubre todo lo demás en lo que los dos motores se distinguen, y la única forma de saberlo es correr la suite contra PostgreSQL: hoy ese motor solo aparece en el trabajo de migraciones y en el arranque del contenedor. Es un servicio más en el CI y varios minutos en cada ejecución, con su propia discusión; no es una corrección | R40 §42.14 |
 | 42 | **La atribución de una ficha no se puede corregir.** `LeadUpdate` no acepta `campaign_id`, y desde el capítulo 42 lo **rechaza** con su motivo en vez de responder 200 y no hacer nada. Una ficha dada de alta a mano con la publicación equivocada —o sin ninguna— se queda así, y el informe de rendimiento por campaña la cuenta donde está. Que se pueda cambiar es una frase nueva: ninguna pantalla la pide, y decidir si la atribución es un dato editable o es cómo llegó el prospecto es una decisión de producto, no una corrección | R40 §42.9 |
 | 43 | **El alta de una ficha contesta 400 y 409 para el mismo conflicto.** Cuando el correo repetido lo encuentra su comprobación, responde **400**; cuando lo encuentra la red del `IntegrityError` —la carrera—, responde **409**, que es lo que contesta la edición en los dos casos. Es la misma situación con dos códigos, y el 400 lleva ahí desde el capítulo 10. Cambiarlo es tocar lo que un cliente ya recibe sin corregir ningún dato | R40 §42.14 |
-| 44 | **Los tres campos del cambio de contraseña se nombran con un `placeholder`.** No con una etiqueta: el marcador desaparece al escribir, así que quien vuelve al campo ya no sabe cuál es, y no es lo mismo que un `<label>` para quien navega con lector de pantalla. No es un incumplimiento claro de AA —el marcador da nombre accesible al campo— y ponerles etiqueta cambia la maquetación de un modal, así que no entró con el capítulo que sí les dio la clase de la hoja y el reparto de su error | R41 §43.12 |
+| 44 | ~~**Los tres campos del cambio de contraseña se nombran con un `placeholder`.** No con una etiqueta: el marcador desaparece al escribir, así que quien vuelve al campo ya no sabe cuál es, y no es lo mismo que un `<label>` para quien navega con lector de pantalla. No es un incumplimiento claro de AA —el marcador da nombre accesible al campo— y ponerles etiqueta cambia la maquetación de un modal, así que no entró con el capítulo que sí les dio la clase de la hoja y el reparto de su error~~ — **cerrado en el capítulo 44**, y el punto era correcto en todo, incluido lo que parecía su parte débil. Al montar ese panel en la auditoría, `axe` da **cero infracciones**: un marcador sí da nombre accesible, así que ningún motor se queja de un nombre que se va en cuanto se usa el campo. Son tres cajas de contraseña seguidas, idénticas en cuanto hay algo escrito —una fila de puntos—, y con el marcador como único nombre quien vuelve a la segunda no puede saber si es la nueva o la repetición. Las tres llevan ya su `<label>` con la clase que la hoja define, no un `style` nuevo, y el marcador se queda solo donde dice algo que la etiqueta no dice: «Mínimo 12 caracteres». Sus pruebas dejan de buscar los campos por el marcador y los buscan por su etiqueta, con una nueva que comprueba lo que el punto describía: que el nombre **sigue ahí con el campo lleno** (R42 §44.8) | R41 §43.12 |
 | 45 | **El simulador de scoring no reparte su 422 por campos.** Es el único de los formularios que quedan donde un rechazo por campo es alcanzable —veintisiete campos en el cuerpo—, y todos sus valores salen de deslizadores y listas cerradas, así que un 422 ahí es un fallo de programación y no un dato mal escrito. Con el nombre de la columna ya fuera, lo que se ve es el mensaje del servidor; repartir veintisiete campos para eso es trabajo sin ningún número que corregir | R41 §43.12 |
 | 46 | **El cierre de un prospecto y el registro de una actividad rechazan sin nombrar el campo.** Los dos validan con `model_validator(mode="after")`, así que su 422 lleva `loc: ['body']` y nunca puede señalar un campo —el docstring del cierre dice lo contrario, «la convierte en un 422 que señala el campo», y no es cierto para un validador de modelo—. Pasarlos a validadores de campo permitiría repartirlos en la pantalla, y cambia lo que la API contesta a un cliente que ya existe | R41 §43.10, §43.12 |
+| 47 | **El recorrido con teclado mira 2 de las 18 pantallas, y los anuncios a un lector de pantalla 5.** La auditoría con `axe` pasa desde el capítulo 44 por las dieciocho que llevan controles, y su lista sale del código; las otras dos suites de accesibilidad siguen tomando la suya a mano, y son las que miden lo que `axe` no puede: el **orden real del foco** al tabular y si lo que falla **llega** a un lector de pantalla. No se derivan del código como la de `axe` porque cada pantalla tiene su propio orden esperado y hay que escribirlo —trece recorridos es más trabajo que el capítulo entero—. Lo que sí es cierto es que lo estructural ya lo mira un motor en todas | R42 §44.13 |
+| 48 | **Cuarenta y ocho etiquetas escriben a mano un estilo que la hoja ya define.** En diez componentes, mientras `.form-label` existe en `index.css` y ocho la usan. Es la misma forma que el punto 37 que cerró el capítulo 43 —la hoja lo tiene y el marcado lo reescribe—, una planta más abajo, y **no** es un incumplimiento: ninguna de esas etiquetas forma un par de colores sin medir, porque ninguna escribe su propio fondo. Lo que hay es un tamaño y un color que dependen del archivo, con `--text-muted` en unas y `--text-secondary` en otras, y unificarlo toca diez componentes sin corregir ningún número | R42 §44.15 |
 
 ---
 

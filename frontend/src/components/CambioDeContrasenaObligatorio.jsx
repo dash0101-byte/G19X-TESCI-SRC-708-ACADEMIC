@@ -89,7 +89,12 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
   const campo = { width: '100%', marginBottom: '14px' };
 
   return (
-    <div style={{
+    // `<main>` y no un `<div>`, por lo mismo que `LoginScreen` desde el capítulo 36: esto
+    // es la pantalla entera —`App.jsx` la devuelve **en lugar** del panel— y no había
+    // ninguna región alrededor, así que quien navega por regiones con un lector de pantalla
+    // no tenía adónde saltar en la única pantalla que una cuenta nueva puede ver. La de la
+    // entrada lo arregló entonces porque la auditoría la montaba; esta no se montaba.
+    <main style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -157,6 +162,6 @@ export default function CambioDeContrasenaObligatorio({ user, onCompletado, onSa
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,6 +1,22 @@
 // ============================================================================
-// Accesibilidad: las ocho pantallas, revisadas por un motor y no por una lectura
+// Accesibilidad: todas las pantallas, revisadas por un motor y no por una lectura
 // ============================================================================
+//
+// La cabecera decía «las ocho pantallas» y era verdad: ocho, de dieciocho que llevan cajas
+// de formulario. **La lista estaba escrita a mano**, y es la misma forma que el capítulo 43
+// encontró en `PARES`: lo que la suite mide no es el cliente, es el inventario que alguien
+// escribió. Las nueve que faltaban llevaban 39 de las 105 cajas del cliente, y en ellas
+// había tres controles sin nombre accesible y dos pantallas enteras fuera de toda región.
+//
+// La diferencia se ve en una frase que ya estaba escrita: `LoginScreen` abre con
+// «`<main>` y no un `<div>`: es la pantalla entera y no estaba dentro de ninguna región».
+// Eso lo arregló el capítulo 36 **porque esta auditoría la montaba**. El cambio obligatorio
+// de contraseña y el alta del segundo factor son también la pantalla entera, nunca se
+// montaron aquí, y seguían siendo un `<div>`. El defecto no estaba repartido al azar:
+// seguía la lista.
+//
+// Desde el capítulo 44 la lista no se escribe, se comprueba: `pantallas.test.js` la deriva
+// del código y se pone roja cuando una pantalla con controles no aparece en este archivo.
 //
 // Hasta este capítulo la accesibilidad del cliente estaba cubierta por **una sola regla**
 // del `linter` —`label-has-associated-control`— y el resto del plugin estaba apagado con
@@ -48,6 +64,18 @@ import PanelDeDesenlaces from '../components/PanelDeDesenlaces.jsx';
 import DerechosDelTitular from '../components/DerechosDelTitular.jsx';
 import NewLeadModal from '../components/NewLeadModal.jsx';
 import App from '../App.jsx';
+
+// Las nueve del capítulo 44.
+import AdminPanel from '../components/AdminPanel.jsx';
+import ScoringSimulator from '../components/ScoringSimulator.jsx';
+import SessionModal from '../components/SessionModal.jsx';
+import CambioDeContrasenaObligatorio from '../components/CambioDeContrasenaObligatorio.jsx';
+import AltaDelSegundoFactor from '../components/AltaDelSegundoFactor.jsx';
+import BandejaSinAsociar from '../components/BandejaSinAsociar.jsx';
+import CerrarProspecto from '../components/CerrarProspecto.jsx';
+import CompartirEnRedes from '../components/CompartirEnRedes.jsx';
+import AsignarAsesor from '../components/AsignarAsesor.jsx';
+import LeadsTable from '../components/LeadsTable.jsx';
 
 // ---------------------------------------------------------------------------
 // Datos. Realistas y no vacíos a propósito: una pantalla sin filas no tiene tabla, y una
@@ -243,9 +271,22 @@ beforeEach(() => {
   });
   api.fetchCampaigns.mockResolvedValue([PUBLICACION]);
   api.fetchLeads.mockResolvedValue({ items: PROSPECTOS, total: 2 });
+  // La forma de este doble estaba mal y no se notaba: los motivos iban en un diccionario
+  // de primer nivel y no dentro de cada resultado, y no traía `pide_tramo`. El servidor los
+  // manda dentro (`OpcionDeResultado.motivos`), que es de donde los lee el formulario.
+  // Mientras ninguna prueba eligiera un desenlace, la diferencia no salía: la pantalla no
+  // llegaba a pintar la lista. La del capítulo 44 sí elige, y con la forma vieja reventaba.
   api.fetchOpcionesDeCierre.mockResolvedValue({
-    resultados: [{ clave: 'ganado', etiqueta: 'Ganado' }, { clave: 'perdido', etiqueta: 'Perdido' }],
-    motivos: { ganado: [{ clave: 'precio', etiqueta: 'Precio' }], perdido: [{ clave: 'precio', etiqueta: 'Precio' }] },
+    resultados: [
+      {
+        clave: 'ganado', etiqueta: 'Ganado', pide_tramo: true,
+        motivos: [{ clave: 'precio', etiqueta: 'Precio', descripcion: 'Ganado por precio.' }],
+      },
+      {
+        clave: 'perdido', etiqueta: 'Perdido', pide_tramo: false,
+        motivos: [{ clave: 'precio', etiqueta: 'Precio', descripcion: 'Perdido por precio.' }],
+      },
+    ],
     tramos: [{ clave: 'no_consta', etiqueta: 'Todavía no consta' }],
   });
 });
@@ -488,6 +529,242 @@ describe('el alta de un prospecto con el servidor quejándose', () => {
       expect(id, `${campo} quedó marcado sin decir dónde está su explicación`).not.toBeNull();
       expect(document.getElementById(id), `${campo} apunta a un id que no existe`).not.toBeNull();
     }
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+// ===========================================================================
+// Las nueve que faltaban, y la tabla (capítulo 44)
+// ===========================================================================
+//
+// Cada una se monta **como la monta la aplicación**, y esa frase hace trabajo. Un bloque de
+// una pestaña del panel vive dentro del `<main>` de `App.jsx`; montarlo suelto produce
+// fallos de `region` —«todo el contenido dentro de una marca de región»— que no son suyos.
+// La salida fácil sería apagar esa regla, y eso la apagaría también para las nueve
+// pantallas que hoy la cumplen, que es cambiar un hueco por otro más grande. Así que lo que
+// se escribe aquí es dónde vive cada cosa:
+//
+// * un bloque de pestaña va en `<main>`, porque ahí lo pone `App.jsx`;
+// * un modal se monta solo, porque su `role="dialog"` ya es su región;
+// * una pantalla entera —el cambio obligatorio, el alta del segundo factor— se monta sola
+//   **y tiene que traer su propia región**, porque `App.jsx` la devuelve en lugar del panel
+//   y no hay ningún `<main>` alrededor. Las dos eran un `<div>`; es el arreglo del capítulo.
+
+/** Lo que `App.jsx` pone alrededor de un bloque de pestaña. */
+function enElPanel(contenido) {
+  return <main>{contenido}</main>;
+}
+
+const RECIEN_CREADA = {
+  id: 9, email: 'luis.nuevo@plurione.test', full_name: 'Luis Nuevo Paredes',
+  role: 'Commercial_Executive', must_change_password: true, totp_activo: false,
+};
+
+const ADMINISTRADOR = {
+  id: 2, email: 'admin@plurione.test', full_name: 'Admin de Pruebas',
+  role: 'System_Admin', must_change_password: false, totp_activo: false,
+};
+
+function cuenta(id, nombre, { activo = true, asignados = 0 } = {}) {
+  return {
+    id, full_name: nombre, email: `${nombre.split(' ')[0].toLowerCase()}@plurione.test`,
+    role: 'Commercial_Executive', is_active: activo, is_sales_rep: true,
+    capacity: 50, leads_asignados: asignados, must_change_password: false,
+  };
+}
+
+const ALTA_DEL_SEGUNDO_FACTOR = {
+  uri_otpauth: 'otpauth://totp/PluriOne%3Aadmin%40plurione.test?secret=JBSWY3DPEHPK3PXP',
+  qr_svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 41"><path d="M0 0h1v1h-1z"/></svg>',
+  secreto_en_base32: 'JBSWY3DPEHPK3PXP',
+  codigos_de_recuperacion: [
+    '23AB-CDEF-GHJK', '4MNP-QRST-UVWX', '5YZ2-3456-789A', 'BCDE-FGHJ-KMNP', 'QRST-UVWX-YZ23',
+    '4567-89AB-CDEF', 'GHJK-MNPQ-RSTU', 'VWXY-Z234-5678', '9ABC-DEFG-HJKM', 'NPQR-STUV-WXYZ',
+  ],
+};
+
+const SIN_ASOCIAR = {
+  id: 11, source: 'whatsapp', activity_type: 'WHATSAPP_MESSAGE', channel: 'WhatsApp',
+  direction: 'ENTRANTE', call_outcome: null, contact_email: null,
+  contact_phone: '+525598765432', contact_name: 'Contacto de WhatsApp',
+  occurred_at: '2026-09-10T15:00:00Z', received_at: '2026-09-10T15:00:05Z',
+};
+
+const RED = (clave, etiqueta, extra = {}) => ({
+  clave, etiqueta, activa: true,
+  enlace: `${ENLACE}?r=${clave}`,
+  texto: `Texto de ${etiqueta}\n\n${ENLACE}?r=${clave}`,
+  longitud: 40, maximo: 3000,
+  compartir: `https://ejemplo-${clave}.test/compartir`,
+  admite_texto: true, aviso: null,
+  ...extra,
+});
+
+const PARA_DIFUNDIR = {
+  ...PUBLICACION,
+  difusion: [
+    RED('linkedin', 'LinkedIn', {
+      admite_texto: false,
+      aviso: 'LinkedIn solo recibe el enlace: copia el texto y pégalo en el post.',
+    }),
+    RED('whatsapp', 'WhatsApp', { maximo: 400, longitud: 120 }),
+    RED('x', 'X', { activa: false, maximo: 280 }),
+  ],
+};
+
+describe('la gestión de cuentas', () => {
+  it('cumple el nivel AA con la cartera cargada y el alta de cuenta en pantalla', async () => {
+    api.getCurrentUserRole.mockReturnValue('System_Admin');
+    api.fetchSalesReps.mockResolvedValue({
+      total: 2, items: [cuenta(3, 'Ana Activa Soto', { asignados: 20 }), cuenta(7, 'Marta Baja Ruiz', { activo: false, asignados: 12 })],
+      prospectos_en_cuentas_de_baja: 12,
+    });
+    api.fetchUsers.mockResolvedValue({
+      total: 2, items: [cuenta(3, 'Ana Activa Soto', { asignados: 20 }), ADMINISTRADOR],
+    });
+    render(enElPanel(<AdminPanel onBatchRecalculate={() => {}} isRecalculating={false} />));
+
+    // El alta es donde están ocho de sus doce cajas, y el estado que esta auditoría no
+    // había visto nunca: son las ocho que el capítulo 40 marca con `aria-invalid`.
+    await screen.findByLabelText('Correo institucional');
+    await waitFor(() => expect(screen.getAllByText(/Ana Activa Soto/).length).toBeGreaterThan(0));
+
+    await noDebeTenerInfracciones();
+  });
+
+  it('y con el formulario de restablecer la contraseña de otra cuenta abierto', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    api.getCurrentUserRole.mockReturnValue('System_Admin');
+    api.fetchSalesReps.mockResolvedValue({ total: 1, items: [cuenta(3, 'Ana Activa Soto')], prospectos_en_cuentas_de_baja: 0 });
+    api.fetchUsers.mockResolvedValue({ total: 1, items: [cuenta(3, 'Ana Activa Soto')] });
+    render(enElPanel(<AdminPanel onBatchRecalculate={() => {}} isRecalculating={false} />));
+
+    await usuario.click(await screen.findByRole('button', { name: 'Restablecer contraseña' }));
+    await screen.findByLabelText(/Contraseña nueva para/);
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('el simulador de scoring', () => {
+  it('cumple el nivel AA', async () => {
+    api.predictScoreLive.mockResolvedValue({
+      score: 72.5, score_category: 'HOT', conversion_probability: 0.58,
+      explicacion: null, desglose: [],
+    });
+    render(enElPanel(<ScoringSimulator />));
+    await waitFor(() => expect(api.predictScoreLive).toHaveBeenCalled());
+
+    // Los tres deslizadores no tenían nombre: ni `<label>`, ni `aria-label`, ni `title`.
+    // `axe` lo da como infracción crítica y nadie lo había corrido aquí.
+    await noDebeTenerInfracciones();
+  });
+
+  it('y sus tres deslizadores dicen de qué son', () => {
+    render(enElPanel(<ScoringSimulator />));
+    for (const etiqueta of [/Páginas Vistas/, /Clics en Correos/, /Días de Inactividad/]) {
+      const control = screen.getByLabelText(etiqueta);
+      expect(control.type).toBe('range');
+    }
+  });
+});
+
+describe('el panel de la sesión', () => {
+  it('cumple el nivel AA con el cambio de contraseña abierto', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    render(<SessionModal user={LIDER} onLogout={() => {}} onClose={() => {}} />);
+    await usuario.click(screen.getByRole('button', { name: 'Cambiar mi contraseña' }));
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('el cambio de contraseña obligatorio', () => {
+  it('cumple el nivel AA, y es la pantalla entera: trae su propia región', async () => {
+    render(<CambioDeContrasenaObligatorio user={RECIEN_CREADA} onCompletado={() => {}} onSalir={() => {}} />);
+    await screen.findByLabelText('Contraseña actual');
+
+    // `App.jsx` la devuelve **en lugar** del panel, así que no hay ningún `<main>` arriba.
+    // Era un `<div>`: la pantalla por la que pasa toda cuenta nueva estaba entera fuera de
+    // cualquier región, y quien navega por regiones no tenía dónde saltar.
+    expect(document.querySelector('main')).not.toBeNull();
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('el alta del segundo factor', () => {
+  it('cumple el nivel AA con el QR y los códigos en pantalla', async () => {
+    api.altaDelSegundoFactor.mockResolvedValue(ALTA_DEL_SEGUNDO_FACTOR);
+    render(<AltaDelSegundoFactor user={ADMINISTRADOR} onActivado={() => {}} onSalir={() => {}} />);
+    await screen.findByLabelText(/Código QR/);
+
+    // Lo mismo que la de arriba: pantalla entera, devuelta en lugar del panel, sin región.
+    expect(document.querySelector('main')).not.toBeNull();
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('la bandeja de avisos sin asociar', () => {
+  it('cumple el nivel AA con una fila y su formulario de vinculación', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    api.fetchEventosSinAsociar.mockResolvedValue({ items: [SIN_ASOCIAR], total: 1, limit: 50, offset: 0 });
+    render(enElPanel(<BandejaSinAsociar />));
+    await screen.findByText(/Contacto de WhatsApp/);
+
+    // Y con la confirmación del descarte abierta, que es el bloque que el capítulo 43
+    // escribió para quitar el `window.confirm` y que nadie ha auditado.
+    await usuario.click(screen.getByRole('button', { name: /Descartar/i }));
+    await screen.findByRole('button', { name: /Sí, descartar/i });
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('el cierre de un prospecto', () => {
+  it('cumple el nivel AA con el desenlace elegido y sus tres campos', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const usuario = userEvent.setup();
+    render(enElPanel(<CerrarProspecto lead={PROSPECTO} onCerrado={() => {}} onCancelar={() => {}} />));
+
+    await usuario.click(await screen.findByRole('button', { name: 'Ganado' }));
+    await screen.findByLabelText('¿Por qué?');
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('compartir una publicación en redes', () => {
+  it('cumple el nivel AA con las redes y el código QR', async () => {
+    render(enElPanel(<CompartirEnRedes publicacion={PARA_DIFUNDIR} onCopiar={() => {}} />));
+    await screen.findByRole('list', { name: 'Redes activas' });
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('asignar un asesor a una ficha', () => {
+  it('cumple el nivel AA', async () => {
+    api.getCurrentUserRole.mockReturnValue('Sales_Lead');
+    api.fetchSalesReps.mockResolvedValue({
+      total: 1, items: [cuenta(3, 'Ana Activa Soto', { asignados: 20 })],
+    });
+    render(enElPanel(<AsignarAsesor lead={PROSPECTO} onAsignado={() => {}} />));
+    await waitFor(() => expect(api.fetchSalesReps).toHaveBeenCalled());
+
+    await noDebeTenerInfracciones();
+  });
+});
+
+describe('la tabla de prospectos', () => {
+  it('cumple el nivel AA', async () => {
+    render(enElPanel(
+      <LeadsTable leads={PROSPECTOS} onSelectLead={() => {}} onRefresh={() => {}} />,
+    ));
+    await screen.findByText(/Rosa/);
 
     await noDebeTenerInfracciones();
   });

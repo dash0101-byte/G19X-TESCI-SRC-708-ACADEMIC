@@ -170,12 +170,19 @@ export default function ScoringSimulator() {
             Comportamiento e Interacción Digital
           </div>
 
+          {/* El rótulo de cada deslizador es una `label` con `htmlFor`, y no el `span` que
+              había. Un `span` al lado se lee con los ojos y no existe para el control: el
+              lector de pantalla anunciaba «control de deslizamiento, 6, mínimo 0, máximo
+              25» sin decir de qué, que es §4.1.2 sin cumplir. El número de la derecha se
+              queda fuera de la etiqueta a propósito —el propio control ya anuncia su
+              valor, y meterlo dentro lo haría decir la cifra dos veces—. */}
           <div style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-              <span>Páginas Vistas:</span>
+              <label htmlFor="sim-page-views">Páginas Vistas:</label>
               <strong style={{ fontFamily: 'var(--font-mono)' }}>{formData.page_views}</strong>
             </div>
             <input
+              id="sim-page-views"
               type="range"
               min="0"
               max="25"
@@ -187,10 +194,11 @@ export default function ScoringSimulator() {
 
           <div style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-              <span>Clics en Correos:</span>
+              <label htmlFor="sim-email-clicks">Clics en Correos:</label>
               <strong style={{ fontFamily: 'var(--font-mono)' }}>{formData.email_clicks}</strong>
             </div>
             <input
+              id="sim-email-clicks"
               type="range"
               min="0"
               max="10"
@@ -203,10 +211,11 @@ export default function ScoringSimulator() {
           {/* Temporal Decay Slider */}
           <div style={{ background: 'var(--bg-subtle)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: formData.days_since_last_activity > 14 ? 'var(--warm-text)' : 'var(--text-primary)' }}>
-              <span>⏱️ Días de Inactividad (Decaimiento):</span>
+              <label htmlFor="sim-days-inactive">⏱️ Días de Inactividad (Decaimiento):</label>
               <strong style={{ fontFamily: 'var(--font-mono)' }}>{formData.days_since_last_activity} días</strong>
             </div>
             <input
+              id="sim-days-inactive"
               type="range"
               min="0"
               max="45"
