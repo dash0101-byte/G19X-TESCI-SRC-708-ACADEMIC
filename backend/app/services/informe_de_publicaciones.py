@@ -36,7 +36,7 @@ el resto; el líder y el administrador, todo.
 """
 import datetime
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy import case, false, func, or_
@@ -78,10 +78,6 @@ MAX_DIAS_DEL_GRAFICO = 90
 def _avanzo():
     """Expresión SQL: 1 si la ficha salió de la etapa inicial, 0 si no."""
     return case((Lead.status != ETAPA_INICIAL, 1), else_=0)
-
-
-def _redondear(valor) -> float:
-    return round(float(valor or 0.0), 1)
 
 
 # --------------------------------------------------------------------------- publicación
@@ -295,9 +291,11 @@ def informe(
     propios, ajenos = _condiciones_de_alcance(alcance)
     visibles = base if propios is None else base.filter(propios)
 
-    total, avanzaron, media = visibles.with_entities(
-        func.count(Lead.id), func.sum(_avanzo()), func.avg(Lead.current_score)
-    ).one()
+    # La media ya no se pide aquí: la calcula `media_de_scores` sobre `scores_visibles`,
+    # que es el mismo conjunto —`current_score` es `NOT NULL`, así que `avg` y la media de
+    # esa lista no se pueden separar—, y así la regla de «sin filas no hay media» vive en un
+    # solo sitio para las tres tablas que la enseñan.
+    total, avanzaron = visibles.with_entities(func.count(Lead.id), func.sum(_avanzo())).one()
     de_otros = 0 if ajenos is None else (base.filter(ajenos).with_entities(func.count(Lead.id)).scalar() or 0)
 
     filas = (
@@ -326,7 +324,7 @@ def informe(
         resumen=ResumenDePublicacion(
             perfiles_recibidos=int(total or 0),
             avanzaron_de_etapa=int(avanzaron or 0),
-            score_medio=_redondear(media),
+            score_medio=media_de_scores(list(scores_visibles.values())),
             de_otros_asesores=int(de_otros),
             alcance_completo=alcance.toda_la_cartera,
             visitas=visitas,
@@ -349,6 +347,22 @@ def informe(
 def tasa(envios: int, visitas: int) -> Optional[float]:
     """Envíos entre visitas, en tanto por ciento. Sin visitas no hay tasa, no un 0 %."""
     return round(100.0 * envios / visitas, 1) if visitas else None
+
+
+def media_de_scores(valores: Sequence[float]) -> Optional[float]:
+    """
+    La media de los scores, o `None` si no hay ninguno.
+
+    Es la regla de `tasa()` justo encima, escrita para la columna de al lado. Se encontró
+    recorriendo la demostración: una publicación recién creada salía en la comparativa con
+    «Tasa de envío —» y «Score medio 0», una al lado de la otra y contando lo mismo —que
+    todavía no ha llegado nadie—. El cero no es una media baja: es la media de un conjunto
+    vacío, que no existe, y quien lee la tabla no tiene cómo distinguirlo de una publicación
+    que sí trae perfiles y los trae malos. El panel de desenlaces ya lo hacía así desde el
+    capítulo 30 (`score_medio_de_los_ganados` es `None` sin ganados); esta pantalla es
+    anterior y se quedó con el cero.
+    """
+    return round(sum(valores) / len(valores), 1) if valores else None
 
 
 def _visitas_filtradas(
@@ -462,7 +476,7 @@ def _por_red(
                 perfiles=len(de_esta),
                 envios=envios.get(red, 0),
                 tasa_de_envio=tasa(envios.get(red, 0), visitas.get(red, 0)),
-                score_medio=_redondear(sum(valores) / len(valores)) if valores else 0.0,
+                score_medio=media_de_scores(valores),
             )
         )
     return filas
@@ -696,9 +710,9 @@ def _cuentan_avance(fichas: Iterable[int], estados: Dict[int, tuple]) -> int:
     return sum(1 for f in fichas if estados.get(f, (ETAPA_INICIAL, 0.0))[0] != ETAPA_INICIAL)
 
 
-def _media(fichas, estados: Dict[int, tuple]) -> float:
+def _media(fichas, estados: Dict[int, tuple]) -> Optional[float]:
     valores = [estados[f][1] or 0.0 for f in fichas if f in estados]
-    return _redondear(sum(valores) / len(valores)) if valores else 0.0
+    return media_de_scores(valores)
 
 
 # -------------------------------------------------------------------------- el contador

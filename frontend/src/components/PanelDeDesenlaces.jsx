@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { fetchPanelDeDesenlaces } from '../services/api';
+import { NUMERO, PORCENTAJE } from '../services/cifras';
 
 // Qué se gana, qué se pierde y por qué. La pantalla del líder.
 //
@@ -13,9 +14,6 @@ import { fetchPanelDeDesenlaces } from '../services/api';
 //
 // Cada tasa va acompañada del número de casos que hay detrás, y no por adorno: con doce
 // cierres, cualquier conclusión sobre la calidad del modelo es una anécdota con decimales.
-
-const PORCENTAJE = (valor) => (valor === null || valor === undefined ? '—' : `${valor} %`);
-const NUMERO = (valor) => (valor === null || valor === undefined ? '—' : valor);
 
 const CELDA = { padding: '7px 10px', verticalAlign: 'top' };
 

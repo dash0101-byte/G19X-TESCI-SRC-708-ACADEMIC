@@ -34,7 +34,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1695 pruebas en el backend (93 % de cobertura) y 730 en
+> **Calidad en las dos mitades.** 1700 pruebas en el backend (93 % de cobertura) y 748 en
 > el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
 > encendidas—, y 10 trabajos de integración continua con 59 guardas de regresión de
 > configuración peligrosa y seis guardas de propiedades.

@@ -1,4 +1,5 @@
 import React from 'react';
+import { nombreDeEtapa } from '../services/actividades';
 
 export default function LeadsTable({
   leads,
@@ -230,8 +231,11 @@ export default function LeadsTable({
 
                     {/* Estado */}
                     <td>
+                      {/* La misma traducción que usa la ficha. La columna decía
+                          «QUALIFIED» al lado de una fila que, abierta, dice
+                          «Calificado». */}
                       <span className="badge badge-status">
-                        {lead.status}
+                        {nombreDeEtapa(lead.status)}
                       </span>
                     </td>
 

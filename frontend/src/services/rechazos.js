@@ -38,13 +38,18 @@ export const RUIDO_DE_PYDANTIC = /^(Value error|Assertion failed),\s*/;
  * las puso: no dicen de qué campo hablan, porque eso lo dice el sitio donde salen. Cuando la
  * pantalla no puede repartirlas, lo que se enseña es la frase del servidor y no estas.
  */
+// «1 carácter», no «1 caracteres». La mayoría de los textos obligatorios del panel llevan
+// `min_length=1`, así que el plural mal puesto es justo el caso que más sale: vaciar
+// «Apellidos» en la ficha y guardar contestaba «Tiene que tener al menos 1 caracteres».
+const caracteres = (cuantos) => (cuantos === 1 ? '1 carácter' : `${cuantos} caracteres`);
+
 export const POR_TIPO = {
   missing: () => 'Falta este campo.',
   string_too_short: (item) => (item.ctx && item.ctx.min_length
-    ? `Tiene que tener al menos ${item.ctx.min_length} caracteres.`
+    ? `Tiene que tener al menos ${caracteres(item.ctx.min_length)}.`
     : 'Es demasiado corto.'),
   string_too_long: (item) => (item.ctx && item.ctx.max_length
-    ? `No puede pasar de ${item.ctx.max_length} caracteres.`
+    ? `No puede pasar de ${caracteres(item.ctx.max_length)}.`
     : 'Es demasiado largo.'),
   string_pattern_mismatch: () => 'No tiene la forma que se espera.',
   greater_than_equal: (item) => `Tiene que ser ${item.ctx.ge} o más.`,

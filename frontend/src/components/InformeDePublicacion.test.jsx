@@ -67,6 +67,44 @@ describe('lo que enseña', () => {
     expect(screen.getByText('Score medio').parentElement).toHaveTextContent('60');
   });
 
+  it('y sin perfiles recibidos no hay score medio: un guion, no un cero', async () => {
+    // Lo que se vio en la demostración, en la pantalla de al lado y por el mismo
+    // motivo. Aquí se comprueba además el reparto por red, donde la publicación de
+    // ejemplo tenía tres redes a cero y las tres decían «Score medio 0».
+    fetchInformeDePublicacion.mockResolvedValueOnce({
+      ...INFORME,
+      resumen: {
+        ...INFORME.resumen,
+        perfiles_recibidos: 0,
+        avanzaron_de_etapa: 0,
+        score_medio: null,
+        visitas: 0,
+        envios: 0,
+        tasa_de_envio: null,
+      },
+      filas: [],
+      total: 0,
+      por_red: [
+        { red: 'linkedin', etiqueta: 'LinkedIn', visitas: 0, envios: 0, tasa_de_envio: null, perfiles: 0, score_medio: null },
+        { red: 'whatsapp', etiqueta: 'WhatsApp', visitas: 3, envios: 1, tasa_de_envio: 33.3, perfiles: 1, score_medio: 34.3 },
+      ],
+    });
+    pintar();
+    await screen.findByText('Perfiles recibidos');
+
+    // El primero de cada uno es el dato de la cabecera; el otro es la cabecera de
+    // columna de la tabla por red, que se comprueba abajo.
+    expect(screen.getAllByText('Score medio')[0].parentElement).toHaveTextContent('—');
+    expect(screen.getAllByText('Tasa de envío')[0].parentElement).toHaveTextContent('—');
+
+    const sinNadie = await screen.findByRole('row', { name: /LinkedIn/ });
+    expect(within(sinNadie).getAllByRole('cell').map((c) => c.textContent.trim()))
+      .toEqual(['0', '0', '—', '0', '—']);
+    // Y la red por la que sí llegó alguien conserva su número.
+    const conAlguien = screen.getByRole('row', { name: /WhatsApp/ });
+    expect(conAlguien).toHaveTextContent('34.3');
+  });
+
   it('abajo, la tabla con nombre, empresa, cargo, score, etapa, asesor y fecha', async () => {
     pintar();
     const fila = await screen.findByRole('row', { name: /Ana Prueba/ });

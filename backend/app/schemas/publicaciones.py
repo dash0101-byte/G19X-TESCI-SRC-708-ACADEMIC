@@ -79,7 +79,10 @@ class ResumenDePublicacion(BaseModel):
     """
     perfiles_recibidos: int
     avanzaron_de_etapa: int
-    score_medio: float
+    # `None` sin perfiles recibidos, por lo mismo que `tasa_de_envio` es `None`
+    # sin visitas: la media de un conjunto vacío no es un cero, y las dos cifras
+    # van una al lado de la otra.
+    score_medio: Optional[float] = None
     de_otros_asesores: int = 0
     alcance_completo: bool = True
     # Totales de la publicación en el periodo, sin nombres: cuántas veces se abrió la página
@@ -114,7 +117,7 @@ class FilaDeRed(BaseModel):
     perfiles: int = 0
     envios: int = 0
     tasa_de_envio: Optional[float] = None
-    score_medio: float = 0.0
+    score_medio: Optional[float] = None
 
 
 class FilaDelInforme(BaseModel):
@@ -155,7 +158,7 @@ class FilaDeComparativa(BaseModel):
     estado: str = "activa"
     perfiles_recibidos: int
     avanzaron_de_etapa: int
-    score_medio: float
+    score_medio: Optional[float] = None
     visitas: int = 0
     envios: int = 0
     tasa_de_envio: Optional[float] = None

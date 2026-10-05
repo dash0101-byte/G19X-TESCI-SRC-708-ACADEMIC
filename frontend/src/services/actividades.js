@@ -98,6 +98,31 @@ export function nombreDeEtapa(etapa) {
   return NOMBRES_DE_ETAPA[etapa] || etapa;
 }
 
+// Los sectores que conoce el modelo, escritos como se leen. El valor que viaja es el de la
+// izquierda —es vocabulario del modelo y no se toca—; lo que cambia es lo que se lee.
+//
+// Se encontró recorriendo la página pública desde el teléfono, que es donde la ve quien no
+// trabaja aquí: una página entera en castellano y, en «Sector», siete de las diez opciones
+// en inglés. No es jerga del oficio como «CTO»: son palabras corrientes —banca, salud,
+// logística— que nadie elige en otro idioma para decir a qué se dedica.
+//
+// `NOMBRES_DE_SECTOR` no cubre lo que se escribe a mano en el panel, donde el campo es
+// libre: `nombreDeSector` devuelve tal cual lo que no esté en la tabla.
+export const NOMBRES_DE_SECTOR = {
+  Banking: 'Banca',
+  'E-Commerce': 'Comercio electrónico',
+  Healthcare: 'Salud',
+  Logistics: 'Logística',
+  Retail: 'Comercio minorista',
+  Consulting: 'Consultoría',
+  Manufacturing: 'Manufactura',
+  Education: 'Educación',
+};
+
+export function nombreDeSector(sector) {
+  return NOMBRES_DE_SECTOR[sector] || sector;
+}
+
 export function nombreDeFuente(fuente) {
   return NOMBRES_DE_FUENTE[fuente] || fuente;
 }

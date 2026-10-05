@@ -228,6 +228,25 @@ describe('abrir un prospecto', () => {
     expect(onSelectLead).toHaveBeenCalledWith(12, false);
   });
 
+  it('la columna «Estado» dice la etapa en castellano', async () => {
+    // El servidor guarda la etapa con una clave en inglés y la tabla la enseñaba
+    // tal cual: «QUALIFIED» en la columna, y «Calificado» dos clics más adentro, en
+    // la ficha de esa misma fila. La traducción existe desde el capítulo 29 y su
+    // cabecera dice que es «la única»; esta pantalla no la leía.
+    montar();
+
+    expect(screen.getByText('Calificado')).toBeInTheDocument();
+    expect(screen.queryByText('QUALIFIED')).not.toBeInTheDocument();
+  });
+
+  it('y una etapa que la tabla no conozca se enseña tal cual, sin romperse', () => {
+    // `nombreDeEtapa` devuelve la clave si no la tiene. Vale más una clave en
+    // pantalla que una celda vacía el día que el servidor añada una etapa.
+    montar({ leads: [{ ...PROSPECTO, status: 'ETAPA_NUEVA' }] });
+
+    expect(screen.getByText('ETAPA_NUEVA')).toBeInTheDocument();
+  });
+
   it('los botones de acción de una fila son los de ESA fila', async () => {
     const usuario = userEvent.setup();
     const { onSelectLead } = montar({

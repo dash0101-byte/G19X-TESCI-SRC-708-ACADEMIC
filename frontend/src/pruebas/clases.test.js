@@ -178,6 +178,53 @@ describe('las clases del marcado', () => {
     ).toMatch(/color:\s*inherit/);
   });
 
+  it('y también de qué color es su fondo', () => {
+    // La otra mitad del mismo arreglo, y tardó seis capítulos en aparecer porque el de
+    // arriba miró el texto y dio el caso por cerrado. `.btn` tampoco declaraba `background`,
+    // y un `<button>` sin fondo declarado se queda con el gris claro del navegador: con el
+    // texto heredando el casi blanco del panel, los cuatro botones sin variante eran blanco
+    // sobre blanco. Razón de contraste 1,03:1.
+    //
+    // Uno de ellos es «Cerrar sesión» en la pantalla de alta del segundo factor, que es la
+    // ÚNICA pantalla que ve una cuenta de administración mientras no lo active: la única
+    // salida de la pantalla, invisible. Se encontró entrando con `admin.ti` a mirar la
+    // demostración, no leyendo código.
+    //
+    // `contraste.test.js` no podía verlo: sus pares son de tokens de la paleta, y aquí el
+    // fondo no era un token, era el del navegador. Por eso la comprobación vive aquí, con
+    // las demás que preguntan **si la hoja dice algo** sobre lo que se dibuja.
+    const regla = /\n\.btn \{([\s\S]*?)\n\}/.exec(HOJA);
+    expect(regla, 'desapareció la regla base de .btn').not.toBeNull();
+    expect(
+      regla[1],
+      '.btn volvió a no declarar fondo: un <button class="btn"> sin variante se dibuja con '
+      + 'el gris del navegador y su texto hereda el del panel oscuro',
+    ).toMatch(/background:\s*\S/);
+  });
+
+  it('ninguna regla de botón pone un color de texto sin poner el fondo debajo', () => {
+    // Derivada de la hoja y no de una lista escrita a mano: el defecto de arriba estuvo seis
+    // capítulos en `.btn` porque nadie volvió a contar qué declara cada regla de botón. Si
+    // mañana aparece `.btn-fantasma`, esta prueba la cuenta sola.
+    //
+    // La pareja es la comprobación, no cada mitad: una regla que decide de qué color se lee
+    // un botón está decidiendo un contraste, y el contraste tiene dos lados. `.btn-sm` no
+    // sale aquí y no es una excepción escrita a mano: no declara color, porque solo cambia
+    // el tamaño. Las que deciden color son las que tienen que decir sobre qué.
+    const reglas = [...HOJA.matchAll(/\n(\.btn[\w-]*) \{([\s\S]*?)\n\}/g)]
+      .filter(([, selector]) => !selector.includes(':'));
+    expect(reglas.length, 'no se leyó ninguna regla de botón de la hoja').toBeGreaterThan(3);
+    const descuadradas = reglas
+      .filter(([, , cuerpo]) => /(^|\n)\s*color:\s*\S/.test(cuerpo) && !/background:\s*\S/.test(cuerpo))
+      .map(([, selector]) => selector);
+    expect(
+      descuadradas,
+      'Estas clases de botón deciden el color del texto y dejan el fondo al navegador, que '
+      + 'sobre un panel oscuro pinta su gris claro y vuelve el texto ilegible: '
+      + `${descuadradas.join(', ')}`,
+    ).toEqual([]);
+  });
+
   it('y ningún enlace se queda con «btn» a secas', () => {
     // El arreglo de arriba hace legible ese caso; esto impide que vuelva a haber un enlace
     // con aspecto de nada. Las variantes son las que le dan fondo y borde.

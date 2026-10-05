@@ -91,6 +91,27 @@ describe('lo que enseña', () => {
     expect(botones.map((b) => b.value)).toEqual(Object.keys(PUBLICACION.opciones.necesidades));
   });
 
+  it('el sector se lee en castellano y viaja en el vocabulario del modelo', async () => {
+    // La página entera está en castellano y el selector de sector ofrecía «Banking»,
+    // «Healthcare», «Logistics», «Retail», «Consulting», «Manufacturing» y
+    // «Education»: siete de diez. Lo ve quien no trabaja aquí, desde el teléfono, y
+    // no es jerga del oficio como «CTO»: son palabras corrientes que nadie elige en
+    // otro idioma para decir a qué se dedica.
+    //
+    // El `value` no se toca: es el vocabulario con el que el modelo puntúa, y la
+    // guarda del CI compara esta lista con la suya. La prueba de arriba lo fija.
+    await abrir();
+
+    const sector = screen.getByLabelText('Sector');
+    const porValor = Object.fromEntries(
+      within(sector).getAllByRole('option').map((o) => [o.value, o.textContent]),
+    );
+    expect(porValor.Education).toBe('Educación');
+    // Y las que ya se leían en castellano no se tocan.
+    expect(porValor.FinTech).toBe('FinTech');
+    expect(porValor['Software/TI']).toBe('Software/TI');
+  });
+
   it('obligatorio solo lo imprescindible; teléfono y LinkedIn, plegados', async () => {
     await abrir();
 

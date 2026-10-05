@@ -51,6 +51,7 @@ import {
   getCurrentUserRole,
   logout,
   recalculateAllScores,
+  login,
   restoreSession,
   setSessionExpiredHandler,
   changeOwnPassword,
@@ -66,20 +67,32 @@ import {
 // de pestaña no se puede comprobar ninguna de las dos. Siguen siendo botones pelados: no
 // deciden qué se ve, solo piden el cambio, que es lo que hace la barra de verdad.
 vi.mock('./components/Navbar', () => ({
-  default: ({ setActiveTab }) => (
+  default: ({ setActiveTab, onOpenSessionModal }) => (
     <nav data-testid="navbar">
       {['hoy', 'dashboard', 'leads', 'publicaciones', 'admin'].map((pestana) => (
         <button key={pestana} type="button" onClick={() => setActiveTab(pestana)}>
           {pestana}
         </button>
       ))}
+      <button type="button" onClick={onOpenSessionModal}>mi sesión</button>
     </nav>
   ),
 }));
 vi.mock('./components/BandejaDeHoy', () => ({ default: () => <div data-testid="bandeja-de-hoy" /> }));
 vi.mock('./components/KPICards', () => ({ default: () => <div data-testid="kpis" /> }));
 vi.mock('./components/AnalyticsCharts', () => ({ default: () => <div data-testid="graficas" /> }));
-vi.mock('./components/LeadsTable', () => ({ default: () => <div data-testid="tabla-de-prospectos" /> }));
+// La matriz enseña el filtro que `App` le pasa, porque el filtro es estado de
+// `App` y es lo que esta prueba mide: quién lo pone y quién lo quita.
+vi.mock('./components/LeadsTable', () => ({
+  default: ({ searchQuery, setSearchQuery, selectedCategory, setSelectedCategory }) => (
+    <div data-testid="tabla-de-prospectos">
+      <span data-testid="busqueda">{searchQuery}</span>
+      <span data-testid="cuadrante">{selectedCategory}</span>
+      <button type="button" onClick={() => setSearchQuery('Lucía Prado')}>buscar a alguien</button>
+      <button type="button" onClick={() => setSelectedCategory('HOT')}>solo los HOT</button>
+    </div>
+  ),
+}));
 vi.mock('./components/LeadDetailModal', () => ({ default: () => <div data-testid="ficha" /> }));
 vi.mock('./components/ScoringSimulator', () => ({ default: () => <div data-testid="simulador" /> }));
 // El panel de administración, con el único botón que `App` le pasa: el del recálculo
@@ -96,7 +109,13 @@ vi.mock('./components/AdminPanel', () => ({
 vi.mock('./components/BandejaSinAsociar', () => ({ default: () => <div data-testid="sin-asociar" /> }));
 vi.mock('./components/Publicaciones', () => ({ default: () => <div data-testid="publicaciones" /> }));
 vi.mock('./components/PanelDeDesenlaces', () => ({ default: () => <div data-testid="desenlaces" /> }));
-vi.mock('./components/SessionModal', () => ({ default: () => <div data-testid="sesion" /> }));
+vi.mock('./components/SessionModal', () => ({
+  default: ({ onLogout }) => (
+    <div data-testid="sesion">
+      <button type="button" onClick={onLogout}>cerrar sesión</button>
+    </div>
+  ),
+}));
 vi.mock('./components/NewLeadModal', () => ({ default: () => <div data-testid="alta" /> }));
 vi.mock('./components/AltaDelSegundoFactor', () => ({ default: () => <div data-testid="alta-del-segundo-factor" /> }));
 
@@ -225,6 +244,78 @@ describe('con sesión utilizable', () => {
     render(<App />);
     expect(await screen.findByTestId('bandeja-de-hoy')).toBeInTheDocument();
     expect(screen.queryByTestId('administracion')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Salir devuelve la pantalla a como estaba
+// ============================================================================
+//
+// Encontrado recorriendo la demostración con los tres roles, no leyendo código. El
+// líder buscó a una persona por su nombre en la matriz, cerró sesión y entró la
+// asesora: su cartera, que son tres prospectos, salía con uno. El buscador seguía
+// con el nombre que había escrito el líder —un nombre que además no era de su
+// cartera— y nada en la pantalla explicaba por qué faltaban los otros dos.
+//
+// `handleLogout` sí limpiaba: usuario, pestaña, resumen, campañas, prospectos y el
+// contador. La lista se escribió a mano el día que nació y se quedó corta cuando
+// llegaron el buscador y el cuadrante. Es la avería de siempre: no falla, no sale
+// en ninguna cobertura, y lo que deja en pantalla es de otra persona.
+
+describe('al cerrar sesión', () => {
+  const OTRA_PERSONA = {
+    ...ASESOR, id: 8, email: 'otra@plurione.test', full_name: 'Otra Persona',
+  };
+
+  /** Entra, se va a la matriz y deja puestos los dos filtros. */
+  async function entrarYFiltrar() {
+    conSesion(ASESOR);
+    render(<App />);
+    await screen.findByTestId('navbar');
+    await userEvent.click(screen.getByRole('button', { name: 'leads' }));
+    await userEvent.click(screen.getByRole('button', { name: 'buscar a alguien' }));
+    await userEvent.click(screen.getByRole('button', { name: 'solo los HOT' }));
+    expect(screen.getByTestId('busqueda')).toHaveTextContent('Lucía Prado');
+    expect(screen.getByTestId('cuadrante')).toHaveTextContent('HOT');
+  }
+
+  /** Y entra otra persona en el mismo navegador, que es lo que pasa en un equipo compartido. */
+  async function entraOtraPersona() {
+    login.mockResolvedValue(OTRA_PERSONA);
+    await userEvent.type(await screen.findByLabelText(/Correo corporativo/), OTRA_PERSONA.email);
+    await userEvent.type(screen.getByLabelText(/Contraseña/), 'la-que-sea-12');
+    await userEvent.click(screen.getByRole('button', { name: /Iniciar sesión/ }));
+    await screen.findByTestId('navbar');
+  }
+
+  it('mientras hay sesión, el filtro sí viaja: por eso la lista llegaba recortada', async () => {
+    // El contraste que da sentido a la prueba de abajo. Sin esto, «va sin filtro»
+    // podría estar comprobando que el filtro no viaja nunca.
+    await entrarYFiltrar();
+
+    await waitFor(() => {
+      expect(fetchLeads.mock.calls.at(-1)[0]).toMatchObject({
+        search: 'Lucía Prado', category: 'HOT',
+      });
+    });
+  });
+
+  it('lo que escribió el anterior no filtra la cartera del siguiente', async () => {
+    await entrarYFiltrar();
+    await userEvent.click(screen.getByRole('button', { name: 'mi sesión' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'cerrar sesión' }));
+    fetchLeads.mockClear();
+
+    await entraOtraPersona();
+
+    // Lo que se le pide al servidor, que es lo que decide qué filas llegan.
+    await waitFor(() => expect(fetchLeads).toHaveBeenCalled());
+    expect(fetchLeads.mock.calls.at(-1)[0]).toMatchObject({ search: '', category: '' });
+
+    // Y lo que se ve en la caja, que es lo que explica —o no— por qué faltan filas.
+    await userEvent.click(screen.getByRole('button', { name: 'leads' }));
+    expect(screen.getByTestId('busqueda')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('cuadrante')).toBeEmptyDOMElement();
   });
 });
 

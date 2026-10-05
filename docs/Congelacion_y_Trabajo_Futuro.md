@@ -3,7 +3,34 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 2 de octubre de 2026 (apéndice del capítulo 45)
+**Última revisión:** 5 de octubre de 2026 (recorrido de la demostración)
+
+> **Recorrido de la demostración, 5 de octubre de 2026.** No es un capítulo ni una
+> auditoría: es la historia del README recorrida en el navegador con los tres roles y con
+> una persona interesada desde la vista de teléfono, apuntando todo lo que falla, se ve
+> mal, está en otro idioma o confunde. La congelación se mantiene; lo que entró son
+> correcciones, cada una con su prueba.
+>
+> **Lo primero que apareció no estaba en el código.** La pila que llevaba levantada toda
+> la mañana servía la imagen del **1 de octubre**: su `app.css` tenía 8 KB y no traía
+> ninguna de las reglas de `CompartirEnRedes`, así que el panel de difusión salía con el
+> estilo por omisión del navegador —lo que el capítulo 39 cerró— y los capítulos 42 a 45
+> no estaban en lo que se iba a enseñar. Nada lo decía: la pila arranca igual, los seis
+> contenedores se ponen verdes y la pantalla funciona. Está anotado como punto 56.
+>
+> **Lo que se corrigió, con su prueba y su arnés** (11 defectos reintroducidos, 11
+> detectados): la media de un conjunto vacío salía como **0** al lado de una tasa que sí
+> decía «—», en las tres tablas que la enseñan; el embudo del tablero y la columna
+> «Estado» de la matriz enseñaban **`NEW`, `ENGAGED`, `QUALIFIED`** teniendo la tabla de
+> traducción escrita desde el capítulo 29 y usada por la ficha; cerrar sesión no limpiaba
+> el buscador ni el cuadrante, de modo que la asesora entraba y veía **uno** de sus tres
+> prospectos, filtrados por un nombre que había escrito el líder; `.btn` sin variante
+> seguía sin declarar **fondo** —el capítulo 39 le dio el color del texto y dio el caso por
+> cerrado—, y eso dejaba cuatro botones de blanco sobre blanco, uno de ellos el «Cerrar
+> sesión» de la pantalla de alta del segundo factor, que es la única salida de la única
+> pantalla que ve una cuenta de administración; el selector de **Sector** de la página
+> pública ofrecía siete opciones de diez en inglés; y vaciar un campo de la ficha
+> contestaba «Tiene que tener al menos **1 caracteres**».
 
 > **Revisión del capítulo 45.** La congelación se mantiene, y este capítulo la abrió **para
 > el punto 46 de §6.4 y para nada más**. El punto decía, de los validadores de modelo que
@@ -1224,6 +1251,12 @@ defectos reintroducidos y 22 detectados.
 | 48 | **Cuarenta y ocho etiquetas escriben a mano un estilo que la hoja ya define.** En diez componentes, mientras `.form-label` existe en `index.css` y ocho la usan. Es la misma forma que el punto 37 que cerró el capítulo 43 —la hoja lo tiene y el marcado lo reescribe—, una planta más abajo, y **no** es un incumplimiento: ninguna de esas etiquetas forma un par de colores sin medir, porque ninguna escribe su propio fondo. Lo que hay es un tamaño y un color que dependen del archivo, con `--text-muted` en unas y `--text-secondary` en otras, y unificarlo toca diez componentes sin corregir ningún número | R42 §44.15 |
 | 49 | **El formulario de actividad y el de cierre no reparten su 422 por campos.** Son los dos del panel que no lo hacen, y desde el capítulo 45 ya **no** es un problema de idioma —los seis de nueve rechazos que llegaban en inglés llegan en castellano— sino de **dónde cae el renglón**: en el aviso de arriba y no debajo de su campo. Repartiría poco: los dos tienen pocos campos y casi todos sus rechazos son de listas cerradas que el propio desplegable ofrece, así que un 422 ahí es un fallo de programación y no un dato mal escrito —el mismo argumento que el punto 45—. Y el del cierre depende de la mitad abierta del punto 46, porque todos sus rechazos salen de un validador de modelo | R43 §45.7, §45.14 |
 | 50 | **Un tipo de rechazo que la tabla del cliente no conozca sale como «No se admite este valor».** Mejor que el inglés y peor que una frase. La tabla cubre hoy los diecinueve tipos que las diecisiete puertas con cuerpo pueden contestar, y `test_lo_que_el_cliente_sabe_decir_de_un_rechazo.py` los deriva de los esquemas y exige que los cubra, así que el hueco no se puede llenar en silencio: un tipo nuevo nace en rojo. Lo que no tiene arreglo sin una segunda fuente de verdad es que el cliente diga algo sensato de un tipo que nadie ha visto todavía | R43 §45.9, §45.14 |
+| 51 | **«Ver y repartir» no reparte: lleva a la matriz entera.** El contador del tablero dice «4 nuevos de publicaciones, sin asesor» y su botón cambia a la pestaña de prospectos sin filtrar nada, así que el líder aterriza en las dieciséis filas y tiene que encontrar las cuatro a ojo —la fila las marca con «Nuevo, sin asesor», pero los únicos filtros de esa pantalla son los tres cuadrantes de score—. El componente lo dice en su propio comentario: «aquí además lleva a la matriz, que es donde se abre la ficha y se asigna», así que el comportamiento es el previsto y lo que promete de más es la etiqueta. Darle un filtro propio es funcionalidad nueva | Demo 05-10-2026 |
+| 52 | **Siete formularios del panel dejan la queja de un campo vacío al navegador, que la escribe en SU idioma.** Llevan `required` sin `noValidate`, así que quien pulsa «Consultar qué consta» con el correo en blanco recibe el globo del navegador y no un mensaje de la página: en un Chrome en inglés, **«Please fill out this field.»** dentro del panel en castellano. La página pública hace lo contrario desde el capítulo 39 —`noValidate` y su propio mensaje bajo cada campo—, y la razón está escrita en `LeadDetailModal`: «un cuadro del navegador no se puede señalar junto a un campo, no lo anuncia la página y tapa el formulario que hay que corregir». Son los de derechos del titular, alta de cuenta, cambio de contraseña, cierre de prospecto, alta del segundo factor, acceso y edición de ficha: **siete**, y hacerlo bien es escribir la validación de los siete | Demo 05-10-2026 |
+| 53 | **La lista de cargos de la página pública mezcla los dos idiomas dentro de sí misma.** «Director de Tecnología» y «Gerente de Talento TI» conviven con «Head of Engineering» y «Engineering Manager». Los sectores se corrigieron el 05-10-2026 —son palabras corrientes y nadie dice «me dedico al Banking»—; los cargos no, y la razón es que un cargo es como se llama alguien: traducir «Head of Engineering» a «Jefe de Ingeniería» puede hacer que quien lo es no reconozca el suyo. Decidir qué pesa más es una decisión de producto y no una corrección | Demo 05-10-2026 |
+| 54 | **Las dos listas de sector del panel están escritas a mano, son distintas entre sí y ninguna es la del modelo.** El alta ofrece «Banking / Banca», «Educación / Universidades», «Salud / HealthTech»; la edición ofrece «Banca y Finanzas», «Logistics», «Manufactura», «Retail / E-Commerce». El campo es de texto libre a propósito —lo que no está en el vocabulario del modelo se trata como desconocido—, así que no hay ningún dato mal; lo que hay son dos sugerencias que no coinciden ni entre ellas ni con las diez categorías que el modelo conoce, de modo que escribir el sector desde el panel o desde la página pública produce fichas que no se agrupan igual. Unificarlas es decidir antes si ese campo sigue siendo libre | Demo 05-10-2026 |
+| 55 | **La matriz de prospectos desborda en horizontal y su primera columna no es fija.** Con nueve columnas, por debajo de unos 1200 px la tabla se lleva «Cuadrante», «Estado» y «Acciones» fuera de la vista; hay barra de desplazamiento, pero al usarla se pierde el nombre del prospecto, que es la primera columna. No se ve en la suite —`jsdom` no dibuja— y no se vio antes porque la demostración se ensaya en una pantalla ancha | Demo 05-10-2026 |
+| 56 | **Nada comprueba que la pila levantada sea de este código.** `pila.py up -d` sin `--build` reutiliza la imagen que haya, y una imagen vieja arranca igual de bien: los seis contenedores se ponen verdes y el panel funciona. El 05-10-2026 llevaba toda la mañana levantada una del **1 de octubre**, cuatro capítulos por detrás, y lo que la delató fue mirar un panel que salía sin estilos —no una comprobación—. El compose ya avisa de la mitad de abajo de este problema (el `target` explícito del Dockerfile del cliente, que servía un `dist/` viejo); lo que falta es que algo compare lo que sirve la pila con el commit que hay en el árbol. Un `/health` que devolviera la revisión construida lo resolvería, y es funcionalidad nueva | Demo 05-10-2026 |
 
 ---
 

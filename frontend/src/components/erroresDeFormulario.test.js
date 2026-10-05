@@ -102,6 +102,25 @@ describe('qué se dice de un renglón del 422', () => {
     })).toBe('Tiene que tener al menos 2 caracteres.');
   });
 
+  it('y cuando el número es uno, la frase concuerda', () => {
+    // Vaciar «Apellidos» en la ficha y guardar contestaba «Tiene que tener al menos
+    // 1 caracteres». Casi todos los textos obligatorios del panel llevan
+    // `min_length=1`, así que el plural mal puesto era justo el caso que más sale.
+    expect(mensajeDelRenglon({
+      type: 'string_too_short',
+      loc: ['body', 'last_name'],
+      msg: 'String should have at least 1 character',
+      ctx: { min_length: 1 },
+    })).toBe('Tiene que tener al menos 1 carácter.');
+
+    expect(mensajeDelRenglon({
+      type: 'string_too_long',
+      loc: ['body', 'codigo'],
+      msg: 'String should have at most 1 character',
+      ctx: { max_length: 1 },
+    })).toBe('No puede pasar de 1 carácter.');
+  });
+
   it('un tipo con contexto incompleto no tumba el formulario', () => {
     // Un `ctx` que no trae lo que su tipo promete es un error del servidor, no de quien
     // rellena el formulario. El objetivo era explicar un error, no provocar otro.

@@ -1,4 +1,5 @@
 import React from 'react';
+import { nombreDeEtapa } from '../services/actividades';
 
 export default function AnalyticsCharts({ summary, campaigns }) {
   if (!summary) return null;
@@ -80,7 +81,12 @@ export default function AnalyticsCharts({ summary, campaigns }) {
             return (
               <div key={stage}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{stage}</span>
+                  {/* El embudo enseñaba la clave del servidor: «NEW», «ENGAGED»,
+                      «QUALIFIED». La traducción existe desde el capítulo 29 y su
+                      cabecera dice que es «la única»; la leen la ficha, el selector
+                      de etapa y el informe de cada publicación. La pantalla que el
+                      líder abre primero no la leía. */}
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{nombreDeEtapa(stage)}</span>
                   <span style={{ color: 'var(--text-primary)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{count} leads ({pct}%)</span>
                 </div>
                 <div style={{ height: '8px', background: 'var(--bg-chip)', borderRadius: '4px', overflow: 'hidden' }}>

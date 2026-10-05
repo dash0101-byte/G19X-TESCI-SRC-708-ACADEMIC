@@ -11,6 +11,7 @@ import {
   fetchVistaPreviaDePublicacion,
   updateCampaign,
 } from '../services/api';
+import { NUMERO, PORCENTAJE } from '../services/cifras';
 import CompartirEnRedes, { RedesDelFormulario } from './CompartirEnRedes';
 import ContadorSinAsesor from './ContadorSinAsesor';
 import InformeDePublicacion from './InformeDePublicacion';
@@ -475,11 +476,14 @@ export default function Publicaciones({ puedeGestionar = false, onSelectLead }) 
                   </th>
                   <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{fila.visitas}</td>
                   <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>
-                    {fila.tasa_de_envio === null || fila.tasa_de_envio === undefined ? '—' : `${fila.tasa_de_envio} %`}
+                    {PORCENTAJE(fila.tasa_de_envio)}
                   </td>
                   <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{fila.perfiles_recibidos}</td>
                   <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{fila.avanzaron_de_etapa}</td>
-                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{fila.score_medio}</td>
+                  {/* Una publicación recién creada salía con «Tasa de envío —» y
+                      «Score medio 0» en la misma fila, y las dos cifras cuentan lo
+                      mismo: que todavía no ha llegado nadie. */}
+                  <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)' }}>{NUMERO(fila.score_medio)}</td>
                 </tr>
               ))}
             </tbody>

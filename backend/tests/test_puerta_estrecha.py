@@ -139,6 +139,79 @@ def _publicada(puerta: str, ruta: str) -> bool:
     return False
 
 
+def _cache_de(bloque: str, ruta: str) -> str:
+    """
+    Qué `Cache-Control` emite ese servidor para esa ruta, leyendo sus `location`.
+
+    Las `location` de expresión regular ganan a las de prefijo, que es lo que hace nginx y
+    es justo lo que decide este caso: `/assets/app.js` casa con las dos.
+    """
+    bloques = re.findall(
+        r"location\s+(~\s+\"?[^\s\"{]+\"?|/[A-Za-z0-9_./-]*)\s*\{(.*?)\n    \}",
+        bloque,
+        re.S,
+    )
+    regex, prefijos = [], []
+    for selector, cuerpo in bloques:
+        cache = re.search(r'add_header\s+Cache-Control\s+"([^"]+)"', cuerpo)
+        if selector.startswith("~"):
+            regex.append((selector[1:].strip().strip('"'), cache))
+        else:
+            prefijos.append((selector, cache))
+    for expresion, cache in regex:
+        if re.search(expresion, ruta):
+            return cache.group(1) if cache else ""
+    for prefijo, cache in sorted(prefijos, key=lambda p: -len(p[0])):
+        if prefijo != "/" and ruta.startswith(prefijo):
+            return cache.group(1) if cache else ""
+    return ""
+
+
+@pytest.mark.parametrize("entrada", ["/assets/app.js", "/assets/app.css"])
+def test_la_entrada_de_la_aplicacion_no_se_cachea_para_siempre_por_ninguna_puerta(entrada):
+    """
+    El nombre es fijo, así que `immutable` lo congela para siempre.
+
+    `vite.config.js` fija el nombre de la entrada —`app.js` y `app.css`, sin huella— porque
+    el HTML de la página pública lo nombra desde el backend, que no conoce las huellas. Un
+    archivo de nombre fijo marcado `immutable` es un archivo que el navegador **no vuelve a
+    pedir**: ni siquiera pregunta si cambió.
+
+    El servidor del panel lo tenía bien desde el capítulo 34, con su motivo escrito al lado.
+    La puerta pública, que es la copia de ese bloque, no: servía las dos entradas con
+    `max-age=31536000, immutable`. Y es donde más duele, porque por el 80 entra gente de la
+    oficina y por el 8080 entra un desconocido que abrió un enlace de LinkedIn o escaneó un
+    código impreso: cualquier corrección de la página de interés no le llegaba nunca.
+
+    Se encontró recorriendo la demostración: tras reconstruir la pila, el panel enseñaba el
+    arreglo y la misma página por la puerta pública seguía con la versión anterior.
+    """
+    texto = NGINX.read_text(encoding="utf-8")
+    inicio = texto.index("listen 8080;")
+    bloque_de_la_puerta = texto[texto.rindex("server {", 0, inicio):]
+    bloque_del_panel = texto[:texto.rindex("server {", 0, inicio)]
+
+    for donde, bloque in (("el panel", bloque_del_panel), ("la puerta pública", bloque_de_la_puerta)):
+        cache = _cache_de(bloque, entrada)
+        assert cache, f"{donde} no dice nada del `Cache-Control` de {entrada}"
+        assert "immutable" not in cache, (
+            f"{donde} sirve {entrada} como «{cache}»: nombre fijo marcado inmutable, "
+            "así que el navegador se queda con esa copia y no vuelve a preguntar"
+        )
+        assert "no-cache" in cache, (
+            f"{donde} sirve {entrada} como «{cache}», y tiene que revalidar"
+        )
+
+
+def test_los_assets_con_huella_si_se_cachean(puerta):
+    """
+    La otra mitad: quitarle `immutable` a todo haría pasar la prueba de arriba y tiraría a
+    la basura la caché de las fuentes, que sí llevan huella en el nombre y por eso pueden
+    cachearse para siempre.
+    """
+    assert "immutable" in _cache_de(puerta, "/assets/inter-latin-wght-normal-Dx4kXJAl.woff2")
+
+
 def test_la_puerta_no_publica_la_documentacion_aunque_cambie_de_sitio(puerta):
     """
     Las rutas de arriba son direcciones concretas; esta mira el otro lado.

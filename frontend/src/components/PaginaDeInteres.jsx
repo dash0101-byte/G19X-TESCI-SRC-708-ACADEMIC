@@ -4,6 +4,7 @@ import { enviarInteres, fetchPublicacionDeInteres } from '../services/api';
 // para que los cuatro formularios del panel lo usen, y esta página lo importa en vez de
 // quedarse con su copia: dos copias de la misma mecánica son dos cosas que se separan.
 import MensajeDeCampo from './MensajeDeCampo.jsx';
+import { nombreDeSector } from '../services/actividades';
 import {
   comoAviso,
   enfocarPrimerCampoConError,
@@ -325,7 +326,11 @@ export default function PaginaDeInteres({ slug, red = '', vistaPrevia = null }) 
               <select id="interes-sector" className="input-field" required {...conError('sector')}
                 value={formulario.sector} onChange={(e) => cambiar('sector', e.target.value)}>
                 <option value="">Elige</option>
-                {opciones.sectores.map((valor) => <option key={valor} value={valor}>{valor}</option>)}
+                {/* El `value` es el del modelo y no se toca —la guarda del CI compara
+                    esta lista con la suya—; lo que se traduce es lo que se lee. */}
+                {opciones.sectores.map((valor) => (
+                  <option key={valor} value={valor}>{nombreDeSector(valor)}</option>
+                ))}
               </select>
               {mensaje('sector')}
             </div>

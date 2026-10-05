@@ -133,6 +133,17 @@ export default function App() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
 
+  // Salir deja la pantalla como la encontró quien entre después. La lista de
+  // abajo se escribió a mano el día que nació y se quedó corta: el buscador y el
+  // cuadrante son estado de la vista igual que los datos, y nadie volvió a leerla
+  // cuando se añadieron. Se vio recorriendo la demostración: el líder había buscado
+  // a una persona, cerró sesión, entró la asesora y su cartera —tres prospectos—
+  // salía con uno, filtrada por un nombre que ella no había escrito y que no era
+  // suyo. No hay nada en la pantalla que explique por qué faltan los otros dos.
+  //
+  // `selectedLead` entra por lo mismo aunque hoy no se pueda salir con la ficha
+  // abierta —el modal tapa la barra—: es la ficha de otra persona, guardada en la
+  // memoria del navegador para la sesión siguiente.
   const handleLogout = async () => {
     await logout();
     setUser(null);
@@ -141,6 +152,9 @@ export default function App() {
     setCampaigns([]);
     setLeads([]);
     setSinAsesor(null);
+    setSelectedCategory('');
+    setSearchQuery('');
+    setSelectedLead(null);
   };
 
   // `useCallback` no está aquí por rendimiento: sin él, estas funciones se recrean en

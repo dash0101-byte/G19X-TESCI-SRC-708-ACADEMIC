@@ -507,6 +507,40 @@ describe('la comparativa y el contador del líder', () => {
     expect(antigua).toHaveTextContent('—');
   });
 
+  it('una publicación sin perfiles no tiene score medio, y eso no es un cero', async () => {
+    // Encontrado recorriendo la demostración: la publicación recién creada salía
+    // con «Tasa de envío —» y «Score medio 0» en la misma fila, y las dos cifras
+    // cuentan lo mismo —que no ha llegado nadie—. El cero se lee como una media
+    // baja: quien compara no distingue «no ha venido nadie» de «viene gente que no
+    // vale».
+    fetchComparativaDePublicaciones.mockResolvedValueOnce({
+      items: [{
+        publicacion_id: 5, titulo: PUBLICACION.name, activa: true, estado: 'activa',
+        perfiles_recibidos: 0, avanzaron_de_etapa: 0, score_medio: null,
+        visitas: 0, envios: 0, tasa_de_envio: null,
+      }],
+    });
+    render(<Publicaciones puedeGestionar />);
+    await esperarPublicacion(PUBLICACION.name);
+
+    const fila = within(screen.getByRole('table'))
+      .getByRole('row', { name: /Post · Talento TI septiembre/ });
+    const celdas = within(fila).getAllByRole('cell').map((c) => c.textContent.trim());
+    // Visitas, tasa, perfiles, avanzaron, score medio.
+    expect(celdas).toEqual(['0', '—', '0', '0', '—']);
+  });
+
+  it('y con perfiles la columna sigue siendo el número', async () => {
+    // La otra mitad: devolver siempre «—» haría pasar la de arriba y dejaría la
+    // columna muda en todas las publicaciones.
+    render(<Publicaciones puedeGestionar />);
+    await esperarPublicacion(PUBLICACION.name);
+
+    const fila = within(screen.getByRole('table'))
+      .getByRole('row', { name: /Post · Talento TI septiembre/ });
+    expect(fila).toHaveTextContent('61.5');
+  });
+
   it('al asesor no se le piden: el servidor no se los daría', async () => {
     render(<Publicaciones />);
     await esperarPublicacion(PUBLICACION.name);

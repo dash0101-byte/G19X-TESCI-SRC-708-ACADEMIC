@@ -516,6 +516,66 @@ def test_la_comparativa_y_el_informe_dan_lo_mismo(
     assert fila["score_medio"] == informe["score_medio"]
 
 
+def test_sin_perfiles_no_hay_score_medio_en_ninguna_de_las_tres_tablas(
+    client, lead_headers, publicacion
+):
+    """
+    La media de un conjunto vacío no es un cero, igual que la tasa sin visitas no es un 0 %.
+
+    Se encontró recorriendo la demostración: una publicación recién creada salía en la
+    comparativa con «Tasa de envío —» y «Score medio 0» en la misma fila, y las dos cifras
+    cuentan lo mismo —que todavía no ha llegado nadie—. El cero se lee como una media baja:
+    quien compara publicaciones no tiene cómo distinguirlo de un post que sí trae perfiles y
+    los trae malos.
+
+    Las tres tablas, y no solo la que se vio: la comparativa, la cabecera del informe y el
+    reparto por red. Las tres salen del mismo sitio, así que un arreglo en una sola habría
+    dejado las otras dos diciendo cero.
+    """
+    fila = next(
+        i for i in client.get(f"{PUBLICACIONES}/comparativa", headers=lead_headers).json()["items"]
+        if i["publicacion_id"] == publicacion["id"]
+    )
+    assert fila["perfiles_recibidos"] == 0
+    assert fila["tasa_de_envio"] is None
+    assert fila["score_medio"] is None
+
+    informe = client.get(
+        f"{PUBLICACIONES}/{publicacion['id']}/informe", headers=lead_headers
+    ).json()
+    assert informe["resumen"]["perfiles_recibidos"] == 0
+    assert informe["resumen"]["score_medio"] is None
+
+    # El reparto por red trae una fila por red activa aunque no haya llegado nadie por
+    # ninguna: son exactamente las que no tienen media.
+    assert informe["por_red"], "el informe tiene que traer sus redes aunque estén a cero"
+    assert all(f["score_medio"] is None for f in informe["por_red"] if f["perfiles"] == 0)
+
+
+def test_con_perfiles_el_score_medio_sigue_siendo_el_numero(
+    client, lead_headers, publicacion, db_session
+):
+    """
+    La otra mitad del arreglo anterior, que es la que lo vuelve una comprobación.
+
+    Devolver `None` siempre también haría pasar la prueba de arriba, y la columna se
+    quedaría muda en todas las publicaciones.
+    """
+    _sembrar(db_session, publicacion, email="uno@media.mx", score=80.0, etapa=LeadStatus.NEW)
+    _sembrar(db_session, publicacion, email="dos@media.mx", score=40.0, etapa=LeadStatus.NEW)
+
+    fila = next(
+        i for i in client.get(f"{PUBLICACIONES}/comparativa", headers=lead_headers).json()["items"]
+        if i["publicacion_id"] == publicacion["id"]
+    )
+    assert fila["score_medio"] == 60.0
+
+    informe = client.get(
+        f"{PUBLICACIONES}/{publicacion['id']}/informe", headers=lead_headers
+    ).json()
+    assert informe["resumen"]["score_medio"] == 60.0
+
+
 def test_la_comparativa_es_de_direccion(client, executive_headers, publicacion):
     """Acotada por cartera compararía asesores, no publicaciones."""
     assert client.get(f"{PUBLICACIONES}/comparativa", headers=executive_headers).status_code == 403

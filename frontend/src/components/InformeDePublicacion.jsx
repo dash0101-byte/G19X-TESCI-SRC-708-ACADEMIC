@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { fetchInformeDePublicacion } from '../services/api';
 import { NOMBRES_DE_ETAPA, nombreDeEtapa } from '../services/actividades';
 import GraficoPorDia from './GraficoPorDia';
+import { NUMERO, PORCENTAJE } from '../services/cifras';
 
 const NOMBRE_DEL_ESTADO = { borrador: 'Borrador', activa: 'Activa', pausada: 'Pausada', cerrada: 'Cerrada' };
 
@@ -78,12 +79,12 @@ export default function InformeDePublicacion({ publicacion, onSelectLead, onCerr
           <Dato titulo="Visitas a la página" valor={resumen.visitas} pie="Aperturas; sin datos de nadie" />
           <Dato
             titulo="Tasa de envío"
-            valor={resumen.tasa_de_envio === null || resumen.tasa_de_envio === undefined ? '—' : `${resumen.tasa_de_envio} %`}
+            valor={PORCENTAJE(resumen.tasa_de_envio)}
             pie={`${resumen.envios} envíos desde que se cuentan visitas`}
           />
           <Dato titulo="Perfiles recibidos" valor={resumen.perfiles_recibidos} />
           <Dato titulo="Avanzaron de etapa" valor={resumen.avanzaron_de_etapa} pie="Salieron de «Nuevo»" />
-          <Dato titulo="Score medio" valor={resumen.score_medio} />
+          <Dato titulo="Score medio" valor={NUMERO(resumen.score_medio)} />
         </div>
       )}
 
@@ -111,9 +112,12 @@ export default function InformeDePublicacion({ publicacion, onSelectLead, onCerr
                   <td>{fila.envios}</td>
                   {/* Sin visitas no hay tasa. Un 0 % diría que nadie escribió de los que
                       miraron, y lo que pasa es que no miró nadie. */}
-                  <td>{fila.tasa_de_envio === null || fila.tasa_de_envio === undefined ? '—' : `${fila.tasa_de_envio} %`}</td>
+                  <td>{PORCENTAJE(fila.tasa_de_envio)}</td>
                   <td>{fila.perfiles}</td>
-                  <td>{fila.score_medio}</td>
+                  {/* Y sin perfiles tampoco hay media. El cero de antes decía que
+                      esta red trae gente que no vale nada; lo que pasa es que por
+                      esta red no ha llegado nadie. */}
+                  <td>{NUMERO(fila.score_medio)}</td>
                 </tr>
               ))}
             </tbody>

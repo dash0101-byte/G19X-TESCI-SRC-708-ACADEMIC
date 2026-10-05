@@ -57,7 +57,7 @@ Lo que queda preparado:
 | Prospectos | 12 de cartera repartida + 3 de la publicación de ejemplo, **sin asesor** |
 | Cuentas | líder (marketing y dirección), asesor, administración |
 
-### Tres cosas que parecen fallos y no lo son
+### Cuatro cosas que parecen fallos y no lo son
 
 Para quien conduce. Si pasa alguna de estas, **no** se apunta como atasco de la persona:
 
@@ -72,6 +72,13 @@ Para quien conduce. Si pasa alguna de estas, **no** se apunta como atasco de la 
   red, el undécimo envío recibe «Hemos recibido demasiadas solicitudes». Para una sesión
   larga, levante el backend con `INTERES_LIMITE_POR_IP=60/hour`. Abrir la página no gasta
   esos diez: las lecturas tienen su propia cuenta (120 por hora).
+- **La bandeja «Hoy» del asesor no estrena tarea con el prospecto que acaban de asignarle.**
+  Las tareas no las crea la pantalla: las crea el motor de reglas, que pasa **una vez al
+  día** y sin nadie delante (`services/agenda_del_dia.py` explica por qué: si las creara
+  quien mira, «cuántas tareas hay» dependería de cuánta gente hubiera entrado esa mañana).
+  Así que durante la sesión el asesor encuentra al prospecto en su cartera y en la ficha,
+  con la tarjeta «Llegó por», pero no en «Hoy». Lo que sí se apunta es si **busca** la tarea
+  ahí y no entiende por qué no está: eso es un atasco de verdad y hay que anotarlo.
 
 ---
 

@@ -390,8 +390,22 @@ h1, h2, h3, h4, h5 {
 
      `inherit` y no un token: lo que hace esto es que un `.btn` sin variante se comporte en
      un enlace igual que en un botón, que es lo que cualquiera que escriba la clase espera.
-     Las variantes de abajo ponen el suyo y mandan ellas. */
+     Las variantes de abajo ponen el suyo y mandan ellas.
+
+     Aquel arreglo miró el color del texto y no el del fondo, y por eso se quedó a medias
+     (encontrado recorriendo la demostración). `.btn` tampoco decía de qué color es su
+     fondo, y un `<button>` sin fondo declarado se queda con el gris claro del navegador.
+     Con el texto heredando el casi blanco del panel oscuro, el resultado eran cuatro
+     botones de blanco sobre blanco —razón de contraste 1,03:1—, y uno de ellos es
+     «Cerrar sesión» en la pantalla de alta del segundo factor, que es la ÚNICA pantalla
+     que ve una cuenta de administración hasta que lo activa: la única salida, invisible.
+     La guarda de contraste del capítulo 43 no podía verlo porque deriva sus pares de los
+     tokens de la hoja, y aquí el fondo no era un token: era el del navegador.
+
+     `transparent` y no un token, por lo mismo que `inherit` arriba: un `.btn` sin
+     variante se dibuja sobre la superficie que lo rodea, sea la que sea. */
   color: inherit;
+  background: transparent;
 }
 
 .btn-primary {
