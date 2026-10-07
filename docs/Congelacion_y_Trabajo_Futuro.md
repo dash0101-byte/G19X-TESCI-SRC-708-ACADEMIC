@@ -1,9 +1,74 @@
 # Congelación de funcionalidades y trabajo futuro
 
 **Fecha de congelación:** 24 de septiembre de 2026
+**Congelación definitiva:** 6 de octubre de 2026 — a partir de aquí, **solo fallos que impidan la instalación o la demostración**
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 6 de octubre de 2026 (capítulo 46)
+**Último capítulo:** 46 (Reporte 44), 6 de octubre de 2026
+
+> ## 🧊 Congelación definitiva — 6 de octubre de 2026
+>
+> **Aquí se cierra.** El 24 de septiembre de 2026 el proyecto se congeló para funcionalidad:
+> desde entonces entraban correcciones, y entraron **quince capítulos** —del 32 al 46—, cada
+> uno abriendo la congelación para puntos nombrados de este documento y para ninguno más.
+> Catorce fueron correcciones; el último, el 46, es el único que entró como funcionalidad, y
+> porque se encargó explícitamente.
+> Desde hoy el criterio es **más estrecho que ese**, y es el último:
+>
+> > Solo entra un cambio si, sin él, **la pila no se levanta** o **la demostración no se
+> > puede enseñar**. Nada más.
+>
+> **No se abre ningún capítulo ni ninguna auditoría nuevos.** Ni de código, ni de
+> accesibilidad, ni de seguridad, ni de calidad. Los capítulos 42 a 45 fueron auditorías de
+> lo que ya existía y el 46 cerró el último punto que se encargó; el trabajo que queda está
+> **escrito y clasificado** en las secciones §3 a §6 de este documento, y seguirá escrito.
+> Eso es el entregable: no una lista de deseos, sino el inventario de lo que falta con el
+> motivo por el que falta.
+>
+> **Qué cuenta y qué no, con ejemplos, para que no haya que interpretar:**
+>
+> | Entra | No entra |
+> | :--- | :--- |
+> | La pila no arranca: un contenedor se cae, una migración falla, el lanzador no encuentra `pila.env` | Un punto de §6.4, aunque sea de una línea y esté medido |
+> | La demostración se detiene: la página pública no carga, el QR no se lee, el panel no deja asignar, el túnel no publica | Una pantalla, un filtro, un campo o un mensaje que **se ve** mal pero deja seguir |
+> | Una cuenta de demostración no entra, o el sembrado deja la base inservible | Reentrenar el modelo, o cualquier cosa que lo cambie |
+> | Una dependencia fijada desaparece del registro y la imagen ya no se construye | Un capítulo de auditoría nuevo, de cualquier clase |
+> | El CI se pone rojo por algo del entorno y no por el código | Una guarda nueva, aunque vigile algo real |
+>
+> Ante la duda, la pregunta es una sola: **¿se puede enseñar el sistema hoy sin esto?** Si la
+> respuesta es sí, se anota en §6.4 y no se toca.
+>
+> **Dónde está escrito el relevo.** Quien reciba este repositorio tiene tres documentos y en
+> ese orden: [`AGENTS.md`](../AGENTS.md) en la raíz, con las reglas del proyecto —que está
+> congelado, cómo se levanta, qué guardas hay y cómo se prueban, dónde vive cada cosa—;
+> [**Si algo falla**](Si_Algo_Falla.md), escrito para quien no programa, con la tabla de
+> «síntoma → qué mirar → qué hacer»; y este documento, para saber qué **no** se hizo y por
+> qué. El informe técnico de la residencia y la guía de defensa llevan las cifras finales.
+>
+> **Las cifras del cierre.** 46 capítulos, 44 reportes. Servidor: **1734 pruebas**, 2
+> omitidas, **94,42 %** de cobertura sobre un suelo de 85. Cliente: **748 pruebas** en 45
+> archivos, con suelos de 96 / 90 / 98 / 98. **10 trabajos** de integración continua, **59
+> controles** de configuración peligrosa y **siete guardas de propiedades**, cada una con su
+> arnés de reintroducción. Modelo publicado: ROC-AUC **0,9469** con IC 95 % [0,9275, 0,9635]
+> sobre datos sintéticos, y un aporte sobre el heurístico de **+0,0519** con IC 95 %
+> [0,0296, 0,0761], que es la cifra que se defiende. `ruff`, `eslint` y `npm run build` sin
+> avisos.
+>
+> **Lo que sigue abierto, en una línea cada bloque.** §3, lo que depende de cuentas externas:
+> LinkedIn no se lee, Calendly y WhatsApp tampoco, no se publica solo en ninguna red, la
+> tarjeta de vista previa no se ha visto en una red de verdad, nada sale del panel, las copias
+> no salen de la máquina y sin `event_id` el CRM se deduplica por contenido. §4, lo que
+> depende de datos reales: el modelo no se reentrena y por eso no conoce los canales nuevos,
+> no hay deriva medible todavía, el monitor dirá «muestra insuficiente» un tiempo, las
+> instantáneas anteriores al capítulo 24 no sirven para entrenar, los cierres anteriores al 30
+> no tienen motivo, y **la sesión con personas sigue sin celebrarse**. §5, lo que no es
+> técnico: los plazos de conservación no tienen valoración jurídica, aceptar el aviso no es
+> condición para crear la ficha, suprimir aquí no suprime en el CRM, «¿qué necesitas?» no
+> pesa, reabrir un cerrado no es una operación del sistema, los motivos no tienen peso y no
+> hay candidatos. §6.2, cinco de nueve cerrados: siguen abiertos el 9, el 12, el 15 y el 35.
+> §6.3 y §6.4, las comprobaciones que nadie ha hecho a mano y los restos menores: **39
+> anotados** y numerados hasta el 59, de los que **13 se cerraron** por el camino, con el 57,
+> el 58 y el 59 recién anotados por el capítulo 46.
 
 > **Revisión del capítulo 46.** La congelación se abre **para el punto 10 de §6.2 (H-6) y
 > para nada más**, y esta vez lo que entra **es** funcionalidad: el punto exige que el

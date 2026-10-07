@@ -27,7 +27,7 @@
 | **1:00 – 2:00**<br>*(1 min)* | **El problema** | • Atención FIFO sin calificar: **36 horas** de latencia de primer contacto, conversión del **12 %**.<br>• La restricción de ingeniería: local, **$0 USD**, con salida a Microsoft Azure sin reescribir la lógica. | Dos cifras y una restricción. No entrar en arquitectura todavía. |
 | **2:00 – 3:00**<br>*(1 min)* | **La arquitectura, en una diapositiva** | • Puertos y Adaptadores: la lógica no sabe si detrás hay Scikit-Learn o Azure ML.<br>• $S_{\text{final}} = 0.60 \times S_{\text{ML}} + 0.40 \times S_{\text{Heurístico}} \times \gamma(\Delta t)$, con $\gamma(\Delta t) = (0.5)^{\Delta t/14}$.<br>• Por qué 60/40 y no 100 % ML: arranque en frío y reglas de negocio deterministas. | Una sola diapositiva. Si el sínodo quiere profundizar, preguntará: están las Preguntas 1, 2 y 3. |
 | **3:00 – 7:30**<br>*(4.5 min)* | **LA DEMOSTRACIÓN**<br>*Del post a la red social hasta el dato de entrenamiento* | **1.** Marketing crea la publicación → enlace de 128 bits que da el servidor.<br>**2.** Un post, varias redes: **los dos enlaces son distintos**, y por eso después hay atribución.<br>**3.** El interesado envía sus datos desde el teléfono: **ni un campo de texto libre**.<br>**4.** La ficha nace puntuada, atribuida y **ya repartida**: a quien tiene menos cartera abierta, sin mirar el score.<br>**5.** El líder ve a quién le tocó y se la pasa a su asesor; lo que reasigna a mano se queda.<br>**6.** El asesor **no tiene que buscarla**: está en «Hoy», con el motivo escrito, y la ficha 360 responde de dónde salió, qué pidió y cuándo aceptó el aviso.<br>**7.** El líder compara publicaciones y ve **por qué red** llegó cada persona.<br>**8.** El trato **se cierra diciendo por qué**: lista cerrada, fecha y tramo. El score **no** se recalcula.<br>**9.** El panel de desenlaces: por motivo, por red, y **qué score tenían al cerrarse**. Más el contador del reentrenamiento. | **Nunca pulsar en silencio.** Cada paso tiene su frase en el guion cronometrado.<br>**El paso 0 es obligatorio:** hacer un envío de prueba antes de empezar, o la primera puntuación tarda **más de 3 s** en lugar de 286 ms mientras todos miran. |
-| **7:30 – 8:45**<br>*(1.25 min)* | **Calidad, seguridad y operación** | • **1485 pruebas** de backend (93 % de cobertura) y **385** de cliente, todas en verde.<br>• **10 trabajos** de integración continua, y **cuatro guardas de propiedades** que fallan cuando el sistema pierde una defensa aunque ninguna prueba se rompa.<br>• Autenticación real con JWT y revocación inmediata; **autorización sobre el dato**: un asesor solo ve su cartera, y un prospecto ajeno responde 404.<br>• Imágenes fijadas por huella, copias con **prueba de restauración**, derechos del titular comprobados tabla por tabla. | Si hay que recortar la exposición, se recorta **aquí**, no en la demostración: esto se puede contestar en preguntas y la demostración, no. |
+| **7:30 – 8:45**<br>*(1.25 min)* | **Calidad, seguridad y operación** | • **1734 pruebas** de backend (94 % de cobertura) y **748** de cliente, todas en verde.<br>• **10 trabajos** de integración continua, **59 controles** de configuración peligrosa y **siete guardas de propiedades** que fallan cuando el sistema pierde una defensa aunque ninguna prueba se rompa.<br>• Y cada corrección pasó su **arnés de reintroducción**: se vuelve a escribir el defecto y se exige que algo se ponga rojo. Una guarda que nadie ha podido poner en rojo no es una guarda.<br>• Autenticación real con JWT y revocación inmediata; **autorización sobre el dato**: un asesor solo ve su cartera, y un prospecto ajeno responde 404.<br>• Imágenes fijadas por huella, copias con **prueba de restauración**, derechos del titular comprobados tabla por tabla. | Si hay que recortar la exposición, se recorta **aquí**, no en la demostración: esto se puede contestar en preguntas y la demostración, no. |
 | **8:45 – 10:00**<br>*(1.25 min)* | **Lo que se negó a hacer, y cierre** | • **No se reentrenó el modelo** con los canales nuevos: no hay desenlaces reales, y el capítulo 30 construyó justamente el mecanismo para tenerlos.<br>• **No se inventó el peso de los motivos** ni se proyectaron ingresos.<br>• **No se publica un modelo** cuyo intervalo de confianza no alcance el umbral, aunque su estimación puntual lo supere.<br>• El trabajo futuro está en un solo documento, con **de qué depende cada punto**.<br>• Agradecimiento al sínodo. | Este bloque es el que distingue un proyecto terminado de uno abandonado. Decirlo con seguridad, no como disculpa. |
 
 **Dónde está cada cosa si el sínodo la pide:**
@@ -36,8 +36,10 @@
 | :--- | :--- |
 | «Enséñeme el detalle de la demostración» | `docs/Guion_Cronometrado_de_la_Demo.md` |
 | «¿Qué queda por hacer?» | `docs/Congelacion_y_Trabajo_Futuro.md` |
-| «¿Dónde está todo esto documentado?» | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` (33 reportes compilados) |
+| «¿Dónde está todo esto documentado?» | `docs/Memoria_Tecnica_Final_Lead_Scoring.md` (44 reportes compilados, 46 capítulos) |
 | «¿Se ha probado con usuarios?» | `docs/Prueba_Con_Personas.md` — y la respuesta honesta es **todavía no**: Pregunta 20 |
+| «¿Y si falla el día de la demostración?» | `docs/Si_Algo_Falla.md` — tabla de síntoma → qué mirar → qué hacer |
+| «¿Quién puede seguir esto después?» | `AGENTS.md` en la raíz, y `docs/Informe_Tecnico_de_Residencia.md` para las cifras |
 
 ---
 
@@ -377,17 +379,17 @@
 
 ---
 
-## 3. Las Ocho Preguntas Incómodas (17 – 24)
+## 3. Las Diez Preguntas Incómodas (17 – 26)
 
 Las de la sección 2 preguntan **cómo está hecho** algo. Estas preguntan **por qué falta**
 algo, y son las que de verdad se pueden contestar mal.
 
-La regla para las ocho es la misma: **decir primero que sí falta**, después por qué, y
+La regla para las diez es la misma: **decir primero que sí falta**, después por qué, y
 después qué hay construido alrededor del hueco. Una respuesta que empieza justificándose
 suena a excusa aunque sea verdad; una que empieza reconociendo el hueco tiene permiso para
 explicarlo.
 
-Y una advertencia general: **ninguna de las ocho se arregla el día antes**. Si el sínodo
+Y una advertencia general: **ninguna de las diez se arregla el día antes**. Si el sínodo
 encuentra una que no está en esta lista, la respuesta honrada es «no lo había pensado, y
 tiene razón», no una improvisación.
 
@@ -508,6 +510,21 @@ tiene razón», no una improvisación.
 > **Ocho atascos salieron de ensayos propios y siete están corregidos**, así que el guion no
 > está sin probar; está probado sin nadie delante, que es distinto y hay que decirlo así.
 >
+> **Y hay una cosa más, que es lo más cerca que se ha estado de la respuesta.** El 5 de
+> octubre recorrí la historia entera en el navegador con los tres papeles y con un teléfono,
+> como quien la usa por primera vez. Aparecieron **siete defectos** que la suite entera no
+> veía, y los siete de la misma forma: una regla escrita una vez, con su motivo al lado,
+> aplicada en uno solo de los sitios que la necesitaban. Ninguno **falla**: el embudo del
+> tablero enseñaba `NEW` y `QUALIFIED` teniendo la traducción escrita desde el capítulo 29; el
+> botón «Cerrar sesión» de la pantalla de alta del segundo factor era blanco sobre blanco,
+> 1,03:1, y es la única salida de la única pantalla que ve una cuenta de administración; y la
+> puerta pública servía su JavaScript como `immutable` **un año**, de modo que un visitante no
+> podía recibir una corrección ni recargando. Los siete están corregidos con su guarda.
+>
+> Eso no sustituye a la sesión con personas —sigo siendo yo, y conozco el sistema—, pero sí
+> dice una cosa con números: **mirar la pantalla encuentra una clase de defecto que ninguna
+> suite alcanza**, y son 1734 pruebas las que no los vieron."*
+>
 > Y hay un error del que aprendí algo: el capítulo 28 dio por cerradas dos notas de
 > usabilidad y solo una lo estaba. Al líder le di ver los prospectos calientes que se
 > enfrían, que es **otra pregunta distinta** de cuántos esperan a que los repartan. Lo dejé
@@ -517,27 +534,36 @@ tiene razón», no una improvisación.
 
 ---
 
-### Pregunta 21: ¿Por qué un sistema que maneja datos personales no tiene segundo factor de autenticación?
+### Pregunta 21: ¿Tiene segundo factor de autenticación? Durante meses no lo tuvo.
 **Respuesta Modelo:**
-> *"Porque era opcional en el alcance y decidí **no hacerlo a medias**, que en autenticación
-> es peor que no hacerlo.
+> *"Lo tiene desde el **capítulo 35**, y durante quince capítulos no lo tuvo a propósito. Las
+> dos mitades de esa frase importan.
 >
-> Un TOTP para la cuenta de administración exige: alta con código de verificación, códigos
-> de recuperación, un paso más en el inicio de sesión del cliente y —la parte que nadie
-> recuerda— una respuesta para quien pierde el teléfono **siendo el único administrador**,
-> que es justamente la cuenta que no puede quedarse fuera. Añadir la verificación sin todo
-> eso produce una cuenta de administración que se bloquea sola, y un sistema al que nadie
-> puede entrar no es un sistema más seguro.
+> **Por qué tardó.** Un TOTP para administración exige cinco cosas, y la quinta es la que
+> nadie recuerda: alta con código de verificación, códigos de recuperación, un paso más en el
+> login del cliente, auditoría de cada uso… y **una respuesta para quien pierde el teléfono
+> siendo el único administrador**, que es justamente la cuenta que no puede quedarse fuera.
+> Añadir la verificación sin eso produce un sistema al que nadie puede entrar, y eso no es
+> más seguro: es una pérdida total con aspecto de mejora.
 >
-> **Lo que sí se hizo en su lugar**, y creo que cubre más superficie real: contraseñas con
-> `bcrypt` contrastadas contra una lista de filtradas; revocación **inmediata** por
-> `token_version`, de modo que cerrar sesión cierra todos los dispositivos a la vez y un
-> cambio de rol expulsa la sesión abierta; rotación verificable del token de refresco con
-> detección de reutilización y revocación por familia; y autorización sobre el dato, que
-> limita lo que un token robado alcanza.
+> **Cómo está hecho, y la decisión de la que estoy más conforme:** el secreto **no se
+> guarda**. En la base hay una **sal** aleatoria por cuenta, y el secreto se deriva de ella y
+> de `SECRET_KEY`, que vive en el entorno. Quien se lleve un volcado de la tabla se lleva
+> sales, y con una sal sola no se genera ni un código: no hay nada que cifrar porque no hay
+> nada guardado. El precio está escrito —rotar `SECRET_KEY` invalida todas las altas— y es un
+> precio que se paga a sabiendas.
 >
-> Un segundo factor protege del robo de contraseña. La revocación inmediata protege del robo
-> de sesión, que es el caso que este sistema tenía abierto y ya no tiene."*
+> El alta **no activa** hasta que se comprueba un código, así que quien se equivoque al
+> escanear el QR no se queda fuera; el desafío del login es de un tipo propio y **no sirve
+> como sesión**; un código no vale dos veces dentro de su ventana; los diez códigos de
+> recuperación se guardan como **resumen** y son de un solo uso; y **la última cuenta de
+> administración con el factor activo no puede quitárselo**, que es la salvaguarda que cierra
+> el caso del teléfono perdido. El TOTP está escrito sobre la biblioteca estándar y comprobado
+> contra los **18 vectores oficiales del RFC 6238**.
+>
+> Y lo que ya había antes sigue estando, porque cubre otra superficie: un segundo factor
+> protege del robo de contraseña; la revocación inmediata por `token_version` protege del robo
+> de **sesión**, que es un caso distinto."*
 
 ---
 
@@ -627,11 +653,26 @@ tiene razón», no una improvisación.
 > seguía ahí. Se cerró en el capítulo 33, el Reporte 31, y con él §6.1 vuelve a no tener
 > nada que dependa de nosotros.
 >
-> **Todo lo que se decidió está explicado, no solo hecho.** Treinta y tres reportes, y cada uno
-> dice por qué se tomó cada decisión y qué se descartó. La memoria técnica los compila con
-> índice y anclas, y hay una prueba que falla si un reporte existe y no entró en la memoria:
-> los capítulos 22 a 24 se pegaron a mano una vez, salieron sin ancla y la siguiente
-> regeneración los habría borrado sin avisar.
+> **Todo lo que se decidió está explicado, no solo hecho.** **Cuarenta y cuatro reportes** para
+> 46 capítulos, y cada uno dice por qué se tomó cada decisión y qué se descartó. La memoria
+> técnica los compila con índice y anclas, y hay una prueba que falla si un reporte existe y no
+> entró en la memoria: los capítulos 22 a 24 se pegaron a mano una vez, salieron sin ancla y la
+> siguiente regeneración los habría borrado sin avisar.
+>
+> **Y hay dos documentos escritos para quien venga, no para el sínodo.** `AGENTS.md`, en la
+> raíz, dice en una página que el proyecto está congelado, cómo se levanta —un solo modo—, qué
+> guardas hay y cómo se prueban, dónde vive cada cosa y las siete cosas que se aprendieron por
+> las malas. Y `docs/Si_Algo_Falla.md` está escrito para quien **no programa**: encender,
+> apagar, reiniciar el túnel, qué hacer cuando se pierde la dirección pública, restaurar un
+> respaldo paso a paso, y una tabla de «síntoma → qué mirar → qué hacer» con diecisiete
+> entradas. Todas sus órdenes se ejecutaron contra la pila antes de escribirlas, y una de ellas
+> estaba **mal** la primera vez: sin cuatro variables de entorno, restablecer las cuentas en la
+> pila de Docker genera contraseñas aleatorias y deja a todo el mundo fuera. Se descubrió
+> probándola, que es exactamente para lo que se prueba un documento de operación.
+>
+> **Desde el 6 de octubre la congelación es definitiva**: solo entra lo que impida levantar la
+> pila o enseñar la demostración. No queda ningún capítulo abierto, y eso también es una
+> decisión y está escrita con fecha.
 >
 > **Y el sistema se defiende solo mientras nadie lo mire.** Las guardas del CI no comprueban
 > que las funciones sigan dando el resultado correcto: comprueban que el sistema no ha
@@ -639,6 +680,73 @@ tiene razón», no una improvisación.
 > o hace que cerrar un prospecto recalcule su puntuación, el pipeline se pone en rojo y el
 > mensaje dice exactamente qué se perdió y por qué importaba. Eso es lo que queda cuando yo
 > ya no estoy para explicarlo."*
+
+---
+
+### Pregunta 25: La página pública funciona con una dirección que caduca. ¿Eso no invalida la demostración?
+**Respuesta Modelo:**
+> *"Caduca, y hay que decirlo antes de que lo pregunten. Lo que invalidaría la demostración
+> sería no saberlo.
+>
+> **Qué es.** La página de interés sale a internet por un **túnel gratuito** de Cloudflare. No
+> hace falta cuenta, ni tarjeta, ni abrir ningún puerto del router: el túnel sale **desde** la
+> máquina hacia fuera, así que nadie entra por el router. A cambio, la dirección es prestada
+> —`https://algo-algo-algo.trycloudflare.com`— y **cambia en cada arranque**.
+>
+> **La consecuencia honesta, que es la que importa:** un post publicado en LinkedIn con una de
+> esas direcciones tiene un enlace **muerto** en cuanto se reinicia el túnel. El post sigue
+> ahí; el enlace no lleva a nada. Por eso esto sirve para **enseñar** la página, probarla con
+> personas y ver la tarjeta de vista previa en una red de verdad; la difusión en serio —publicar
+> y dejarlo semanas— espera a un dominio propio.
+>
+> **Y el sistema no finge que no pasa.** La pantalla de Publicaciones **marca** los enlaces ya
+> repartidos que no llevan aquí, y avisa cuando la dirección configurada dejó de responder. Eso
+> es lo que separa una limitación documentada de un fallo: el software sabe en qué estado está
+> y lo dice.
+>
+> **Lo que costaría cerrarlo del todo** son dos cosas que no son de programación: un dominio y
+> un certificado. La dirección pública es **un solo ajuste** del entorno desde el capítulo 34
+> —`PUBLICACIONES_URL_BASE`—, así que pasar a un dominio propio es cambiar un valor y
+> reiniciar un servicio. Está escrito así a propósito, para que esa migración no sea un
+> capítulo.
+>
+> Y se comprobó **desde fuera de la red**, no desde esta máquina: por esa puerta se publican 5
+> rutas y se niegan las 25 comprobadas. El panel y la API de gestión no existen ahí."*
+
+---
+
+### Pregunta 26: El sistema atiende el derecho de supresión, pero suprimir aquí no suprime en el CRM. ¿No es eso un derecho a medias?
+**Respuesta Modelo:**
+> *"Lo es, y la parte que falta **no la puede hacer el software**. Prefiero explicar por qué, y
+> qué se hizo para que nadie se lleve una sorpresa.
+>
+> **Qué sí hace.** La supresión recorre el mapa completo del esquema tabla por tabla —no una
+> lista escrita a mano— y borra a la persona de todas. Queda constancia de que se hizo y de
+> quién la pidió, **sin volver a guardar los datos de la persona borrada**: un asiento que
+> dijera «suprimida Ana Pérez el día tal» sería conservar precisamente lo que se pidió borrar.
+> Y la exportación previa dice, campo por campo, qué consta y de dónde llegó.
+>
+> **Qué no hace, y es la mitad incómoda.** El CRM es otro sistema, con su propio responsable.
+> Aquí no hay credenciales para borrar allí, y no las habría aunque se quisiera: un sistema que
+> puede borrar en otro es una superficie de ataque nueva. Peor que eso: una entrega posterior
+> del CRM **vuelve a crear** a la persona, porque el webhook crea fichas que no existen. No es
+> solo que los datos sigan allí; es que **volverán**.
+>
+> **Lo que se podría hacer y no se ha hecho, con el motivo.** La huella con clave del correo
+> permitiría reconocer a una persona suprimida y **rechazar** su ingesta. Técnicamente está al
+> alcance. Bloquear una entrada de negocio para siempre es una decisión que nadie ha tomado, y
+> tomarla yo solo, en un capítulo técnico, sería la clase de decisión que no me corresponde.
+> Está escrita como §5.3 de la congelación, en la sección de **decisiones que no son técnicas**.
+>
+> **Y lo que sí se hizo cuando se vio el hueco**: la advertencia dejó de vivir solo en un
+> documento y en un campo del JSON de exportación, que no los lee quien atiende una petición de
+> borrado. Desde el capítulo 38 la pantalla de derechos lo dice **dos veces** —al confirmar y al
+> terminar— y dice la mitad que cambia lo que hay que hacer: que volverán. Las copias de
+> seguridad conservan a la persona hasta 14 días, y eso también está dicho: no se editan
+> volcados.
+>
+> Un derecho a medias documentado y visible en la pantalla es peor que uno completo y mejor que
+> uno a medias que nadie sabe que lo está."*
 
 ---
 
