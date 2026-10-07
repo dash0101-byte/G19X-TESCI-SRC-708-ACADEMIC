@@ -79,7 +79,7 @@ para explicar lo que se va a ver, y todo lo posterior para explicar lo que se ac
 | **1:00 – 2:00** | El problema | 36 horas de latencia, 12 % de conversión, atención FIFO. Y la restricción: local, a coste cero, con salida a Azure |
 | **2:00 – 3:00** | La arquitectura, en una diapositiva | Puertos y adaptadores; el score híbrido 60/40 con decaimiento exponencial de vida media 14 días |
 | **3:00 – 7:30** | **LA DEMOSTRACIÓN** — §4 | Del post a la red social hasta el dato de entrenamiento |
-| **7:30 – 8:45** | Calidad, seguridad y operación | 1734 + 748 pruebas, 94 % de cobertura, 10 trabajos de CI, 59 controles y siete guardas de propiedades |
+| **7:30 – 8:45** | Calidad, seguridad y operación | 1743 + 748 pruebas, 94 % de cobertura, 10 trabajos de CI, 59 controles y siete guardas de propiedades |
 | **8:45 – 10:00** | Lo que se negó a hacer, y cierre | Por qué no se reentrenó, por qué no hay pesos inventados, y qué queda |
 
 ---
@@ -308,6 +308,17 @@ a volver a sembrarla justo antes de la defensa.
 
 **No inicia sesión con ninguna contraseña**: firma el token de las dos cuentas que necesita,
 como hacen las guardas del CI. Lo que se ensaya es el camino, no el formulario de entrada.
+
+**La base que se le pase tiene que estar al día de las migraciones.** Una guardada hace unos
+capítulos no falla a medias: el ensayo muere en el primer paso con `no such column:
+users.totp_sal` o la columna que falte, y eso se lee como «el ensayo está roto» y no como «la
+base es vieja». El 07-10-2026 la guardada era del 24 de septiembre, catorce capítulos por
+detrás. Se pone al día con Alembic, sobre una **copia** y desde la raíz del repositorio —ahí
+está `alembic.ini`, y lanzarlo desde `backend/` falla con «No 'script_location' key found»—:
+
+```bash
+DATABASE_URL="sqlite:///C:/ruta/a/la/copia.db" python -m alembic upgrade head
+```
 
 Si un paso falla, para ahí y dice cuál y por qué. Un guion que se ensaya y no se comprueba
 es un guion que se cae delante del sínodo.

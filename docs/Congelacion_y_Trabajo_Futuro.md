@@ -45,7 +45,7 @@
 > «síntoma → qué mirar → qué hacer»; y este documento, para saber qué **no** se hizo y por
 > qué. El informe técnico de la residencia y la guía de defensa llevan las cifras finales.
 >
-> **Las cifras del cierre.** 46 capítulos, 44 reportes. Servidor: **1734 pruebas**, 2
+> **Las cifras del cierre.** 46 capítulos, 44 reportes. Servidor: **1743 pruebas**, 2
 > omitidas, **94,42 %** de cobertura sobre un suelo de 85. Cliente: **748 pruebas** en 45
 > archivos, con suelos de 96 / 90 / 98 / 98. **10 trabajos** de integración continua, **59
 > controles** de configuración peligrosa y **siete guardas de propiedades**, cada una con su

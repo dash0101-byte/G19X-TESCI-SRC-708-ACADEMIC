@@ -55,6 +55,21 @@ OBLIGATORIAS = ("SECRET_KEY", "POSTGRES_PASSWORD")
 # proyecto, y la aplicación busca `.env` y `../.env` desde donde se lance (`config.py`).
 ENV_QUE_SE_LEEN_SOLOS = (DEVOPS / ".env", RAIZ / ".env", RAIZ / "backend" / ".env")
 
+# El cliente compilado no viaja en el repositorio —`dist/` está en `.gitignore`— y la imagen
+# del backend lo COPIA, para poder servir la SPA ella sola en el 8000. En un clon limpio eso
+# hace morir la construcción con `failed to compute cache key: "/frontend/dist": not found`,
+# sesenta líneas por debajo de la orden, nombrando una ruta de dentro de la imagen y sin decir
+# qué hacer. El 07-10-2026 un ensayo de instalación desde cero murió exactamente ahí.
+#
+# El compose ya avisa de la otra mitad de este problema —la imagen del cliente sirviendo un
+# `dist/` de otro día— en el comentario de su `target` explícito, y esa nota ya decía que «en
+# una máquina limpia la construcción falla de golpe». Lo que faltaba era decirlo aquí, antes.
+CLIENTE_COMPILADO = RAIZ / "frontend" / "dist" / "index.html"
+
+# `run` incluido a propósito: `run --rm migrate` usa la imagen del backend, así que también
+# la construye si no existe.
+ORDENES_QUE_CONSTRUYEN = ("up", "build", "create", "run")
+
 
 def ruta_del_entorno(explicita: Optional[str] = None, entorno: Optional[Dict[str, str]] = None) -> pathlib.Path:
     entorno = os.environ if entorno is None else entorno
@@ -105,6 +120,21 @@ def problemas_del_entorno(ruta: pathlib.Path) -> List[str]:
         if not variables.get(obligatoria):
             problemas.append(f"{ruta} no define {obligatoria}.")
     return problemas
+
+
+def problema_del_cliente_compilado(resto: Sequence[str]) -> Optional[str]:
+    """Qué falta para construir, dicho antes de que Docker lo diga de otra manera."""
+    if not any(palabra in ORDENES_QUE_CONSTRUYEN for palabra in resto):
+        return None
+    if CLIENTE_COMPILADO.exists():
+        return None
+    return (
+        f"Falta el cliente compilado: {CLIENTE_COMPILADO}. La imagen del backend lo copia para "
+        "la entrega unificada del 8000, así que su construcción falla con "
+        '«"/frontend/dist": not found». No está en el repositorio a propósito —se compila—, '
+        "y basta con hacerlo una vez:\n"
+        "    cd frontend && npm ci && npm run build"
+    )
 
 
 def aviso_de_permisos(ruta: pathlib.Path) -> Optional[str]:
@@ -195,6 +225,10 @@ def main(argv: Optional[Sequence[str]] = None, ejecutar: Callable[[List[str]], i
         return 0
     if not argv:
         print("Falta la orden de docker compose (por ejemplo: up -d --build).")
+        return 2
+    sin_cliente = problema_del_cliente_compilado(argv)
+    if sin_cliente:
+        print(f"FALLO: {sin_cliente}")
         return 2
     return ejecutar(orden_de_compose(ruta, dev, argv))
 

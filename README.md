@@ -19,7 +19,7 @@
 
 | | |
 | :--- | :--- |
-| **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 1734 pruebas de servidor y 748 de cliente, seis contenedores. |
+| **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 1743 pruebas de servidor y 748 de cliente, seis contenedores. |
 | **Cómo se levanta** | Entrenar el modelo, `python devops/pila.py iniciar`, `python devops/pila.py up --build -d`, y el panel queda en [localhost:3000](http://localhost:3000). Las órdenes exactas, en la [guía de inicio rápido](#-guía-de-inicio-rápido-despliegue-de-la-versión-entregable). Nunca `docker compose` a secas: el lanzador es el único arranque, y los secretos viven **fuera** del árbol. |
 | **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **59 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
 | **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
@@ -57,7 +57,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1734 pruebas en el backend (94 % de cobertura) y 748 en
+> **Calidad en las dos mitades.** 1743 pruebas en el backend (94 % de cobertura) y 748 en
 > el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
 > encendidas—, y 10 trabajos de integración continua con 59 controles de regresión de
 > configuración peligrosa y **siete guardas de propiedades**, cada una con su arnés de
@@ -117,6 +117,11 @@ faltan `SECRET_KEY` o `POSTGRES_PASSWORD` (capítulo 22).
 pip install --require-hashes -r backend/requirements.lock
 python ml_pipeline/src/train_model.py
 
+# Y el cliente compilado, por la misma razón: `dist/` tampoco está en el repositorio, y la
+# imagen del backend lo copia para servir la SPA ella sola en el 8000. El lanzador se niega
+# a construir sin él y dice esta misma orden.
+cd frontend && npm ci && npm run build && cd ..
+
 # Una sola vez: crea el archivo de entorno, con los dos secretos ya generados
 python devops/pila.py iniciar
 
@@ -163,6 +168,23 @@ python devops/pila.py run --rm migrate alembic history --indicate-current
 El sistema queda disponible en [http://localhost:3000](http://localhost:3000). Esa es la
 puerta de entrada: nginx sirve la SPA, añade las cabeceras de seguridad y hace de pasarela
 hacia la API.
+
+**Recién levantada, la base no tiene ni una cuenta.** `migrate` crea el esquema y nada más, así
+que el panel pide credenciales que todavía no existen. Con esto hay sistema que mirar —las siete
+cuentas, cuatro publicaciones y doce prospectos clasificados—, y la contraseña viaja en variables
+de entorno para no quedar escrita en ningún archivo:
+
+```bash
+python devops/pila.py exec -e ENVIRONMENT=development -e SEED_ADMIN_PASSWORD=PluriOne2026! -e SEED_SALES_LEAD_PASSWORD=PluriOne2026! -e SEED_EXECUTIVE_PASSWORD=PluriOne2026! -e SEED_ASESOR_PASSWORD=PluriOne2026! backend python /app/scripts/seed_data.py
+```
+
+El `-e ENVIRONMENT=development` no es un atajo sospechoso: el sembrado de demostración **vacía
+las tablas de negocio** antes de regenerarlas y por eso se niega a correr contra un entorno
+endurecido, que es lo que la pila es. La variable se pasa a **ese** proceso y no a la pila. En un
+despliegue de verdad lo que se usa es `--solo-usuarios`, que crea o restablece las cuentas de
+acceso y **no toca ningún otro dato** (está en [Si algo falla](docs/Si_Algo_Falla.md)). Y sin
+`--force`, el sembrado completo se niega en cuanto la base ya tiene datos de negocio y enumera lo
+que borraría.
 
 Lo que la pila **no** publica, y antes sí:
 
@@ -1245,7 +1267,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 1734 pruebas
+### Backend — 1743 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
@@ -1325,7 +1347,7 @@ exactamente lo que el extractor del dataset sabría usar; y que el panel sea de 
 devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
 es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
 
-### Cliente — 472 pruebas
+### Cliente — 748 pruebas
 
 El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
 Vitest y Testing Library, y un `linter` propio:
@@ -1334,7 +1356,7 @@ Vitest y Testing Library, y un `linter` propio:
 cd frontend
 
 npm run lint            # eslint + eslint-plugin-react-hooks
-npm test                # 472 pruebas
+npm test                # 748 pruebas
 npm run test:coverage   # con suelo de cobertura; falla si baja
 npm run test:watch      # mientras se trabaja
 ```

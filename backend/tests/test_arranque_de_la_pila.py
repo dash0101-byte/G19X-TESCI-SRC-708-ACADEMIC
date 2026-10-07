@@ -35,6 +35,27 @@ def sin_env_sueltos(monkeypatch):
     monkeypatch.setattr(pila, "ENV_QUE_SE_LEEN_SOLOS", ())
 
 
+@pytest.fixture
+def cliente_compilado(tmp_path, monkeypatch):
+    """
+    Se finge que el cliente está compilado.
+
+    Esta suite no lo compila —el CI lo hace en otro trabajo y `dist/` no está en el
+    repositorio—, así que sin esto las pruebas que llegan a ejecutar Docker dependerían de
+    si alguien corrió `npm run build` en la máquina. Es la misma razón que `sin_env_sueltos`.
+    """
+    indice = tmp_path / "dist" / "index.html"
+    indice.parent.mkdir(parents=True, exist_ok=True)
+    indice.write_text("<!doctype html>\n", encoding="utf-8")
+    monkeypatch.setattr(pila, "CLIENTE_COMPILADO", indice)
+    return indice
+
+
+@pytest.fixture
+def sin_cliente_compilado(tmp_path, monkeypatch):
+    monkeypatch.setattr(pila, "CLIENTE_COMPILADO", tmp_path / "sin-compilar" / "index.html")
+
+
 # ==============================================================================
 # Cuándo se niega
 # ==============================================================================
@@ -93,7 +114,7 @@ def test_la_variable_de_entorno_elige_el_archivo(tmp_path):
 # Qué ejecuta
 # ==============================================================================
 
-def test_la_orden_pasa_siempre_el_entorno_y_conserva_el_proyecto(tmp_path, sin_env_sueltos):
+def test_la_orden_pasa_siempre_el_entorno_y_conserva_el_proyecto(tmp_path, sin_env_sueltos, cliente_compilado):
     ruta = _entorno(tmp_path / "pila.env")
     ejecutadas = []
 
@@ -112,6 +133,43 @@ def test_la_orden_pasa_siempre_el_entorno_y_conserva_el_proyecto(tmp_path, sin_e
 def test_comprobar_no_ejecuta_docker(tmp_path, sin_env_sueltos):
     ruta = _entorno(tmp_path / "pila.env")
     assert pila.main(["--entorno", str(ruta), "--comprobar"], ejecutar=_no_debe_ejecutarse) == 0
+
+
+# ==============================================================================
+# El cliente compilado, que no viaja en el repositorio
+# ==============================================================================
+
+@pytest.mark.parametrize("orden", [
+    ["up", "-d", "--build"],
+    ["up", "-d"],                       # `up` sin --build también construye lo que no existe
+    ["build", "backend"],
+    ["run", "--rm", "migrate"],         # usa la imagen del backend, así que la construye
+    ["--profile", "respaldo", "up", "-d"],
+])
+def test_sin_el_cliente_compilado_no_se_construye(tmp_path, sin_env_sueltos, sin_cliente_compilado, capsys, orden):
+    """
+    Sin `frontend/dist` la construcción de la imagen del backend muere con
+    `"/frontend/dist": not found`, sesenta líneas por debajo de la orden. Se para antes y se
+    dice qué hacer: es lo que se comió un ensayo de instalación desde cero el 07-10-2026.
+    """
+    ruta = _entorno(tmp_path / "pila.env")
+
+    assert pila.main(["--entorno", str(ruta), *orden], ejecutar=_no_debe_ejecutarse) == 2
+
+    dicho = capsys.readouterr().out
+    assert "npm ci && npm run build" in dicho, dicho
+
+
+@pytest.mark.parametrize("orden", [["down"], ["ps"], ["logs", "-f"], ["stop"]])
+def test_lo_que_no_construye_no_necesita_el_cliente(tmp_path, sin_env_sueltos, sin_cliente_compilado, orden):
+    """Apagar o mirar la pila no construye nada: negarse ahí sería dejar sin apagar."""
+    ruta = _entorno(tmp_path / "pila.env")
+    ejecutadas = []
+
+    codigo = pila.main(["--entorno", str(ruta), *orden], ejecutar=lambda o: ejecutadas.append(o) or 0)
+
+    assert codigo == 0
+    assert len(ejecutadas) == 1
 
 
 def test_iniciar_genera_secretos_nuevos_y_no_sobrescribe(tmp_path, sin_env_sueltos):

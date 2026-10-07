@@ -39,6 +39,7 @@ La pila se arranca **siempre** con el lanzador, nunca con `docker compose` a sec
 ```bash
 pip install --require-hashes -r backend/requirements.lock
 python ml_pipeline/src/train_model.py  # PRIMERO: el .joblib no está versionado (ver abajo)
+cd frontend && npm ci && npm run build && cd ..   # y `dist/` tampoco (ver abajo)
 
 python devops/pila.py iniciar          # una sola vez: crea ~/.plurione/pila.env con los secretos
 python devops/pila.py up -d --build    # cualquier orden de docker compose se pasa tal cual
@@ -67,6 +68,18 @@ base contra la que el modelo se compara. `curl -s http://127.0.0.1:8000/health` 
 puntuando, en `ml_model_loaded`, y la auditoría lo guarda en cada puntuación
 —`v1.0.0-hybrid+ml:98ed8bd1` frente a `v1.0.0-hybrid+heuristico`—.
 
+**Y el cliente compilado tampoco viaja**, por el mismo motivo de siempre —se compila, no se
+versiona— con una consecuencia peor: la imagen del **backend** copia `frontend/dist` para poder
+servir la SPA ella sola en el 8000, así que sin él la construcción muere con `"/frontend/dist":
+not found`, sesenta líneas por debajo de la orden y nombrando una ruta de dentro de la imagen. El
+lanzador lo para antes y dice qué hacer; está probado con su arnés, 3 de 3.
+
+Y una base recién migrada **no tiene ninguna cuenta**: el panel pide credenciales que no existen.
+El sembrado completo se niega contra un entorno endurecido —vacía las tablas de negocio antes de
+regenerarlas—, así que para tener algo que mirar se le pasa el entorno a **ese proceso**:
+`pila.py exec -e ENVIRONMENT=development -e SEED_*_PASSWORD=… backend python
+/app/scripts/seed_data.py`. En un despliegue, `--solo-usuarios`.
+
 Puertas: panel en **3000**, puerta pública en **127.0.0.1:8080**, API en **127.0.0.1:8000**.
 PostgreSQL no se publica salvo con el overlay `--dev`.
 
@@ -83,7 +96,7 @@ comprobación y conviene no confundirlas:
 
 | Clase | Cuántas | Qué es |
 | :--- | :---: | :--- |
-| Pruebas | 1734 servidor · 748 cliente | Comprueban **casos** |
+| Pruebas | 1743 servidor · 748 cliente | Comprueban **casos** |
 | Controles de configuración peligrosa | 59 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
 | Guardas de propiedades | 7 | Programas que levantan la aplicación y comprueban **propiedades**, no casos |
 

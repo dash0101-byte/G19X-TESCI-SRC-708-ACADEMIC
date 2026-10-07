@@ -43,11 +43,16 @@ del árbol: no es un aviso, es una parada.
 
 ## 2. La variable
 
-Busque la línea `PUBLICACIONES_URL_BASE` y déjela así, con la dirección de la empresa:
+Al final del archivo, escriba la línea con la dirección de la empresa:
 
 ```
 PUBLICACIONES_URL_BASE=https://plurione.com/interes
 ```
+
+**En un archivo recién creado esa línea no está, y es normal:** el valor de fábrica
+—`http://localhost:3000/interes`— lo pone el compose, no el archivo de entorno, así que lo
+que hay que hacer es **añadirla**. Si ya estuviera escrita, se cambia en su sitio y no se
+duplica: con dos líneas iguales manda la última, y eso es muy difícil de ver leyendo.
 
 Tres cosas, y las tres se han roto alguna vez:
 
@@ -86,6 +91,10 @@ En el mismo archivo, y ninguna es obligatoria para que la dirección funcione:
 | `COMPROBAR_DIRECCION_PUBLICA` | Cuando ya hay dirección pública de verdad | `true`. El sistema sale a internet a confirmar que su propia dirección responde —como mucho una vez cada dos minutos, cuando alguien abre la pantalla de Publicaciones— y avisa ahí si deja de responder |
 | `CORS_ORIGINS` | **Solo** si el panel se sirve desde otro dominio que la API | La lista exacta, en formato JSON: `CORS_ORIGINS=["https://panel.plurione.com"]`. Si los sirve el mismo nginx de esta pila, se deja **vacío** |
 | `TRUST_PROXY_HEADERS` | Si delante hay un proxy de confianza que reescribe `X-Forwarded-For` | `true`. Expuesto directamente tiene que ser `false`, o los topes por IP no se aplican nunca |
+
+De las cuatro, `REFRESH_COOKIE_SECURE`, `CORS_ORIGINS` y `TRUST_PROXY_HEADERS` **sí vienen
+escritas** en el archivo recién creado, con su valor de fábrica; `COMPROBAR_DIRECCION_PUBLICA`
+**no**, igual que la variable del apartado 2, y se añade del mismo modo.
 
 El comodín `*` en `CORS_ORIGINS` no se admite: el servidor aborta el arranque si lo encuentra.
 

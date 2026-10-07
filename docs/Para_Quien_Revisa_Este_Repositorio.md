@@ -61,6 +61,51 @@ Un detalle que conviene saber antes de ejecutarlo: el entrenamiento **reescribe*
 la marca de tiempo del perfil de referencia y una entrada nueva en el registro de modelos. No es
 un fallo: es el registro de procedencia haciendo su trabajo.
 
+### El primer arranque entero, en orden
+
+Cuatro pasos. Se ejecutaron en este orden, sobre un clon limpio, el 07-10-2026:
+
+```bash
+# 1. EL MODELO. Dos minutos. Sin esto se mide el heurístico, como dice todo lo de arriba.
+pip install --require-hashes -r backend/requirements.lock
+python ml_pipeline/src/train_model.py
+
+# 2. EL CLIENTE COMPILADO. Tampoco viaja en el repositorio —`dist/` está en `.gitignore`— y
+#    la imagen del backend lo copia para poder servir la SPA ella sola en el 8000.
+cd frontend && npm ci && npm run build && cd ..
+
+# 3. LA PILA. `iniciar` crea ~/.plurione/pila.env con los dos secretos ya generados.
+python devops/pila.py iniciar
+python devops/pila.py up --build -d
+
+# 4. LOS DATOS. Recién migrada, la base no tiene NI UNA CUENTA: el panel pide credenciales
+#    que todavía no existen. Esto crea las siete cuentas, 4 publicaciones y 12 prospectos.
+python devops/pila.py exec -e ENVIRONMENT=development -e SEED_ADMIN_PASSWORD=PluriOne2026! -e SEED_SALES_LEAD_PASSWORD=PluriOne2026! -e SEED_EXECUTIVE_PASSWORD=PluriOne2026! -e SEED_ASESOR_PASSWORD=PluriOne2026! backend python /app/scripts/seed_data.py
+```
+
+El panel queda en [http://localhost:3000](http://localhost:3000) y se entra con
+`lider.ventas@plurione.com` y esa contraseña. `curl -s http://127.0.0.1:8000/health` tiene que
+decir `"ml_model_loaded": true`.
+
+**Por qué el `-e ENVIRONMENT=development` del paso 4**, que parece una trampa y no lo es: el
+sembrado de demostración **vacía las tablas de negocio** antes de regenerarlas, así que se niega
+a correr contra un entorno endurecido —y la pila arranca en `production`—. La variable se pasa a
+**ese** proceso y no a la pila. En una instalación de verdad lo que se usa es `--solo-usuarios`,
+que crea las cuentas y no toca ningún otro dato; está en [Si algo falla](Si_Algo_Falla.md). Y sin
+`--force`, el sembrado completo se niega en cuanto la base **ya** tiene datos de negocio y
+enumera lo que borraría: en una recién migrada no los tiene, así que no hace falta.
+
+**En Windows, clone con `core.longpaths`.** La ruta relativa más larga del repositorio mide **169
+caracteres** —el informe de un capítulo, con su título entero en el nombre—, de modo que con el
+límite de 260 de Windows la carpeta donde clone tiene que medir menos de **90**. Si no, `git
+clone` escribe los que caben, deja fuera unos cuantos con `unable to create file … Filename too long`,
+y el índice se queda **vacío**: `git status` dice entonces que están **todos borrados**, 434
+líneas de `D `, que es lo último que describe lo que pasó. Se evita de una vez:
+
+```bash
+git clone -c core.longpaths=true <url>
+```
+
 ---
 
 ## 2. Cómo saber qué motor está puntuando
@@ -85,6 +130,33 @@ Y después del hecho, cada puntuación lo lleva escrito. La auditoría guarda
 el segundo tramo del hallazgo A-5: se arregló que el modelo llegara a la imagen y el historial
 seguía afirmando que todo venía del modelo. Un historial que no distingue con qué se calculó no
 sirve para auditar.
+
+### Qué se puede comprobar sin levantar nada
+
+Casi todo. Con el entorno del lock instalado y **sin Docker**:
+
+```bash
+python -m pytest backend/tests -q                   # 1743 pruebas, 8 min 20 s medidos
+ruff check backend/ scripts/
+python scripts/guarda_de_la_pagina_publica.py       # la única ruta sin sesión que escribe
+python scripts/guarda_del_motor_de_reglas.py        # lo que decide de madrugada
+python scripts/guarda_de_los_desenlaces.py          # lo que produce etiquetas de entrenamiento
+python scripts/guarda_del_reparto_automatico.py     # lo que decide en el alta
+python -m pytest scripts/test_hojas_de_observacion.py -q
+python scripts/renovar_imagenes.py --solo-fijacion  # que ninguna imagen quede sin huella
+cd frontend && npx vitest run && npx eslint src && npm run build   # 748 pruebas
+```
+
+La suite corre sobre **SQLite en memoria** y cada guarda se monta su propia base temporal y
+habla con la aplicación por `TestClient`: ninguna necesita la pila, ni PostgreSQL, ni red.
+
+**Una regla que cuesta tiempo aprender por las malas: nunca dos `pytest` a la vez.** Comparten
+la base de pruebas y producen cientos de fallos falsos —una vez, 227 rojas sobre un árbol
+correcto—. Si va a repartir el trabajo entre varios agentes, que solo uno corra la suite.
+
+Lo que **sí** necesita Docker es la construcción de las imágenes, la pila, la comprobación de
+la puerta pública (`scripts/comprobar_puerta_publica.py`) y las copias con su prueba de
+restauración.
 
 ---
 
@@ -124,6 +196,8 @@ convence, la discusión es con ese sitio.
 | «¿Qué necesitas?» del formulario público **no pesa** en el score | Es texto libre. Un peso inventado para texto libre es indistinguible de una medición para quien lea el resultado seis meses después | §5.4 · §7 |
 | El alta de una ficha contesta **400 y 409 para el mismo conflicto** | El 400 lo da su propia comprobación; el 409, la carrera que detecta la base. Unificarlo cambia lo que un cliente ya recibe sin corregir ningún dato | §6.4 punto 43 |
 | El panel puede enseñar en rojo **«la dirección pública no responde»** con el túnel funcionando | La sonda sale **desde el contenedor**. En una red con TLS interceptado —proxy corporativo— el certificado lo firma una CA que no está en el almacén del contenedor y la comprobación falla siempre. Se apaga con `COMPROBAR_DIRECCION_PUBLICA=false` | `Poner_la_Direccion_de_la_Empresa.md` |
+| El `pip install` de la construcción de la imagen falla con **«No matching distribution found for aiosqlite==0.22.1»** | **No es el lock.** Dos líneas más arriba está la causa: `CERTIFICATE_VERIFY_FAILED`. En una red que intercepta TLS —un proxy corporativo— el certificado de PyPI lo firma una autoridad que no está en el almacén del contenedor, pip no puede leer el índice y lo cuenta como «ninguna versión disponible». Es la misma red que pinta de rojo la dirección pública, dos filas más abajo | medido el 07-10-2026 |
+| Las órdenes con rutas de dentro del contenedor —`/app/scripts/seed_data.py`— fallan en **Git Bash** con `can't open file '/app/C:/Program Files/Git/app/…'` | Es del shell, no del sistema: Git Bash traduce lo que empieza por `/` a una ruta de Windows. En PowerShell y en `cmd` funcionan tal cual; en Git Bash, con `MSYS_NO_PATHCONV=1` delante | medido el 07-10-2026 |
 | La contraseña `PluriOne2026!` está **en el README** | Es la de desarrollo de `seed_data.py`, documentada desde el principio; en un entorno endurecido el sembrado genera una aleatoria. Es la única excepción a «nunca secretos en el árbol» | `AGENTS.md` §5 |
 | Hay **39 puntos anotados** de deuda menor, 26 abiertos | Están anotados **a propósito**: desde la congelación, lo que no impide levantar la pila ni enseñar la demostración se escribe en lugar de arreglarse. Esa lista es parte del entregable | §6.4 |
 
