@@ -60,3 +60,17 @@ ignore = [
 # Las pruebas que acompañan a un script son pruebas: `assert` es su forma de expresarse.
 "scripts/test_*.py" = ["S101", "S311", "T201"]
 "backend/scripts/*" = ["S311", "T201"]
+
+[tool.coverage.run]
+# Medicion por ramas, y declarada aqui y no como bandera del CI a proposito. Hasta el
+# 7 de octubre de 2026 la cobertura contaba solo sentencias: los documentos decian 94 %
+# cuando la cifra con ramas es 92,64 %, porque habia 214 ramas a medio recorrer que
+# ningun numero nombraba. Puesta en el pyproject, una medicion local mide exactamente lo
+# que mide el CI; puesta como `--cov-branch` en el flujo de trabajo serian dos
+# declaraciones de lo mismo, y dos numeros para lo mismo se desincronizan.
+branch = true
+
+[tool.coverage.report]
+# Dos decimales porque la diferencia entre «92,64» y «93» es justo la que decide si un
+# suelo pegado a lo medido es un trinquete o un sello de goma.
+precision = 2

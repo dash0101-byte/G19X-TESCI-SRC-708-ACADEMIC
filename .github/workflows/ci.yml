@@ -22,14 +22,19 @@ permissions:
 env:
   PYTHON_VERSION: "3.13"
   NODE_VERSION: "20"
-  # Suelo de cobertura del paquete de aplicacion. La medicion actual es del 88 %; se
-  # deja el suelo tres puntos por debajo para absorber diferencias de plataforma sin
-  # convertirlo en un sello de goma. Es un trinquete: solo deberia subir.
+  # Suelo de cobertura del paquete de aplicacion, sobre la cifra CON RAMAS: desde el 7
+  # de octubre de 2026 es la que se mide, y no se declara aqui sino en el pyproject (ver
+  # el paso de la suite). Lo medido es 92.64 % combinado —94.42 % de sentencias y 84.10 %
+  # de ramas—. Este comentario decia «la medicion actual es del 88 %» y daba el suelo por
+  # tres puntos por debajo cuando ya eran casi ocho: con esa holgura deja pasar una
+  # regresion enorme sin decir nada, que es tanto como no tenerlo. Es un trinquete: solo
+  # deberia subir, y sube pegado a lo medido.
   COBERTURA_MINIMA: "85"
-  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (95/89/98/98 desde el
-  # capitulo 36, sobre los cinco modulos con logica). No se repite aqui a proposito: dos
-  # numeros para lo mismo
-  # se desincronizan, y el que manda es el que corre.
+  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (96/90/98/98 desde el
+  # capitulo 40, sobre los seis modulos con logica; aqui decia 95/89/98/98 y cinco, que
+  # es lo que fue hasta que el capitulo 40 metio `erroresDeFormulario.js` en la lista y
+  # subio el suelo). No se repite aqui a proposito: dos numeros para lo mismo se
+  # desincronizan, y el que manda es el que corre.
 
 jobs:
 
@@ -628,6 +633,13 @@ jobs:
       # La suite levanta su propio SQLite en memoria y declara sus datos por fixtures.
       # No se siembra ninguna base de datos antes: hacerlo acoplaba los tests a un script
       # de demostración y los volvía dependientes del orden de ejecución.
+      #
+      # La medicion cuenta RAMAS, y no se pide aqui: `branch = true` vive en
+      # `[tool.coverage.run]` del pyproject.toml, asi que lo que se mide en una maquina
+      # cualquiera es exactamente lo que se mide aqui. Repetirlo como `--cov-branch`
+      # serian dos declaraciones de lo mismo. Hasta el 7 de octubre de 2026 no se
+      # contaban, y la cifra que se publicaba —94 %— era solo la de sentencias, con 214
+      # ramas a medio recorrer que ningun numero nombraba.
       - name: Ejecutar la suite con medición de cobertura
         run: |
           python -m pytest backend/tests/ \
