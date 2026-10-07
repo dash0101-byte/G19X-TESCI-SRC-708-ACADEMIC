@@ -508,7 +508,14 @@ def _envios(db: Session, slug: str, inicio, fin, desde_el_dia: Optional[datetime
         LeadActivity.source == FUENTE,
         LeadActivity.external_event_id.startswith(f"{slug}:", autoescape=True),
     )
-    if inicio is not None:
+    # pragma: no branch — dos líneas más arriba `inicio` recibe `primero` cuando llega a
+    # None, y `primero` siempre es un instante, así que aquí no puede serlo: la salida
+    # contraria no se puede recorrer. Que la premisa siga siendo cierta lo comprueba
+    # `test_la_cuenta_de_envios_siempre_tiene_un_instante_de_inicio`, por lo que se observa
+    # —sin `inicio`, la cuenta sigue acotada por el primer día con visitas— y no repitiendo
+    # el `max`: si alguien quita ese valor por defecto, se pone rojo ahí y esta marca deja
+    # de valer.
+    if inicio is not None:  # pragma: no branch
         consulta = consulta.filter(LeadActivity.occurred_at >= inicio)
     if fin is not None:
         consulta = consulta.filter(LeadActivity.occurred_at < fin)

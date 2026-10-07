@@ -23,7 +23,12 @@ from html.parser import HTMLParser
 
 import pytest
 from app.core import tarjeta as tarjeta_png
-from app.core.etiquetas_sociales import DESCRIPCION_GENERICA, TITULO_GENERICO
+from app.core.etiquetas_sociales import (
+    DESCRIPCION_GENERICA,
+    MAX_TITULO,
+    TITULO_GENERICO,
+    tarjeta_de,
+)
 from app.core.publicaciones import CANAL_LINKEDIN
 from app.models.entities import VisitaDePublicacion
 
@@ -385,3 +390,218 @@ def test_la_pagina_no_pone_cookies(client, publicacion):
 def test_el_html_no_se_cachea(client, publicacion):
     """Una copia vieja seguiría enseñando el título de antes durante días."""
     assert "no-store" in _pagina(client, publicacion).headers["cache-control"]
+
+
+# ==============================================================================
+# Lo que pasa con un titulo largo, que es lo que no se habia mirado
+# ==============================================================================
+
+def test_un_titulo_mas_largo_que_el_tope_se_corta_por_una_palabra():
+    """
+    El texto de la etiqueta se recorta, y el recorte tiene que caer entre palabras.
+
+    Un corte a la mitad de una palabra -«Equipos de TI en treinta dia…»- se lee como un
+    error de la pagina; y sin recorte, LinkedIn y WhatsApp cortan por su cuenta a lo ancho
+    que les quepa, que no es el mismo en los dos. Noventa caracteres para el titulo y
+    doscientos para el texto son los que caben en las dos.
+    """
+    largo = "Equipos de tecnologia de la informacion para empresas que necesitan cubrir vacantes criticas"
+    assert len(largo) > MAX_TITULO
+
+    tarjeta = tarjeta_de(largo, TEXTO, "https://ejemplo.mx/interes/x", "https://ejemplo.mx/t.png")
+
+    assert len(tarjeta.titulo) <= MAX_TITULO
+    assert tarjeta.titulo.endswith("…")
+    # Cortado entre palabras: lo que queda delante del puntito es un prefijo entero del
+    # titulo, no media palabra.
+    assert largo.startswith(tarjeta.titulo[:-1].rstrip())
+    assert not tarjeta.titulo[:-2].endswith(" ")
+
+
+@pytest.mark.parametrize(
+    "titulo",
+    [
+        "A" + "b" * (MAX_TITULO + 20),
+        # Un solo espacio, y al principio: el ultimo espacio existe pero cortar ahi dejaria
+        # el titulo en una letra. Es el caso que justifica la condicion de la mitad.
+        "A " + "b" * (MAX_TITULO + 20),
+    ],
+    ids=["sin un solo espacio", "con el unico espacio al principio"],
+)
+def test_una_palabra_mas_larga_que_el_tope_se_corta_donde_toque(titulo):
+    """
+    La otra salida del recorte: cuando no hay ningun espacio en la segunda mitad.
+
+    Pasa con una direccion pegada en el titulo o con un nombre de producto sin espacios.
+    Buscar el ultimo espacio y cortar ahi dejaria el titulo en una palabra, o en nada; por
+    eso solo se acepta el espacio si cae pasada la mitad del tope.
+    """
+    tarjeta = tarjeta_de(titulo, TEXTO, "https://ejemplo.mx/interes/x", "https://ejemplo.mx/t.png")
+
+    assert len(tarjeta.titulo) <= MAX_TITULO
+    assert tarjeta.titulo.endswith("…")
+    assert len(tarjeta.titulo) > MAX_TITULO // 2, "cortar por el ultimo espacio dejaria casi nada"
+
+
+def test_una_publicacion_sin_titulo_utilizable_cae_a_la_tarjeta_generica():
+    """
+    Un titulo de espacios, o de caracteres de control, no es un titulo.
+
+    Lo importante es que no salga una tarjeta con el titulo vacio: en un chat, el enlace se
+    veria como una caja sin texto, y lo que se comparte es lo unico que se ve de la pagina.
+    """
+    for titulo in ("", "   ", "\u0000\u0001"):
+        tarjeta = tarjeta_de(titulo, TEXTO, "https://ejemplo.mx/interes/x", "https://ejemplo.mx/t.png")
+
+        assert tarjeta.titulo == TITULO_GENERICO
+        assert tarjeta.descripcion == DESCRIPCION_GENERICA
+
+
+def test_un_titulo_larguisimo_se_dibuja_en_tres_lineas_y_con_puntito():
+    """
+    La escalera de tamanos de la imagen y su ultimo peldano.
+
+    El titulo se dibuja lo mas grande que quepa en tres lineas, probando siete tamanos de
+    mayor a menor. Con un titulo que no cabe ni en el mas pequeno, el ultimo peldano recorta
+    a tres lineas y pone el puntito.
+
+    Se comprueban las LINEAS y no el PNG a proposito: la imagen sale valida y de 1200x630
+    tambien con cuatro lineas o con cincuenta —se dibujarian encima del pie y fuera del
+    lienzo, y el fichero seria igual de correcto—, asi que mirar el PNG no distingue nada.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+    larguisimo = " ".join(["palabra"] * 120)
+
+    tamano, lineas = tarjeta_png._tamano_del_titulo(dibujo, larguisimo, 900)
+
+    assert len(lineas) == tarjeta_png.MAX_LINEAS
+    assert lineas[-1].endswith("…")
+    assert tamano == 40, "con un titulo asi se acaba en el peldano mas pequeno"
+    # Y la imagen sigue saliendo, que es lo otro que tiene que seguir siendo verdad.
+    datos = tarjeta_png.dibujar(larguisimo, pie="plurione.mx")
+    assert datos[:8] == b"\x89PNG\r\n\x1a\n"
+    assert struct.unpack(">II", datos[16:24]) == (tarjeta_png.ANCHO, tarjeta_png.ALTO)
+
+
+def test_un_titulo_corto_se_dibuja_con_la_letra_mas_grande():
+    """
+    La otra punta de la escalera, que es la que se ve en la demostracion.
+
+    Si el primer peldano dejara de valer, todos los titulos saldrian pequenos sin que nada
+    fallara: la imagen es correcta y nadie la mide.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+
+    tamano, lineas = tarjeta_png._tamano_del_titulo(dibujo, "Equipos de TI", 900)
+
+    assert tamano == 76
+    assert lineas == ["Equipos de TI"]
+
+
+def test_una_sola_palabra_mas_ancha_que_el_lienzo_se_parte_por_letras():
+    """
+    La vuelta que parte por letras se recorre, y parte UNA letra: deja la linea desbordada.
+
+    Esta prueba se escribio para comprobar lo que el docstring de `_repartir` promete —«una
+    palabra mas larga que la linea entera se corta por caracteres en lugar de desbordar el
+    lienzo»— y lo que mide es que no lo cumple. El `while` saca `actual[:-1]` como linea y
+    se queda con `actual[-1]`: corta un caracter y guarda el ultimo, en vez de sacar un
+    trozo que quepa y seguir con el resto. Con 200 letras y el ancho util de verdad (1032
+    px), la primera linea mide 14 925 px y se sale de la imagen por la derecha; la segunda
+    es una «W» sola.
+
+    Y no hay escalera que lo salve: `_tamano_del_titulo` prueba de 76 a 40 y se detiene en
+    cuanto caben tres lineas, y aqui caben dos desde el primer peldano, asi que devuelve el
+    tamano MAS GRANDE. Queda anotado en §6.4 y la prueba comprueba lo medido, no lo
+    prometido: arreglar `_repartir` cambiaria pixeles de una imagen que hoy se sirve, y eso
+    no entra en la congelacion. Lo que esta prueba sujeta es que la vuelta se recorre: si
+    alguien la quita, estas dos lineas vuelven a ser una.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+    fuente = tarjeta_png._fuente(76)
+    ancho_util = tarjeta_png.ANCHO - tarjeta_png.MARGEN * 2
+
+    lineas = tarjeta_png._repartir(dibujo, "W" * 200, fuente, ancho_util)
+
+    assert lineas == ["W" * 199, "W"], "la vuelta corta una letra y guarda la ultima"
+    assert tarjeta_png._ancho(dibujo, lineas[0], fuente) > ancho_util, (
+        "el defecto: la linea que la vuelta saca sigue sin caber"
+    )
+
+    # Y el titulo entero sale al tamano mayor, porque dos lineas ya son menos de tres.
+    tamano, del_titulo = tarjeta_png._tamano_del_titulo(dibujo, "W" * 200, ancho_util)
+    assert (tamano, del_titulo) == (76, lineas)
+
+
+def test_un_titulo_que_se_queda_sin_palabras_no_reparte_ninguna_linea():
+    """
+    `_repartir` de algo sin palabras devuelve la lista vacia, no una linea en blanco.
+
+    `dibujar` nunca le pasa esto -antes cae a la marca-, pero la funcion es la que decide
+    cuantas lineas hay y de ella cuelga la escalera de tamanos: una linea vacia contaria
+    como linea, y la escalera elegiria un tamano por un renglon que no se ve.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+    fuente = tarjeta_png._fuente(76)
+
+    for vacio in ("", "   ", "\n\t "):
+        assert tarjeta_png._repartir(dibujo, vacio, fuente, 1032) == []
+
+
+def test_tres_lineas_o_menos_vuelven_del_recorte_sin_tocar():
+    """
+    El recorte no toca lo que ya cabe: no le pone puntito a un titulo completo.
+
+    Hoy solo lo llama la salida de emergencia de la escalera, que llega siempre con mas de
+    tres lineas, asi que esta es la mitad del contrato que ningun camino del dibujo recorre.
+    Se comprueba igual porque es lo que separa «recortado» de «completo»: un puntito en un
+    titulo que caben entero le dice a quien lee la tarjeta que falta algo.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+    fuente = tarjeta_png._fuente(76)
+
+    for lineas in ([], ["una"], ["una", "dos"], ["una", "dos", "tres"]):
+        recortadas = tarjeta_png._recortar_a_tres(dibujo, list(lineas), fuente, 1032)
+        assert recortadas == lineas
+        assert not any(linea.endswith(tarjeta_png.CORTE) for linea in recortadas)
+
+
+def test_la_tercera_linea_se_acorta_hasta_que_quepa_con_el_puntito():
+    """
+    El puntito ocupa, asi que la tercera linea se acorta hasta dejarle sitio.
+
+    Es la vuelta que nadie recorria. Sin ella, `linea + CORTE` se dibujaria mas ancho que
+    el lienzo y el puntito -lo unico que avisa de que el titulo sigue- seria justo lo que
+    se sale de la imagen: la tarjeta diria un titulo recortado sin decir que lo esta.
+    """
+    from PIL import Image, ImageDraw
+
+    dibujo = ImageDraw.Draw(Image.new("RGB", (tarjeta_png.ANCHO, tarjeta_png.ALTO)))
+    fuente = tarjeta_png._fuente(76)
+    ancho_util = tarjeta_png.ANCHO - tarjeta_png.MARGEN * 2
+    # Una tercera linea que ocupa el ancho justo: con el puntito detras ya no cabe.
+    llena = "W"
+    while tarjeta_png._ancho(dibujo, llena + "W", fuente) <= ancho_util:
+        llena += "W"
+    assert tarjeta_png._ancho(dibujo, llena, fuente) <= ancho_util
+    assert tarjeta_png._ancho(dibujo, llena + tarjeta_png.CORTE, fuente) > ancho_util
+
+    recortadas = tarjeta_png._recortar_a_tres(
+        dibujo, ["una", "dos", llena, "cuarta"], fuente, ancho_util
+    )
+
+    assert len(recortadas) == 3
+    ultima = recortadas[-1]
+    assert ultima.endswith(tarjeta_png.CORTE)
+    assert len(ultima) < len(llena) + 1, "hubo que quitar letras para que quepa el puntito"
+    assert tarjeta_png._ancho(dibujo, ultima, fuente) <= ancho_util

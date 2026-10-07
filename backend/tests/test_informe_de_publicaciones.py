@@ -16,10 +16,26 @@ Lo que se comprueba:
   informe (dos caminos distintos que tienen que dar lo mismo).
 """
 import datetime
+import logging
+import uuid
 
 import pytest
 from app.core.audit import ACCION_PUBLICACION_COMPARATIVA, ACCION_PUBLICACION_INFORME
-from app.models.entities import AuditLog, Lead, LeadStatus, ScoreCategory, User
+from app.core.autorizacion import AlcanceDeCartera
+from app.core.publicaciones import NECESIDADES_POR_DEFECTO, base_publica
+from app.core.security import CurrentUser, UserRole
+from app.models.entities import (
+    ActivityType,
+    AuditLog,
+    Campaign,
+    Lead,
+    LeadActivity,
+    LeadStatus,
+    ScoreCategory,
+    User,
+)
+from app.services import ciclo_de_publicaciones, informe_de_publicaciones
+from app.services.pagina_de_interes import FUENTE as FUENTE_DE_LA_PAGINA
 from tests.conftest import TEST_ACCOUNTS
 
 CAMPANAS = "/api/v1/campaigns"
@@ -599,3 +615,487 @@ def test_el_contador_es_del_lider(client, executive_headers):
     assert client.get(
         f"{PUBLICACIONES}/nuevos-sin-asesor", headers=executive_headers
     ).status_code == 403
+
+
+# ==============================================================================
+# Las rutas de los datos antiguos, que son las que se recorren contra la base de verdad
+# ==============================================================================
+
+def _solicitud_antigua(db_session, lead, publicacion, **datos):
+    """
+    Una solicitud escrita como las escribía una versión anterior del sistema.
+
+    No es un caso inventado: la base de la demostración y la del servidor llevan filas de
+    antes del capítulo 26 —cuando la actividad empezó a guardar la etiqueta de la necesidad
+    junto a su clave— y de antes del 30 —cuando empezó a guardar el slug en sus datos—. Lo
+    que esas filas tienen es lo que esta función escribe, y ninguna prueba las miraba.
+    """
+    actividad = LeadActivity(
+        lead_id=lead.id,
+        activity_type=ActivityType.FORM_SUBMIT,
+        channel="Web",
+        source=FUENTE_DE_LA_PAGINA,
+        external_event_id=f"{publicacion['public_slug']}:{uuid.uuid4().hex}",
+        verificada=True,
+        activity_data=datos,
+        occurred_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30),
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    db_session.add(actividad)
+    db_session.commit()
+    db_session.refresh(actividad)
+    return actividad
+
+
+def test_la_necesidad_de_una_solicitud_antigua_se_lee_de_la_tabla(
+    client, lead_headers, publicacion, db_session, sample_lead
+):
+    """
+    Las solicitudes viejas solo guardan la clave; la etiqueta se busca en la tabla.
+
+    Sin esa salida, la ficha 360 de una persona que llegó hace meses enseñaría la tarjeta
+    «Llegó por» sin la línea de qué necesitaba: el dato está, y lo que falla es leerlo.
+    """
+    _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="vacantes")
+
+    tarjeta = informe_de_publicaciones.llego_por(db_session, sample_lead)
+
+    assert tarjeta is not None
+    assert tarjeta.solicitudes[0].necesidad == NECESIDADES_POR_DEFECTO["vacantes"]
+
+
+def test_una_necesidad_que_ya_no_esta_en_la_tabla_no_inventa_etiqueta(
+    client, lead_headers, publicacion, db_session, sample_lead
+):
+    """Una clave de una lista que se cambió después no se traduce: se deja en blanco."""
+    _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="algo-que-ya-no-existe")
+
+    tarjeta = informe_de_publicaciones.llego_por(db_session, sample_lead)
+
+    assert tarjeta.solicitudes[0].necesidad is None
+
+
+def test_la_publicacion_de_una_solicitud_antigua_sale_del_identificador_externo(
+    client, lead_headers, publicacion, db_session, sample_lead
+):
+    """
+    El criterio de atribución tiene dos lecturas y la segunda no se probaba.
+
+    El identificador externo lleva el slug delante desde el primer día
+    (`<slug>:<uuid>`), y es lo único que tienen las solicitudes anteriores al capítulo 30.
+    De este criterio cuelga también el panel de desenlaces, que atribuye cada cierre a la
+    publicación por la que llegó esa persona: dos formas de leerlo darían dos atribuciones
+    distintas para las fichas antiguas.
+    """
+    antigua = _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="equipo")
+
+    assert "publicacion" not in (antigua.activity_data or {})
+    assert informe_de_publicaciones.slug_de(antigua) == publicacion["public_slug"]
+
+
+def test_una_solicitud_sin_rastro_de_publicacion_no_se_atribuye_a_ninguna(db_session, sample_lead):
+    """
+    Ni en los datos ni en el identificador: entonces no se adivina.
+
+    Devolver cualquier slug aquí atribuiría una ficha a una publicación que no la trajo, y
+    eso llega al informe de esa publicación y a la comparativa, que son números de negocio.
+    """
+    suelta = LeadActivity(
+        lead_id=sample_lead.id,
+        activity_type=ActivityType.FORM_SUBMIT,
+        channel="Web",
+        source=FUENTE_DE_LA_PAGINA,
+        external_event_id="sin-dos-puntos",
+        verificada=True,
+        activity_data={},
+        occurred_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+
+    assert informe_de_publicaciones.slug_de(suelta) is None
+
+    # Y la tarjeta de la ficha con esa solicitud y ninguna otra: sale la solicitud, sin
+    # publicacion. Es el camino en que no hay ningun slug que buscar, asi que la consulta
+    # de publicaciones no se hace; devolver la tarjeta vacia esconderia una solicitud que
+    # existe, y rellenar la publicacion inventaria la atribucion.
+    db_session.add(suelta)
+    db_session.commit()
+
+    tarjeta = informe_de_publicaciones.llego_por(db_session, sample_lead)
+
+    assert len(tarjeta.solicitudes) == 1
+    assert tarjeta.solicitudes[0].publicacion_id is None
+    assert tarjeta.solicitudes[0].titulo is None
+    assert tarjeta.solicitudes[0].enlace is None
+
+
+def test_sin_marca_del_aviso_vale_la_fecha_del_envio(
+    client, lead_headers, publicacion, db_session, sample_lead, caplog
+):
+    """
+    La fecha del aviso de privacidad es un dato legal: cuándo lo aceptó esa persona.
+
+    Las solicitudes que no la guardan aparte tienen la del envío, que es el mismo instante.
+    Dejarla en blanco borraría la prueba de un consentimiento que sí se dio.
+    """
+    caplog.set_level(logging.DEBUG)
+    antigua = _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="demo")
+
+    tarjeta = informe_de_publicaciones.llego_por(db_session, sample_lead)
+
+    assert tarjeta.solicitudes[0].aviso_aceptado_en is not None
+    assert tarjeta.solicitudes[0].aviso_aceptado_en.date() == antigua.occurred_at.date()
+    # Y sin avisar: una marca que no esta es lo normal en una fila vieja, no una anomalia.
+    # Tratarla como ilegible llenaria el registro de avisos por cada ficha antigua que se
+    # abre, y los avisos que importan dejarian de verse.
+    assert not [r for r in caplog.records if "ilegible" in r.getMessage()]
+
+
+def test_una_marca_del_aviso_ilegible_no_tumba_la_ficha(
+    client, lead_headers, publicacion, db_session, sample_lead, caplog
+):
+    """
+    Una fecha que no se puede leer se cambia por la del envío, con un aviso en el registro.
+
+    Pasa con una fila escrita a mano o migrada de otro sistema. La alternativa sería que la
+    ficha 360 de esa persona contestara 500: un dato de más en una columna JSON no puede
+    dejar sin ficha a nadie.
+    """
+    caplog.set_level(logging.DEBUG)
+    antigua = _solicitud_antigua(
+        db_session, sample_lead, publicacion,
+        necesidad="vacantes", aviso_aceptado_en="ayer por la tarde",
+    )
+
+    tarjeta = informe_de_publicaciones.llego_por(db_session, sample_lead)
+
+    assert tarjeta.solicitudes[0].aviso_aceptado_en.date() == antigua.occurred_at.date()
+    assert any(
+        "ilegible" in r.getMessage() and str(antigua.id) in r.getMessage()
+        for r in caplog.records
+    ), "un dato ilegible tiene que quedar anotado para poder arreglarlo"
+
+
+# ==============================================================================
+# Los bordes del rango de fechas y del grafico
+# ==============================================================================
+
+def test_el_informe_acota_tambien_por_la_fecha_de_fin(
+    client, lead_headers, publicacion, db_session, sample_leads
+):
+    """
+    `hasta` existe para mirar un mes cerrado, y era la mitad del rango sin ejercitar.
+
+    Con el extremo de arriba roto, el informe de septiembre trae también lo de octubre: la
+    cifra que se enseña es mayor que la real y no hay forma de notarlo desde la pantalla.
+
+    **Hace falta una visita contada antes del envío**, y eso lo descubrió esta prueba: los
+    dos agregados de envíos arrancan en `desde_el_dia`, que es el primer día con visitas
+    —`_envios` devuelve 0 de entrada si no hay ninguna—. Sin la visita, el informe daba
+    cero envíos con o sin tope y la prueba no distinguía nada: habría pasado en verde sin
+    recorrer ni una de las dos ramas que dice cubrir.
+    """
+    hoy = datetime.date.today()
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    ciclo_de_publicaciones.registrar_visita(db_session, campana)
+    _enviar(client, publicacion)
+
+    sin_tope = client.get(
+        f"{PUBLICACIONES}/{publicacion['id']}/informe", headers=lead_headers
+    ).json()
+    assert sin_tope["resumen"]["envios"] == 1
+    assert sum(fila["envios"] for fila in sin_tope["por_red"]) == 1
+
+    respuesta = client.get(
+        f"{PUBLICACIONES}/{publicacion['id']}/informe",
+        params={"hasta": (hoy - datetime.timedelta(days=1)).isoformat()},
+        headers=lead_headers,
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    cuerpo = respuesta.json()
+    assert cuerpo["filas"] == []
+    # Los dos agregados que se calculan aparte del listado, y que tambien tienen que
+    # respetar el extremo de arriba: la cuenta de envios y el reparto por red.
+    assert cuerpo["resumen"]["envios"] == 0
+    assert all(fila["envios"] == 0 and fila["perfiles"] == 0 for fila in cuerpo["por_red"])
+
+
+def test_un_rango_al_reves_no_devuelve_ningun_dia(
+    client, lead_headers, publicacion, db_session, sample_leads
+):
+    """
+    Pedir del 20 al 10 no es un error del servidor: es un rango vacio.
+
+    Sin la comprobacion, el calculo de los dias del grafico recorreria un rango negativo.
+    """
+    hoy = datetime.date.today()
+    _sembrar(db_session, publicacion, email="cualquiera@ej.mx", score=60.0, etapa=LeadStatus.NEW)
+
+    respuesta = client.get(
+        f"{PUBLICACIONES}/{publicacion['id']}/informe",
+        params={
+            "desde": hoy.isoformat(),
+            "hasta": (hoy - datetime.timedelta(days=10)).isoformat(),
+        },
+        headers=lead_headers,
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["por_dia"] == []
+
+
+def test_el_dia_de_una_fecha_guardada_como_texto_se_entiende():
+    """
+    Las fechas de SQLite llegan a veces como cadena, y el grafico las agrupa por dia.
+
+    Es la tercera rama de la funcion que normaliza: `datetime`, `date` y texto. La de texto
+    solo se recorre con una fila escrita por otra herramienta, y es justo la que no se puede
+    reproducir desde la aplicacion.
+    """
+    assert informe_de_publicaciones._dia("2026-10-07T18:30:00+00:00") == datetime.date(2026, 10, 7)
+    assert informe_de_publicaciones._dia("2026-10-07") == datetime.date(2026, 10, 7)
+
+
+# ==============================================================================
+# Lo que se enseña cuando no hay nada, y el aviso del enlace caducado
+# ==============================================================================
+
+def test_la_comparativa_sin_ninguna_publicacion_no_falla(db_session):
+    """
+    El estado inicial de una instalación limpia, que es el que ve quien la estrena.
+
+    Se mide sobre una base propia y vacía: la de la suite tiene publicaciones de otras
+    pruebas, y comprobar «no hay ninguna» ahí dependería del orden de ejecución.
+    """
+    from app.core.database import Base
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    motor = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(bind=motor)
+    sesion = sessionmaker(bind=motor)()
+    try:
+        comparativa = informe_de_publicaciones.comparativa(sesion)
+
+        assert comparativa.items == []
+    finally:
+        sesion.close()
+        motor.dispose()
+
+
+def test_el_panel_cuenta_las_publicaciones_con_el_enlace_caducado(
+    client, lead_headers, publicacion, db_session
+):
+    """
+    La cifra del aviso de arriba de la pantalla de publicaciones, que no tenía prueba.
+
+    Es la misma comparación que hace cada fila, en una sola consulta: el panel la necesita
+    antes de dibujar la lista para decidir si enseña el aviso.
+
+    Sobre el `isnot(None)` de esa consulta —«cuenta solo las que tienen dirección anotada,
+    porque las anteriores al capítulo 34 están a `NULL`»— hay algo que decir, porque el
+    arnés lo intentó y no pudo: quitarlo **no cambia ninguna cifra**. En SQL
+    `NULL != 'una-direccion'` no vale cierto, vale `NULL`, así que esas filas ya quedan
+    fuera del `WHERE` sin ayuda. La condición escribe la intención y no tiene ningún efecto
+    observable; ninguna prueba puede distinguirla, y decirlo vale más que inventar una que
+    finja distinguirla. Lo que esta prueba sí sujeta es la comparación de verdad: que cuenta
+    las que llevan una dirección DISTINTA de la actual y no las que llevan la actual.
+    """
+    def contadas():
+        respuesta = client.get(f"{PUBLICACIONES}/direccion-publica", headers=lead_headers)
+        assert respuesta.status_code == 200, respuesta.text
+        return respuesta.json()["publicaciones_con_enlace_caducado"]
+
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    # Recien creada se activa bajo la direccion de ahora, asi que no esta caducada.
+    assert campana.url_base_publicada == base_publica()
+    antes = contadas()
+
+    campana.url_base_publicada = "https://una-direccion-de-antes.example"
+    db_session.commit()
+
+    # Una exactamente, y se mide por diferencia: la base de la suite lleva publicaciones de
+    # otras pruebas, y un numero absoluto dependeria del orden de ejecucion. Contar las que
+    # tienen la direccion a NULL -las de antes del capitulo 34- habria dado el mismo total
+    # antes y despues, que es justo el fallo que esta cifra no puede tener.
+    assert contadas() == antes + 1
+
+
+def test_un_asesor_sin_identificador_resoluble_no_ve_ninguna_fila_del_informe(
+    db_session, publicacion, sample_leads
+):
+    """
+    El mismo «fallar cerrado» del repositorio, en el informe, y por el mismo motivo.
+
+    Las condiciones de alcance del informe reparten las filas en «mías» y «del resto»; con
+    un identificador que no se puede resolver, la comparación natural con `NULL` convertiría
+    «ninguna» en «las que no tienen asesor».
+
+    **Hay que sembrar las dos fichas, y eso lo dijo el arnés.** La primera versión de esta
+    prueba pedía el informe de una publicación recién creada y comprobaba `filas == []`,
+    que salía vacío con alcance o sin él: neutralizar la condición —devolver `(None, None)`,
+    que es justo lo que significa «ve la cartera completa»— no la ponía roja. Una prueba de
+    alcance sobre un conjunto vacío no mide el alcance, mide que no hay nada.
+    """
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    asesor = _usuario(db_session, "Commercial_Executive")
+    _sembrar(
+        db_session, publicacion, email="de.otro@ej.mx", score=80.0,
+        etapa=LeadStatus.NEW, asesor_id=asesor.id, nombre="De otro",
+    )
+    # Y una sin dueño: es la que la comparación natural con `NULL` habría dejado ver.
+    _sembrar(
+        db_session, publicacion, email="de.nadie@ej.mx", score=70.0,
+        etapa=LeadStatus.NEW, nombre="De nadie",
+    )
+    sin_identificador = AlcanceDeCartera.de(
+        CurrentUser(
+            user_id="no-soy-un-numero",
+            email="raro@plurione.com",
+            name="Sin identificador",
+            role=UserRole.COMMERCIAL_EXECUTIVE,
+        )
+    )
+
+    resultado = informe_de_publicaciones.informe(db_session, sin_identificador, campana)
+
+    assert resultado.filas == []
+    assert resultado.resumen.perfiles_recibidos == 0
+    # Ni el número del resto: sin saber quién pregunta no hay «el resto» de nadie.
+    assert resultado.resumen.de_otros_asesores == 0
+    assert resultado.resumen.alcance_completo is False
+
+
+def test_una_necesidad_que_ya_no_esta_en_la_tabla_deja_la_fila_del_informe_en_blanco(
+    db_session, publicacion, sample_lead
+):
+    """
+    La misma lectura que la tarjeta, por el otro camino: la fila del informe.
+
+    `_necesidades` recorre las solicitudes de la publicacion y se queda con la etiqueta de
+    la ultima de cada ficha. Una clave que ya no esta en la lista no se traduce y la fila
+    sale sin necesidad; ensenar la clave interna -«equipo-ti-2024»- en una pantalla de
+    negocio es ensenar un dato del sistema, no del prospecto.
+    """
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    sample_lead.campaign_id = campana.id
+    db_session.commit()
+    _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="una-clave-retirada")
+
+    resultado = informe_de_publicaciones.informe(
+        db_session, AlcanceDeCartera.del_sistema("prueba"), campana
+    )
+
+    fila = next(f for f in resultado.filas if f.lead_id == sample_lead.id)
+    assert fila.necesidad is None
+
+
+def test_la_comparativa_atribuye_las_solicitudes_antiguas_por_su_identificador(
+    db_session, publicacion, sample_lead
+):
+    """
+    La comparativa tiene su propia copia de la lectura del slug, y no se ejercitaba.
+
+    Son dos copias de la misma regla en dos funciones -el informe de una publicacion y la
+    comparativa de todas-, y si solo una sabe leer el identificador externo, los numeros de
+    las dos pantallas no cuadran: la publicacion sale con una ficha en su informe y con
+    cero en la tabla que la compara con las demas. Eso es exactamente la forma de fallo que
+    este repositorio lleva anotada: una regla aplicada en uno solo de los sitios que la
+    necesitaban no falla, se lee.
+    """
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    antigua = _solicitud_antigua(db_session, sample_lead, publicacion, necesidad="equipo")
+    assert "publicacion" not in (antigua.activity_data or {})
+
+    fila = next(
+        f for f in informe_de_publicaciones.comparativa(db_session).items
+        if f.publicacion_id == campana.id
+    )
+
+    assert fila.perfiles_recibidos == 1
+
+
+def test_la_comparativa_no_atribuye_una_solicitud_de_una_publicacion_que_no_existe(
+    db_session, publicacion, sample_lead
+):
+    """
+    Un slug que no es de ninguna publicacion no se suma a ninguna.
+
+    Pasa de verdad: una publicacion borrada deja sus solicitudes en la tabla de actividad
+    -que no se borra, porque es de donde sale el score- con un slug que ya no resuelve.
+    Sumarlas a la primera publicacion, o a la que tenga un slug parecido, inventaria
+    perfiles en una pantalla de negocio.
+    """
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    huerfana = LeadActivity(
+        lead_id=sample_lead.id,
+        activity_type=ActivityType.FORM_SUBMIT,
+        channel="Web",
+        source=FUENTE_DE_LA_PAGINA,
+        external_event_id=f"publicacion-que-ya-no-existe-{uuid.uuid4().hex[:8]}:{uuid.uuid4().hex}",
+        verificada=True,
+        activity_data={},
+        occurred_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    db_session.add(huerfana)
+    db_session.commit()
+
+    items = informe_de_publicaciones.comparativa(db_session).items
+
+    assert next(f for f in items if f.publicacion_id == campana.id).perfiles_recibidos == 0
+    assert all(f.perfiles_recibidos == 0 for f in items)
+
+
+def test_la_cuenta_de_envios_siempre_tiene_un_instante_de_inicio(
+    db_session, publicacion, sample_lead
+):
+    """
+    La premisa del `pragma: no branch` de `_envios`, derivada de la funcion y no escrita a mano.
+
+    `_envios` recibe `inicio` opcional, y justo antes de usarlo hace
+    `inicio = max(inicio, primero) if inicio is not None else primero`, donde `primero`
+    siempre es un instante. A partir de esa linea `inicio` no puede ser None, asi que la
+    salida contraria del `if inicio is not None` de debajo no se puede recorrer: no hay
+    prueba que la alcance, y fingir una seria peor que marcarla.
+
+    La premisa se comprueba por lo que se OBSERVA y no repitiendo el `max` en la prueba,
+    que seria escribir el defecto encima del defecto: **sin `inicio`, la cuenta sigue
+    acotada por abajo**. Un envio anterior al primer dia con visitas no se cuenta aunque no
+    haya filtro de fechas, porque el suelo lo pone `primero`. Si alguien quitara ese valor
+    por defecto, `inicio` volveria a poder ser None, el suelo desapareceria, el envio viejo
+    entraria en la cuenta y esto se pone rojo -y entonces la marca deja de valer-.
+    """
+    campana = db_session.query(Campaign).filter(Campaign.id == publicacion["id"]).one()
+    hoy = datetime.date.today()
+    primer_dia_contado = hoy - datetime.timedelta(days=3)
+    ciclo_de_publicaciones.registrar_visita(db_session, campana, dia=primer_dia_contado)
+
+    for dias in (10, 1):
+        db_session.add(
+            LeadActivity(
+                lead_id=sample_lead.id,
+                activity_type=ActivityType.FORM_SUBMIT,
+                channel="Web",
+                source=FUENTE_DE_LA_PAGINA,
+                external_event_id=f"{publicacion['public_slug']}:{uuid.uuid4().hex}",
+                verificada=True,
+                activity_data={},
+                occurred_at=datetime.datetime.now(datetime.timezone.utc)
+                - datetime.timedelta(days=dias),
+            )
+        )
+    db_session.commit()
+
+    sin_inicio = informe_de_publicaciones._envios(
+        db_session, campana.public_slug, None, None, desde_el_dia=primer_dia_contado
+    )
+
+    # Dos envios en la tabla, uno de hace diez dias y otro de ayer; el suelo es hace tres.
+    assert sin_inicio == 1, "sin `inicio`, el suelo lo pone el primer dia con visitas"
+    # Y sin ningun dia contado no hay tasa, asi que no hay envios que contar para ella.
+    assert informe_de_publicaciones._envios(
+        db_session, campana.public_slug, None, None, desde_el_dia=None
+    ) == 0
