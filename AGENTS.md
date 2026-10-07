@@ -3,6 +3,11 @@
 Esto no es documentación del producto: es lo que hay que saber **antes de tocar nada**. Vale
 igual para una persona que entra nueva y para un agente de código.
 
+Si ha llegado para **revisarlo o probarlo desde un clon limpio**, empiece por
+[**Para quien revisa este repositorio**](docs/Para_Quien_Revisa_Este_Repositorio.md). Su primer
+apartado cambia lo que miden todos los demás: el modelo entrenado no viaja en el repositorio y
+la pila arranca igual sin él, puntuando con el heurístico.
+
 ---
 
 ## 1. El proyecto está congelado, y desde el 6 de octubre de 2026 lo está del todo
@@ -32,6 +37,9 @@ API ya contesta a un cliente que existe.
 La pila se arranca **siempre** con el lanzador, nunca con `docker compose` a secas:
 
 ```bash
+pip install --require-hashes -r backend/requirements.lock
+python ml_pipeline/src/train_model.py  # PRIMERO: el .joblib no está versionado (ver abajo)
+
 python devops/pila.py iniciar          # una sola vez: crea ~/.plurione/pila.env con los secretos
 python devops/pila.py up -d --build    # cualquier orden de docker compose se pasa tal cual
 python devops/pila.py ps
@@ -49,6 +57,15 @@ arranca igual de bien: los seis contenedores se ponen verdes y el panel funciona
 octubre de 2026 se perdió media mañana juzgando la interfaz sobre una imagen de cuatro días
 antes. Antes de dar por bueno algo visual, **reconstruir**; está anotado como punto 56 de
 §6.4 porque nada lo comprueba todavía.
+
+**El entrenamiento va primero, y saltárselo no da ningún síntoma.** El `.joblib` está en
+`.gitignore` —*pickle* ejecuta código al cargar, así que un binario versionado es procedencia
+desconocida— y el CI lo entrena y lo pasa como artefacto a la construcción de la imagen. En un
+clon no hay quien lo reponga: el `COPY` del directorio no falla, el adaptador no encuentra el
+artefacto y **cae al heurístico** con un apunte de nivel `info`. Todo verde, midiendo la línea
+base contra la que el modelo se compara. `curl -s http://127.0.0.1:8000/health` dice cuál está
+puntuando, en `ml_model_loaded`, y la auditoría lo guarda en cada puntuación
+—`v1.0.0-hybrid+ml:98ed8bd1` frente a `v1.0.0-hybrid+heuristico`—.
 
 Puertas: panel en **3000**, puerta pública en **127.0.0.1:8080**, API en **127.0.0.1:8000**.
 PostgreSQL no se publica salvo con el overlay `--dev`.

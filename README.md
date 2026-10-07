@@ -9,12 +9,35 @@
 
 ---
 
+## En treinta segundos
+
+> ⚠️ **Antes de ejecutar nada: el modelo entrenado no viaja en el repositorio** y la pila
+> arranca igual sin él, puntuando con el heurístico —que es la línea base contra la que el
+> modelo se compara—. Sin síntoma ninguno. El primer paso de la guía de inicio es entrenarlo:
+> dos minutos, con los datos ya incluidos. Por qué y cómo comprobarlo, en
+> [**Para quien revisa este repositorio**](docs/Para_Quien_Revisa_Este_Repositorio.md).
+
+| | |
+| :--- | :--- |
+| **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 1734 pruebas de servidor y 748 de cliente, seis contenedores. |
+| **Cómo se levanta** | Entrenar el modelo, `python devops/pila.py iniciar`, `python devops/pila.py up --build -d`, y el panel queda en [localhost:3000](http://localhost:3000). Las órdenes exactas, en la [guía de inicio rápido](#-guía-de-inicio-rápido-despliegue-de-la-versión-entregable). Nunca `docker compose` a secas: el lanzador es el único arranque, y los secretos viven **fuera** del árbol. |
+| **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **59 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
+| **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
+| **Qué está congelado** | Desde el **06-10-2026**, todo: entra un cambio solo si sin él la pila no se levanta o la demostración no se puede enseñar. Lo que queda abierto está escrito y clasificado en [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md), que es la autoridad sobre esto. |
+| **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **39 restos menores** de §6.4 y las **trece decisiones** de §7 «lo que no se va a hacer, y por qué». |
+
+---
+
 ## 🔒 Aviso de Confidencialidad y Propiedad Intelectual
 
 > **CONVENIO DE CONFIDENCIALIDAD Y CESIÓN DE DERECHOS PATRIMONIALES**  
 > La totalidad del código fuente, modelos matemáticos, algoritmos de scoring híbrido, diagramas de arquitectura, componentes de software, reportes técnicos y la memoria técnica consolidada son propiedad intelectual y patrimonial exclusiva de **PLURIONE S.A. DE C.V.**
 >
 > **Anonimización Estricta:** En cumplimiento riguroso con el Secreto Industrial y el Convenio de Confidencialidad, el 100% de los datos, prospectos, empresas y correos electrónicos utilizados en este repositorio corresponden a **datos sintéticos generados probabilísticamente**. No se expone ningún dato sensible, financiero ni de clientes reales de PluriOne.
+>
+> Las condiciones de uso están en [**LICENSE**](LICENSE): se permite clonarlo y ejecutarlo para
+> **evaluar o revisar** el trabajo, y citarlo con atribución; cualquier otro uso necesita
+> autorización escrita de PluriOne S.A. de C.V.
 
 ---
 
@@ -89,6 +112,11 @@ un `.env` suelto en el repositorio que Compose o la aplicación leerían por su 
 faltan `SECRET_KEY` o `POSTGRES_PASSWORD` (capítulo 22).
 
 ```bash
+# PRIMERO el modelo. No viaja en el repositorio, y sin él la pila arranca igual de verde
+# puntuando con el heurístico. Dos minutos, y los datos ya están dentro.
+pip install --require-hashes -r backend/requirements.lock
+python ml_pipeline/src/train_model.py
+
 # Una sola vez: crea el archivo de entorno, con los dos secretos ya generados
 python devops/pila.py iniciar
 
@@ -98,6 +126,19 @@ python devops/pila.py run --rm migrate
 
 python devops/pila.py up --build -d
 ```
+
+**Ese primer paso no es opcional, y saltárselo no da ningún síntoma.**
+`ml_pipeline/models/lead_scorer_model.joblib` no está versionado a propósito —`joblib` carga con
+*pickle*, que ejecuta código, de modo que un binario comprometido en el árbol es un fichero de
+procedencia desconocida que el backend ejecuta con sus credenciales—. El `Dockerfile` copia ese
+directorio, que existe con sus tres `.json`, así que **la imagen se construye sin fallar**: los
+seis contenedores se ponen verdes, el panel funciona y las fichas se puntúan **con el
+heurístico**, que es justo la línea base contra la que el modelo se compara. Quien se lo salte
+mide la línea base y cree medir el modelo.
+
+Para saber cuál está puntuando no hay que leer registros: `curl -s
+http://127.0.0.1:8000/health` responde `"ml_model_loaded": true` o `false`. El detalle, en
+[**Para quien revisa este repositorio**](docs/Para_Quien_Revisa_Este_Repositorio.md).
 
 Todo lo que sigue a `devops/pila.py` es una orden de `docker compose` y se le pasa tal cual.
 `python devops/pila.py --comprobar` hace solo las comprobaciones, sin tocar Docker.
@@ -1358,7 +1399,7 @@ python scripts/demo_e2e.py
 
 ## 📚 Compilación de la Memoria Técnica Institucional
 
-Para compilar los 33 reportes técnicos en el documento formal consolidado con portada e índice:
+Para compilar los 44 reportes técnicos en el documento formal consolidado con portada e índice:
 ```bash
 python docs/compile_reports.py
 ```
@@ -1366,7 +1407,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 
 ---
 
-## 📑 Suite de 30 Reportes Técnicos de Estadía Profesional
+## 📑 Suite de 44 Reportes Técnicos de Estadía Profesional
 
 | Reporte | Documento | Enfoque de Ingeniería |
 | :-: | :--- | :--- |
@@ -1415,6 +1456,7 @@ El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md
 | **42** | [Reporte 42](docs/reportes/Reporte_42_Las_Pantallas_que_Nadie_Auditaba_Tres_Deslizadores_sin_Nombre_el_Selector_que_Cambia_Permisos_y_Dos_Pantallas_Fuera_de_Toda_Region.md) | Las pantallas que nadie auditaba (capítulo 44): el cliente audita su accesibilidad con `axe-core` en cada ejecución de la suite desde el capítulo 36, nivel AA de WCAG 2.1, y la cabecera de ese archivo decía «las **ocho** pantallas». Era verdad; lo que no decía es de cuántas. Hay **dieciocho** componentes con controles de formulario y **nueve no los había mirado ningún motor nunca**, con 39 de las 105 cajas. Es la misma forma que el capítulo 43 encontró en la tabla de pares de colores: una comprobación real, que mide bien, sobre **un inventario escrito a mano**. Y el defecto **seguía la lista**: la pantalla de acceso lleva escrito desde el 36 «`<main>` y no un `<div>`: es la pantalla entera»; el cambio obligatorio de contraseña y el alta del segundo factor también son la pantalla entera, no se montaban, y las dos seguían siendo un `<div>`. Dentro había dos infracciones **críticas** —tres deslizadores del simulador sin ningún nombre accesible y el selector que cambia el rol de una cuenta, tampoco— y un `aria-label` sobre un `div` sin rol, que **ARIA prohíbe**: el único dibujo del alta del segundo factor no tenía nombre, y la prueba que lo buscaba por ese nombre pasaba desde el capítulo 35, porque `getByLabelText` lee el atributo sin preguntar si ARIA lo admite ahí. Ninguna de las tres guardas que debían verlo lo vio, y por tres motivos distintos. Ahora la lista **sale del código**. 24 defectos reintroducidos, 24 detectados, y **tres de ellos los encontró el arnés dentro del control recién escrito**. |
 | **43** | [Reporte 43](docs/reportes/Reporte_43_El_Campo_que_el_Servidor_Nombraba_en_Ingles_Un_Punto_que_Contaba_Dos_de_Cinco_y_Seis_de_Nueve_Rechazos_sin_Traducir.md) | El campo que el servidor nombraba en inglés (capítulo 45): el punto 46 de la deuda técnica describía con precisión un mecanismo —un validador de modelo responde `loc: ['body']` y nunca puede señalar un campo— y decía «los **dos**». En los esquemas hay **cinco**, y los tres que el punto no contaba eran los únicos que tenían un defecto: `PUT /users/{id}` con `{"full_name": null}` contestaba «no se pueden dejar vacíos: **full_name**», el nombre de la columna de la base dentro de una frase en castellano. Es lo que el capítulo 43 le quitó a `parseApiError` —**del prefijo**, que es donde una expresión regular lo alcanza—. Y estaba ahí porque la regla estaba escrita tres funciones más arriba y **no se podía cumplir**: nadie dijo qué hacer cuando no hay `loc`. Ahora la frase se lee sola y los campos viajan en el `ctx`, donde el cliente los reparte con la etiqueta de cada pantalla. Al medirlo apareció algo mayor: de los **19** tipos de rechazo que las **17** puertas con cuerpo pueden contestar, el cliente traducía **11**, y la función que ve todas las pantallas que no reparten su 422 no consultaba la tabla que las otras cuatro sí usan —**seis de nueve** rechazos de los dos formularios del panel llegaban en inglés, con la traducción ya escrita en el archivo de al lado, porque la tabla estaba copiada en dos sitios y la copia sin tabla era la que lo veía todo—. 25 defectos reintroducidos, 25 detectados, y tres los encontró el arnés en el control recién escrito: **un umbral que baja a cero es la forma en que una guarda deja de mirar sin dejar de existir**. |
 | **44** | [Reporte 44](docs/reportes/Reporte_44_El_Reparto_que_Ordenaba_por_un_Campo_H6_Cerrado_la_Tanda_que_Ninguna_Prueba_de_un_Caso_Veia_y_el_Bloqueo_que_SQLite_Ignora.md) | El reparto que ordenaba por un campo (capítulo 46): cierra el punto 10 de §6.2 (H-6), el único punto que entró como **funcionalidad** y porque se encargó. El punto decía que la asignación automática era solo para las `HOT`, y contaba la mitad: lo que repartía **tampoco repartía**. `ORDER BY capacity DESC` ordena por la cartera **máxima declarada** en la ficha de cada cuenta, así que entregaba todas las fichas a la persona del número más alto hasta que alguien lo cambiara —y cada ficha salía con dueño, de modo que ninguna prueba de un solo caso podía verlo: lo que hay que medir es una **tanda**—. La otra mitad era peor de lo que su redacción sugería: sin asesor el motor de reglas **no tiene de quién hablar**, así que una ficha `WARM` no producía ni tarea, ni aviso, ni bandeja. Ahora se reparte por cartera **abierta** —la definición del motor, importada y no copiada— con el tiempo sin recibir como desempate; no se toca lo que ya tiene asesor ni lo que viene de una publicación con responsable, ni aunque ese responsable se haya dado de baja; y corre **una sola vez**, en el alta, probado por que la ficha no tenga todavía instantánea de score, que es lo que hace que una reasignación a mano no se deshaga **sin añadir ninguna columna**. Cada reparto deja en la bitácora la regla y entre cuántos candidatos, sin actor y sin confirmar. El bloqueo de fila que evita repartir dos veces el mismo hueco **no se puede ejercitar en la suite** —SQLite ignora `FOR UPDATE` en silencio—, así que se comprueba sobre la sentencia compilada contra PostgreSQL. 20 defectos reintroducidos, 20 detectados, y **19 por cada mitad**: el desempate perdido solo lo ve la suite y la regla copiada a mano solo la ve la guarda. |
+| **REV** | [Para quien revisa este repositorio](docs/Para_Quien_Revisa_Este_Repositorio.md) | El documento de entrada para quien llega de fuera a evaluarlo o a probarlo con agentes: por qué **un clon limpio no trae el modelo** y la pila arranca igual, cómo saber qué motor está puntuando, qué se defiende y sobre qué datos, y una tabla de **lo que parece un fallo y está decidido así**, con el sitio donde se decidió. |
 | **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
 | **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
 | **DIR** | [Poner la dirección de la empresa](docs/Poner_la_Direccion_de_la_Empresa.md) | Qué archivo se toca —y cuáles no— para publicar el sistema bajo un dominio propio: una sola variable, fuera del repositorio, la puerta a la que apunta el dominio, cómo se comprueba y qué hay que rehacer después en los posts ya publicados |

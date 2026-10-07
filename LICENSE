@@ -1,0 +1,42 @@
+Copyright (c) 2026 PluriOne S.A. de C.V. Todos los derechos reservados.
+
+CONDICIONES DE USO
+
+Este repositorio contiene el Sistema Inteligente de Lead Scoring, desarrollado durante una
+residencia profesional de Ingeniería en Sistemas Computacionales para PluriOne S.A. de C.V.
+
+El código fuente, los modelos matemáticos, los algoritmos de scoring, los diagramas de
+arquitectura, los reportes técnicos y la memoria técnica consolidada son propiedad intelectual
+y patrimonial de PLURIONE S.A. DE C.V., conforme al convenio de confidencialidad y cesión de
+derechos patrimoniales de la residencia.
+
+Se permite, sin autorización adicional:
+
+  * leerlo, clonarlo y ejecutarlo con el fin de EVALUAR o REVISAR el trabajo —incluida la
+    revisión académica de la residencia y la ejecución de pruebas automatizadas contra una
+    copia local—;
+  * citarlo con atribución en trabajos académicos.
+
+Cualquier otro uso —redistribución, publicación, explotación comercial, incorporación a otro
+producto u obra derivada— requiere autorización previa y por escrito de PluriOne S.A. de C.V.
+
+NO SE CONCEDE NINGUNA GARANTÍA. El software se entrega «tal cual», sin garantía de ninguna
+clase, expresa o implícita. En la medida que lo permita la ley aplicable, los autores y el
+titular de los derechos no responden por ninguna reclamación, daño u otra responsabilidad
+derivada del software o de su uso.
+
+SOBRE LOS DATOS
+
+Este repositorio NO contiene datos de personas reales. La totalidad de prospectos, empresas,
+cargos y correos electrónicos que aparecen en él —`ml_pipeline/data/leads_historical.csv`, el
+sembrado de demostración y los ejemplos de la documentación— son datos SINTÉTICOS generados
+probabilísticamente con semilla fija. Las cifras del modelo medidas sobre ellos verifican la
+integridad del pipeline, no el rendimiento comercial; está explicado en `metrics.json`, en el
+README y en `docs/Para_Quien_Revisa_Este_Repositorio.md`.
+
+Los ficheros con desenlaces comerciales reales (`ml_pipeline/data/leads_reales*`) y los papeles
+institucionales de la residencia (`docs/docs_residencias/`) están excluidos por `.gitignore` y
+no forman parte de este repositorio.
+
+La contraseña `PluriOne2026!` que aparece en el README es la de las cuentas de demostración de
+`seed_data.py` y no da acceso a ningún sistema de la empresa.
