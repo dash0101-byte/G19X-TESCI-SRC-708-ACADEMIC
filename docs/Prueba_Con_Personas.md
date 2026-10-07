@@ -57,7 +57,7 @@ Lo que queda preparado:
 | Prospectos | 12 de cartera repartida + 3 de la publicación de ejemplo, **sin asesor** |
 | Cuentas | líder (marketing y dirección), asesor, administración |
 
-### Cuatro cosas que parecen fallos y no lo son
+### Cinco cosas que parecen fallos y no lo son
 
 Para quien conduce. Si pasa alguna de estas, **no** se apunta como atasco de la persona:
 
@@ -72,6 +72,12 @@ Para quien conduce. Si pasa alguna de estas, **no** se apunta como atasco de la 
   red, el undécimo envío recibe «Hemos recibido demasiadas solicitudes». Para una sesión
   larga, levante el backend con `INTERES_LIMITE_POR_IP=60/hour`. Abrir la página no gasta
   esos diez: las lecturas tienen su propia cuenta (120 por hora).
+- **El contador de «sin asesor» dirá 0.** Desde el capítulo 46 la ficha que llega de una
+  publicación sin responsable **ya viene repartida**: se asigna en el alta a la asesora con
+  menos cartera abierta. Así que la tarea 1 del líder no encuentra a nadie esperando, y eso
+  es lo correcto: ese contador mide ahora lo que el reparto **no pudo** colocar. Lo que sí se
+  apunta es qué contesta el líder al verlo en cero: si cree que la persona no ha llegado, el
+  panel no le está diciendo que ya tiene dueño, y eso es un atasco de verdad.
 - **La bandeja «Hoy» del asesor no estrena tarea con el prospecto que acaban de asignarle.**
   Las tareas no las crea la pantalla: las crea el motor de reglas, que pasa **una vez al
   día** y sin nadie delante (`services/agenda_del_dia.py` explica por qué: si las creara
@@ -88,8 +94,11 @@ Cada persona recibe **solo su lista**, sin las demás. Las tareas están escrita
 quiere conseguir, no como los clics que hay que dar: si la tarea dice dónde pulsar, la
 prueba ya no mide nada.
 
-El orden importa: la tarea 4 del líder ocurre **antes** de que el asesor empiece, porque un
-prospecto que llega de LinkedIn no tiene asesor hasta que alguien se lo asigna.
+El orden importa: las tareas del líder ocurren **antes** de que el asesor empiece, porque el
+prospecto que llega de LinkedIn se reparte solo y puede caerle a cualquiera de las seis
+cuentas del equipo sembrado; es la tarea 5 del líder la que lo pone en la cartera del asesor
+que luego se sienta. Que esa reasignación a mano se quede —y no la deshaga el sistema— es la
+mitad del capítulo 46 que esta sesión comprueba con personas.
 
 ### A. Marketing — entra como `lider.ventas@plurione.com`
 
@@ -124,17 +133,22 @@ prospecto que llega de LinkedIn no tiene asesor hasta que alguien se lo asigna.
 ### C. Líder — entra como `lider.ventas@plurione.com`
 
 1. Averigua cuántas personas han llegado por una publicación y **todavía no tienen asesor**.
+   Antes de buscarlo, di en voz alta qué número esperas.
 2. Mira qué ha traído la publicación nueva y compárala con la de agosto: cuál trajo más
    perfiles, cuál los trajo mejores.
 3. Averigua **por qué red** llegó la persona que acaba de escribir: se repartió por dos.
 4. Entra en su ficha y averigua **por qué publicación** llegó y qué necesita.
-5. Asígnasela al asesor comercial (Alejandro Morales).
+5. Averigua **a quién se le asignó** y pásasela al asesor comercial (Alejandro Morales).
 6. Antes de salir, di si hay algún prospecto **caliente que se esté enfriando** y con quién
    está.
 
-> Las tareas 3 y 6 son de los capítulos 27 y 28. En la 1, apunte si lo primero que mira es
-> el tablero: el contador vive en «Publicaciones». En la 6, si busca en algún sitio antes
-> de mirar su propia bandeja.
+> Las tareas 3 y 6 son de los capítulos 27 y 28, y la 5 del 46. En la 1, apunte dos cosas: si
+> lo primero que mira es el tablero —el contador vive en «Publicaciones»— y qué número dijo
+> que esperaba, porque desde el capítulo 46 la respuesta es **cero** y el prospecto sí ha
+> llegado. En la 5, si encuentra a quién le tocó sin que se le diga dónde mirar: el reparto
+> deja su motivo en la bitácora y **no** en ninguna pantalla (punto 58 de §6.4), así que lo
+> único que el panel le enseña es el nombre en la ficha. En la 6, si busca en algún sitio
+> antes de mirar su propia bandeja.
 
 ### D. Asesor — entra como `asesor.comercial@plurione.com`
 

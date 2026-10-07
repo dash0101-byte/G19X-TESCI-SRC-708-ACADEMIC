@@ -7,8 +7,10 @@ Lo que se comprueba:
   a quién va dirigida ni el identificador interno de la campaña.
 * **Lo que acepta**: obligatorio solo lo imprescindible, listas cerradas, perfil de
   LinkedIn con forma de perfil, aviso aceptado, ningún campo de más y nada de facturación.
-* **Lo que hace**: crea la ficha con lo que llegó y nada más, la atribuye a su publicación,
-  la puntúa y no le pone asesor. «¿Qué necesitas?» se guarda y no puntúa.
+* **Lo que hace**: crea la ficha con lo que llegó y nada más, la atribuye a su publicación
+  y la puntúa. «¿Qué necesitas?» se guarda y no puntúa. El asesor no lo elige la página:
+  hasta el capítulo 46 la ficha esperaba al líder, y desde él la reparte el reparto
+  automático por carga, salvo que la publicación tenga responsable.
 * **Lo que no hace**: pisar los datos de una ficha que ya existe.
 * **Cómo se defiende**: límite por IP y por publicación, campo trampa, «no disponible» y la
   misma respuesta exista o no el correo.
@@ -162,11 +164,32 @@ def test_un_envio_crea_la_ficha_puntuada_y_atribuida(client, publicacion, db_ses
     assert lead.privacy_notice_source == "pagina_de_interes"
 
 
-def test_la_ficha_llega_sin_asesor(client, publicacion, db_session, sales_reps):
-    """La reparte quien dirige la cartera; la página no elige por él."""
+def test_la_pagina_no_elige_asesor(client, publicacion, db_session, sales_reps, monkeypatch):
+    """
+    La página no elige por nadie: con el reparto apagado, la ficha nace sin asesor.
+
+    Hasta el capítulo 46 esto era todo lo que había, y era el punto 10 de §6.2: la ficha se
+    quedaba sin dueño hasta que el líder abriera la matriz, y sin dueño el motor de reglas no
+    tiene de quién hablar —ni tarea, ni aviso, ni bandeja—.
+    """
+    monkeypatch.setattr(settings, "REPARTO_AUTOMATICO_ACTIVO", False)
+
     _enviar(client, publicacion)
 
     assert _ficha(db_session).assigned_rep_id is None
+
+
+def test_la_ficha_de_una_publicacion_sin_responsable_la_reparte_el_reparto(
+    client, publicacion, db_session, sales_reps
+):
+    """
+    Capítulo 46. La publicación de este fixture no tiene responsable, así que la ficha entra
+    en el reparto y sale con la asesora de menos cartera abierta, no con la del `capacity`
+    más alto, que es lo que hacía el `if` anterior.
+    """
+    _enviar(client, publicacion)
+
+    assert _ficha(db_session).assigned_rep_id in {rep.id for rep in sales_reps}
 
 
 def test_basta_con_lo_obligatorio(client, publicacion, db_session):

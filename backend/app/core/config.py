@@ -438,6 +438,20 @@ class Settings(BaseSettings):
     # el defecto se equivoca del lado de conservar y quien opere decidirá si acortarlo.
     CONSERVACION_AUDITORIA_DIAS: int = 730
 
+    # --- Reparto automático de prospectos (capítulo 46) ---
+    # El interruptor del punto 4 del encargo. Encendido reparte cada ficha nueva sin asesor
+    # entre las cuentas activas que atienden cartera; apagado, la ficha nace sin asesor y la
+    # reparte quien dirige la cartera, como antes de este capítulo.
+    #
+    # Es configuración de la instalación y no una pantalla, y eso tiene un precio que
+    # conviene escribir: apagarlo exige tocar `pila.env` y reiniciar el backend, así que el
+    # líder lo pide a quien opera la pila en lugar de hacerlo él. La pantalla queda fuera del
+    # encargo por escrito y anotada en la congelación.
+    #
+    # Apagarlo no deshace nada: los prospectos ya repartidos siguen donde están, porque el
+    # reparto corre una sola vez, en el alta, y no vuelve a mirar una ficha que ya se puntuó.
+    REPARTO_AUTOMATICO_ACTIVO: bool = True
+
     # --- Plazos del motor de reglas (capítulo 28) ---
     # Cuánto se da para cada cosa. Son de la instalación, no del dominio: un equipo que
     # atiende cuentas grandes quizá dé 48 horas al primer contacto. El vocabulario de las

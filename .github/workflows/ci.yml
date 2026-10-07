@@ -603,6 +603,20 @@ jobs:
         run: python scripts/guarda_de_los_desenlaces.py
 
       # ----------------------------------------------------------------------
+      # Capitulo 46: el reparto automatico decide en el alta, en milisegundos y sin nadie
+      # delante, y su fallo tipico no se parece a un fallo. Un reparto que le da todo a la
+      # primera cuenta deja cada ficha con dueno, cada pantalla en verde y una sola persona
+      # con la cartera entera: era literalmente lo que hacia el `ORDER BY capacity DESC` que
+      # este capitulo sustituye, y ninguna prueba de «la ficha tiene asesor» lo veia. Esta
+      # guarda comprueba propiedades —una tanda queda equilibrada, el score no cambia a quien
+      # le toca, lo decidido a mano no se deshace, la consulta sigue pidiendo FOR UPDATE, la
+      # definicion de cartera abierta sigue siendo la del motor, el asiento dice con que
+      # regla y entre cuantos, el interruptor apaga y lo repartido recibe su tarea— sobre los
+      # tres caminos del alta.
+      - name: El reparto automatico conserva sus defensas
+        run: python scripts/guarda_del_reparto_automatico.py
+
+      # ----------------------------------------------------------------------
       # Capitulo 29: quien dicta si el criterio «nadie se atasca» se cumple ya no es una
       # frase escrita a mano en un reporte, sino este programa leyendo las hojas de la
       # sesion. Un lector equivocado diria «cumplido» sin que nadie lo notara, asi que

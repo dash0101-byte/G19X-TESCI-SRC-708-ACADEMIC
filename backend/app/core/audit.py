@@ -68,6 +68,12 @@ ACCION_LEAD_CREAR = "lead.crear"
 ACCION_LEAD_ACTUALIZAR = "lead.actualizar"
 ACCION_LEAD_ELIMINAR = "lead.eliminar"
 ACCION_LEAD_ACTIVIDAD = "lead.actividad"
+# El reparto automático eligió un asesor para una ficha recién creada (capítulo 46).
+# Va **sin actor**, como la purga y como el motor de reglas: el alta la pudo pedir una
+# persona, pero a quién le tocaba no lo decidió ella. Los metadatos llevan la regla que
+# decidió y entre cuántos candidatos, que es lo que permite discutir un reparto al día
+# siguiente; nunca el nombre ni el correo del prospecto.
+ACCION_LEAD_REPARTO_AUTOMATICO = "lead.reparto_automatico"
 # Entregar a alguien todo lo que el sistema sabe de una persona es un tratamiento de sus
 # datos como cualquier otro, y además el más completo: tiene que quedar quién lo pidió.
 ACCION_LEAD_EXPORTAR = "lead.exportar"
@@ -193,6 +199,7 @@ def registrar_evento(
     ip: Optional[str] = None,
     user_agent: Optional[str] = None,
     metadatos: Optional[Dict[str, Any]] = None,
+    commit: bool = True,
 ) -> None:
     """
     Escribe un asiento en la bitácora.
@@ -201,6 +208,14 @@ def registrar_evento(
     correcta en un 500 para el usuario: el asiento se pierde —y el fallo queda en el log
     del servidor, que es donde alguien puede verlo— pero la operación se respeta. Al revés
     sería peor de lo que se intenta arreglar.
+
+    Con `commit=False` el asiento se queda pendiente en la transacción de quien llama, que
+    es quien lo confirma con lo demás. Lo pide el reparto automático (capítulo 46): la
+    ingesta del CRM confirma la ficha, su actividad, su score y su auditoría juntas o no
+    confirma nada, y un `commit` desde aquí dejaría escrito en la bitácora el reparto de un
+    prospecto que el `rollback` siguiente se llevó. Entonces tampoco se deshace la sesión si
+    el `add` falla: ese `rollback` le quitaría de debajo a quien llama lo que estaba
+    escribiendo, que es exactamente el daño que este párrafo evita en el otro camino.
     """
     # Import local: `app.models.entities` importa `app.core.database`, y este módulo lo
     # importan las rutas; hacerlo arriba cerraría el ciclo.
@@ -221,11 +236,14 @@ def registrar_evento(
                 event_metadata=metadatos or {},
             )
         )
-        db.commit()
+        if commit:
+            db.commit()
     except Exception:
         logger.exception(
             "No fue posible escribir el asiento de auditoría '%s' sobre %s.", accion, entidad
         )
+        if not commit:
+            return
         try:
             db.rollback()
         except Exception:

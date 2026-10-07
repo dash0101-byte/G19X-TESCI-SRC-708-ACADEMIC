@@ -152,16 +152,23 @@ la atribución por red y se queda sin gracia si todo llegó por el canal de siem
 
 **Enseñar:** el score, la categoría y que **no tiene asesor**.
 
-> *«Nadie ha tocado nada. La ficha se creó, se puntuó y quedó atribuida a su publicación en
-> el mismo segundo del envío. Y quedó sin dueño a propósito: repartir es una decisión, y el
-> sistema solo se la ahorra al líder cuando la ficha entra como `HOT`.»*
+> *«Nadie ha tocado nada. La ficha se creó, se puntuó, quedó atribuida a su publicación y
+> quedó repartida en el mismo segundo del envío. El reparto no mira el score: mira quién
+> tiene menos cartera abierta, y con empate quién lleva más tiempo sin recibir a nadie. Hasta
+> el capítulo 46 esta ficha se quedaba sin dueño esperando al líder, y sin dueño el sistema
+> no tenía a quién ponerle la tarea del paso 6.»*
 
 ---
 
-### Paso 5 — El líder la ve y la reparte · 25 s
+### Paso 5 — El líder ve a quién le tocó y se la pasa a su asesor · 25 s
 
-**El contador «Nuevos de publicaciones, sin asesor».** Abrir la ficha desde ahí y asignarla
-al asesor comercial.
+**El contador «Nuevos de publicaciones, sin asesor», que dice cero.** Abrir la ficha desde la
+matriz, leer a quién se le asignó y pasársela al asesor comercial.
+
+> *«El contador dice cero y la persona sí ha llegado: desde el capítulo 46 cuenta lo que el
+> reparto **no pudo** colocar —una publicación cuyo responsable se dio de baja, un día sin
+> ninguna asesora activa—. Y lo que yo reasigno aquí se queda: el reparto corre una sola vez,
+> en el alta, así que ningún recálculo me va a deshacer esto.»*
 
 > *«El número y la lista los calcula el servidor con la misma condición. Durante dos
 > capítulos no fue así: el contador sumaba seis canales y se seguía llamando “desde
@@ -249,7 +256,7 @@ Del ensayo del 24-09-2026, sobre la base de demostración, **con el modelo ya ca
 | 2 | Los textos de las dos redes, con su enlace cada uno | 40 ms |
 | 3 | El interesado abre el enlace de WhatsApp y envía sus datos | 286 ms |
 | 4 | La ficha queda creada, puntuada y atribuida | 2 ms |
-| 5 | El contador «sin asesor», la asignación y el contador otra vez | 248 ms |
+| 5 | El contador «sin asesor», la reasignación y el contador otra vez | 248 ms |
 | 6 | La bandeja «Hoy», la ficha 360 y el cierre de la tarea | 361 ms |
 | 7 | La comparativa y el informe por red | 197 ms |
 | 8 | El cierre con su motivo | 183 ms |

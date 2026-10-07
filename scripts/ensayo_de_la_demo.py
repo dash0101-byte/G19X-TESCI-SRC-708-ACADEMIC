@@ -259,42 +259,62 @@ def ensayar(cliente, db, lider, asesor, modulos) -> Ensayo:
     e.cerrar("envío aceptado (202), con la red de llegada en la consulta")
 
     # ---------------------------------------------------------------- Paso 4
-    e.paso("4", "El sistema crea la ficha puntuada, atribuida y sin asesor")
+    e.paso("4", "El sistema crea la ficha puntuada, atribuida y ya repartida")
     Lead = modulos["Lead"]
     lead = db.query(Lead).filter(Lead.email == correo).first()
     e.comprobar(lead is not None, "no se creó ninguna ficha con ese correo")
     e.comprobar(lead.current_score is not None and lead.current_score > 0, f"la ficha quedó sin puntuar (score={lead.current_score})")
     e.comprobar(lead.campaign_id == publicacion["id"], f"la ficha no quedó atribuida a la publicación (campaign_id={lead.campaign_id})")
-    e.comprobar(lead.assigned_rep_id is None, "la ficha llegó ya con asesor: el líder no tendría nada que repartir")
-    e.cerrar(f"ficha {lead.id}, score {lead.current_score:.1f} ({lead.score_category.value})")
+    # Capítulo 46. Hasta él la ficha nacía sin asesor y esperaba al líder, y eso era el punto
+    # 10 de §6.2: sin asesor el motor de reglas no tiene de quién hablar, así que la ficha no
+    # producía ni tarea ni aviso hasta que alguien la abriera. Ahora el reparto automático la
+    # asigna en el alta a la cuenta activa con menos cartera abierta —esta publicación no
+    # tiene responsable—, y quién es se lee en la bitácora con la regla que lo decidió.
+    User = modulos["User"]
+    dueno = db.query(User).filter(User.id == lead.assigned_rep_id).first()
+    e.comprobar(
+        dueno is not None and dueno.is_active and dueno.is_sales_rep,
+        "la ficha no quedó repartida a una cuenta activa que atienda cartera "
+        f"(assigned_rep_id={lead.assigned_rep_id})",
+    )
+    e.cerrar(
+        f"ficha {lead.id}, score {lead.current_score:.1f} ({lead.score_category.value}), "
+        f"repartida a {dueno.full_name if dueno else 'nadie'}"
+    )
 
     # ---------------------------------------------------------------- Paso 5
-    e.paso("5", "El líder la ve en el contador «sin asesor» y se la asigna")
+    e.paso("5", "El contador «sin asesor» no sube, y el líder se la pasa a su asesor")
     contador = cliente.get("/api/v1/publicaciones/nuevos-sin-asesor", headers=cab_lider)
     e.comprobar(contador.status_code == 200, f"el contador dio HTTP {contador.status_code}")
     ahora = contador.json()["total"]
-    # No basta con que el contador diga «uno o más»: tiene que haber subido **exactamente
-    # uno** desde antes del envío. Durante dos capítulos el contador sumaba los seis canales
-    # mientras el listado solo marcaba los de LinkedIn, así que el líder veía un número y
-    # encontraba menos fichas. Un «>= 1» habría pasado igual de verde con ese defecto dentro.
+    # Desde el capítulo 46 el contador mide lo que el reparto NO pudo colocar, y eso es lo
+    # que tiene que seguir cuadrando: una ficha nueva repartida no lo mueve. Hasta entonces
+    # subía exactamente uno, y la comprobación era esa; el «exactamente» se conserva porque es
+    # lo que encontró el defecto de los dos capítulos en que el contador sumaba los seis
+    # canales y el listado solo marcaba los de LinkedIn. Un «>= 0» habría pasado igual de
+    # verde con el reparto apagado y la ficha esperando a nadie.
     e.comprobar(
-        ahora == antes_del_envio + 1,
-        f"el contador de prospectos sin asesor pasó de {antes_del_envio} a {ahora} con una sola ficha nueva",
+        ahora == antes_del_envio,
+        f"el contador de prospectos sin asesor pasó de {antes_del_envio} a {ahora}: una ficha repartida no debería contarse como pendiente de repartir",
     )
 
+    # Y el líder la pasa al asesor del guion. Es la otra mitad del punto 4 del encargo del
+    # capítulo 46: el reparto corre una sola vez, en el alta, así que una reasignación hecha
+    # a mano no la deshace ningún recálculo posterior. El guion de la prueba con personas
+    # hace exactamente esto, y por eso la tarea del asesor sigue siendo la misma.
     asignacion = cliente.put(
         f"/api/v1/leads/{lead.id}", json={"assigned_rep_id": asesor.id}, headers=cab_lider
     )
-    e.comprobar(asignacion.status_code == 200, f"asignar dio HTTP {asignacion.status_code}: {asignacion.text[:300]}")
+    e.comprobar(asignacion.status_code == 200, f"reasignar dio HTTP {asignacion.status_code}: {asignacion.text[:300]}")
 
     despues = cliente.get("/api/v1/publicaciones/nuevos-sin-asesor", headers=cab_lider).json()["total"]
     e.comprobar(
         despues == antes_del_envio,
-        f"el contador sigue en {despues} después de repartir la ficha: debería haber vuelto a {antes_del_envio}",
+        f"el contador se movió a {despues} al reasignar una ficha que ya tenía asesor",
     )
     e.cerrar(
         f"contador {antes_del_envio} -> {ahora} -> {despues}, "
-        f"ficha asignada a {asesor.full_name}"
+        f"ficha reasignada a {asesor.full_name}"
     )
 
     # ---------------------------------------------------------------- Paso 6
@@ -475,6 +495,9 @@ def main() -> int:
                 "ejecutar": ejecutar,
                 "cargar_modelo": get_ml_scoring_adapter,
                 "Lead": Lead,
+                # Capítulo 46: el paso 4 comprueba que la ficha quedó repartida a una
+                # cuenta activa que atiende cartera, y para eso hace falta leerla.
+                "User": User,
                 "CANAL_LINKEDIN": CANAL_LINKEDIN,
             },
         )

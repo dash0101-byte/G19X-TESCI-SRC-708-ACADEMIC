@@ -3,7 +3,74 @@
 **Fecha de congelación:** 24 de septiembre de 2026
 **Alcance:** todo el repositorio `Sistema_Inteligente_Lead_Scoring`
 **Sustituye a:** las secciones «Lo que esta fase no hizo» dispersas en los reportes 19 a 29
-**Última revisión:** 5 de octubre de 2026 (recorrido de la demostración)
+**Última revisión:** 6 de octubre de 2026 (capítulo 46)
+
+> **Revisión del capítulo 46.** La congelación se abre **para el punto 10 de §6.2 (H-6) y
+> para nada más**, y esta vez lo que entra **es** funcionalidad: el punto exige que el
+> servidor haga algo que no hacía, y eso es exactamente lo que §1 llama una frase nueva. Se
+> escribe así de claro porque los cuatro puntos que quedaban abiertos en §6.2 lo estaban por
+> este mismo motivo, y cerrar uno no cambia el criterio para los otros tres.
+>
+> **Lo que había, y por qué no era repartir.** El punto decía: «hay dónde repartir, pero nada
+> reparte solo». Lo único que repartía era un `if` dentro del scoring: si la ficha salía
+> `HOT` y no tenía dueño, se le daba a quien tuviera el número más alto en `capacity`. Las
+> dos mitades estaban mal. Una ficha `WARM` —la mayoría de las que llegan de una
+> publicación— esperaba al líder, y **sin asesor el motor de reglas no tiene de quién
+> hablar**: el capítulo 28 no pregunta «¿hay fichas nuevas?», pregunta «¿hay algún prospecto
+> **asignado** al que nadie haya contactado?», así que esa ficha no producía ni tarea, ni
+> aviso, ni línea en la bandeja de nadie. Y `capacity` es la cartera **máxima declarada**, no
+> la que alguien tiene: `ORDER BY capacity DESC` entrega todos los prospectos a la misma
+> persona hasta que alguien le cambie el número. Con dos asesoras de 60 y 40, los mil
+> siguientes son de la de 60, cada ficha tiene dueño y ninguna pantalla se queja.
+>
+> **La regla.** Menos cartera **abierta** —la definición de «queda algo que hacer» es la del
+> motor de reglas, importada y no copiada— y, con empate, quien lleva más tiempo sin recibir
+> uno. Nada más: ni el score, ni el sector, ni la zona, ni `capacity`, que queda sin decidir
+> nada (punto 59). No se toca una ficha que ya tiene asesor, ni una de una **publicación con
+> responsable** —incluso si ese responsable se dio de baja, porque `ciclo.asesor_para` la deja
+> sin asesor a propósito y esa cartera la reparte el líder—, ni una que no sea un alta.
+>
+> **Lo que hace que el punto 4 del encargo se cumpla sin un campo nuevo.** «Es un alta» se
+> comprueba por algo que ya existía: que la ficha no tenga todavía ninguna instantánea en
+> `score_histories`, que es lo primero que escribe el propio scoring. De ahí sale que una
+> reasignación hecha a mano —o un prospecto que el líder dejó sin asesor a propósito— no la
+> deshaga ningún recálculo posterior, sin una columna `asignado_en` que habría que escribir
+> en los cinco sitios que asignan.
+>
+> **Dos altas a la vez.** La decisión lee un recuento que la otra transacción está a punto de
+> cambiar: sin nada más, las dos leen «Ana tiene 0» y las dos se la dan a Ana. Los candidatos
+> se leen con la fila bloqueada y en orden de identificador. Eso **no se puede ejercitar en
+> la suite**, porque SQLite ignora `FOR UPDATE` en silencio; lo que la prueba y la guarda
+> comprueban es que la sentencia lo pide de verdad, compilándola contra el dialecto de
+> PostgreSQL, que es el motor de la pila. Lo que sí se ejercita es el caso hermano: dos altas
+> en la misma transacción —una entrega del CRM con dos eventos— no pueden ir a la misma
+> cuenta, y eso exige que el recuento vea lo que la transacción ya escribió.
+>
+> **Lo que NO se añadió.** Ni una tabla, ni una columna, ni una migración, ni un endpoint, ni
+> una pantalla. Un módulo (`services/reparto_automatico.py`), un ajuste
+> (`REPARTO_AUTOMATICO_ACTIVO`), una acción de bitácora y un parámetro `commit` en
+> `registrar_evento`, que es lo que permite que el asiento del reparto viva en la transacción
+> del alta: la ingesta del CRM confirma la ficha, su actividad, su score y su auditoría
+> juntas o no confirma nada, y un asiento que confirmara por su cuenta dejaría escrito el
+> reparto de un prospecto que el `rollback` siguiente se llevó.
+>
+> **Lo que cambia en lo que ya se enseñaba, que es la parte que no se ve en un diff.** El
+> contador de «nuevos sin asesor» del líder mide desde ahora **lo que el reparto no pudo
+> colocar** —una instalación sin asesoras activas, una publicación cuyo responsable se dio de
+> baja—, y con la pila sembrada eso es cero. No está roto: cuenta otra cosa. Por eso el
+> ensayo del guion (`scripts/ensayo_de_la_demo.py`) comprueba en el paso 5 que **no** sube, y
+> la tarea 5 del líder en la prueba con personas pasa de «asígnasela» a «pásasela», que es
+> además la forma de ejercitar con personas que una reasignación a mano no se deshace. La
+> memoria técnica sigue diciendo, en sus capítulos 25 y 38, que H-6 está a medias: era verdad
+> en su fecha, y la tabla de §6.2 de este documento es la que dice el estado de hoy.
+>
+> **Guarda y arnés.** `scripts/guarda_del_reparto_automatico.py`, con diez propiedades y no
+> casos: que una tanda quede equilibrada, que el score no cambie a quién le toca, que lo
+> decidido a mano no se deshaga, que la consulta siga pidiendo el bloqueo, que la definición
+> de cartera abierta siga siendo la del motor, que el asiento diga con qué regla y entre
+> cuántos candidatos, que el interruptor apague, que lo repartido reciba su tarea en la
+> pasada siguiente, que los tres caminos del alta repartan igual y que sin asesoras no se
+> invente un destino. 20 defectos reintroducidos, 20 detectados.
 
 > **Recorrido de la demostración, 5 de octubre de 2026.** No es un capítulo ni una
 > auditoría: es la historia del README recorrida en el navegador con los tres roles y con
@@ -1163,6 +1230,14 @@ cambiados, sin copiar valores.
 
 ### 6.2. Huecos de la historia que se enseña
 
+> **Estado tras el capítulo 46 (cerrado el 06-10-2026).** El punto **10** queda cerrado, y es
+> el primero de los cuatro que el capítulo 38 dejó abiertos por exigir comportamiento nuevo
+> del servidor. Lo exigía, y se escribió: el reparto automático reparte cada ficha nueva sin
+> asesor entre las cuentas activas que atienden cartera, por cartera abierta y con el tiempo
+> sin recibir como desempate. §6.2 queda en **cinco cerrados de nueve** —10, 11, 13, 14 y
+> 16—, y los tres que siguen abiertos por el mismo motivo —el 9, el 12 y el 15— lo siguen
+> estando: cerrar uno porque se encargó no convierte los otros en correcciones.
+>
 > **Estado tras el capítulo 38 (cerrado el 01-10-2026).** De los ocho puntos, **cuatro
 > cerrados**: 11, 13, 14 y 16. Quedan abiertos el **9**, el **10**, el **12** y el **15**, y
 > los cuatro por el mismo motivo, escrito debajo de la tabla: exigen decidir comportamiento
@@ -1181,7 +1256,7 @@ cambiados, sin copiar valores.
 | # | Qué | Estado | Origen |
 | :---: | :--- | :--- | :---: |
 | 9 | **Las integraciones no atribuyen la ficha a una campaña** | `formulario_web`, `linkedin_lead_gen`, Calendly y WhatsApp no leen el UTM. **Solo la página de interés atribuye.** H-4 está cerrado para ese camino y abierto para los demás | R25 §25.10 |
-| 10 | **La asignación automática es solo para las fichas `HOT`** | H-6, a medias: hay dónde repartir, pero nada reparte solo. Una ficha `WARM` o `COLD` espera a que el líder la asigne | R25 §25.10 |
+| 10 | ~~**La asignación automática es solo para las fichas `HOT`**~~ | H-6, a medias: hay dónde repartir, pero nada reparte solo. Una ficha `WARM` o `COLD` espera a que el líder la asigne. **Cerrado en el capítulo 46**, y el punto estaba corto por un lado: lo que repartía no solo se limitaba a los `HOT`, es que **tampoco repartía** —`ORDER BY capacity DESC` le da todas las fichas a quien tenga el número más alto en su cuenta hasta que alguien lo cambie—. Ahora se reparte por cartera **abierta**, con el tiempo sin recibir como desempate, entre cuentas activas que atienden cartera; no se toca lo que ya tiene asesor ni lo que viene de una publicación con responsable; corre una sola vez, en el alta, así que una reasignación a mano no se deshace; y se apaga con `REPARTO_AUTOMATICO_ACTIVO`. Sin tabla, sin columna, sin migración y sin pantalla | R25 §25.10 |
 | 11 | ~~**El contador de «sin asesor» vive en «Publicaciones»**~~ | No en el tablero, que es donde el líder mira primero. Es la nota de usabilidad que el capítulo 28 dio por cerrada sin estarlo. **Cerrado** en el capítulo 38: el bloque se sacó a `ContadorSinAsesor` y se monta en los dos sitios —el mismo componente, no una copia del texto—, con enlace a la matriz, pedido solo a quien dirige la cartera y distinguiendo «no se preguntó» de cero (R36 §38.8) | R25 §25.10 · R28 §28.13 |
 | 12 | **El reparto de la cartera de una baja es todo o nada** | A un solo destino. Repartir entre varias personas exige hacerlo prospecto a prospecto, y no hay aviso fuera del panel de administración | R19 §19.9 |
 | 13 | ~~**El teléfono de los asesores no se normaliza**~~ | `users.phone`. El capítulo 21 se ocupó del de los prospectos. **Cerrado** en el capítulo 32: mismo E.164 y mismo módulo (`app.core.telefono`), con migración de los que ya estaban escritos de otra forma (R32 §32.4) | R21 §21.12 |
@@ -1190,13 +1265,17 @@ cambiados, sin copiar valores.
 | 16 | ~~**No hay interfaz para exportar ni para explicar la supresión**~~ | Los derechos del titular son API. Funcionan y están comprobados; no tienen pantalla. **Cerrado** en el capítulo 38: pantalla en administración que busca por correo, enseña qué consta y de dónde llegó, exporta el documento del servidor y suprime exigiendo que el correo se **escriba**, con su constancia. Sin lógica de supresión nueva (R36 §38.2–§38.6) | R20 §20.8 |
 | 35 | **El listado no se puede filtrar por «sin asesor»** | El contador del tablero lleva a la matriz, donde las fichas que esperan llevan su marca, pero la lista no se acota a ellas. Filtrarla exige un parámetro nuevo en el servidor; hacerlo en el cliente sobre una página de cincuenta reproduciría la discrepancia del capítulo 27 —un número que dice siete y una lista con dos marcas— | R36 §38.10 |
 
-**Por qué 9, 10, 12 y 15 siguen abiertos.** Los cuatro piden que el servidor **haga algo que
-hoy no hace**: leer el UTM en cuatro conectores y decidir qué gana cuando hay dos
-atribuciones posibles; repartir sin que nadie decida; partir una cartera entre varias
-personas; y encender integraciones desde una pantalla, lo que significa guardar y rotar sus
-secretos en la base en vez de en el entorno. Ninguno es «la frase ya está escrita y el
-código no la cumple»; los cuatro son frases nuevas. Es la distinción del §1, y es la que
-dejó entrar a los tres de este capítulo y detuvo a estos cuatro.
+**Por qué 9, 12 y 15 siguen abiertos.** Los tres piden que el servidor **haga algo que hoy no
+hace**: leer el UTM en cuatro conectores y decidir qué gana cuando hay dos atribuciones
+posibles; partir una cartera entre varias personas; y encender integraciones desde una
+pantalla, lo que significa guardar y rotar sus secretos en la base en vez de en el entorno.
+Ninguno es «la frase ya está escrita y el código no la cumple»; los tres son frases nuevas.
+Es la distinción del §1, y es la que dejó entrar a los tres del capítulo 38 y detuvo a estos.
+
+El **10** era el cuarto de esa lista y se cerró en el capítulo 46 porque se encargó
+explícitamente, no porque hubiera dejado de ser funcionalidad. La distinción del §1 sigue
+siendo la misma: lo que cambió no es el criterio, es que alguien decidió abrir la congelación
+para ese punto. Queda escrito para que la siguiente vez no se lea como un precedente.
 
 **16, 14 y 11 — qué se cerró exactamente.** Lo que faltaba no era la capacidad, era el
 alrededor. En el 16: encontrar a la persona por su correo comparando la **igualdad** y no la
@@ -1257,6 +1336,9 @@ defectos reintroducidos y 22 detectados.
 | 54 | **Las dos listas de sector del panel están escritas a mano, son distintas entre sí y ninguna es la del modelo.** El alta ofrece «Banking / Banca», «Educación / Universidades», «Salud / HealthTech»; la edición ofrece «Banca y Finanzas», «Logistics», «Manufactura», «Retail / E-Commerce». El campo es de texto libre a propósito —lo que no está en el vocabulario del modelo se trata como desconocido—, así que no hay ningún dato mal; lo que hay son dos sugerencias que no coinciden ni entre ellas ni con las diez categorías que el modelo conoce, de modo que escribir el sector desde el panel o desde la página pública produce fichas que no se agrupan igual. Unificarlas es decidir antes si ese campo sigue siendo libre | Demo 05-10-2026 |
 | 55 | **La matriz de prospectos desborda en horizontal y su primera columna no es fija.** Con nueve columnas, por debajo de unos 1200 px la tabla se lleva «Cuadrante», «Estado» y «Acciones» fuera de la vista; hay barra de desplazamiento, pero al usarla se pierde el nombre del prospecto, que es la primera columna. No se ve en la suite —`jsdom` no dibuja— y no se vio antes porque la demostración se ensaya en una pantalla ancha | Demo 05-10-2026 |
 | 56 | **Nada comprueba que la pila levantada sea de este código.** `pila.py up -d` sin `--build` reutiliza la imagen que haya, y una imagen vieja arranca igual de bien: los seis contenedores se ponen verdes y el panel funciona. El 05-10-2026 llevaba toda la mañana levantada una del **1 de octubre**, cuatro capítulos por detrás, y lo que la delató fue mirar un panel que salía sin estilos —no una comprobación—. El compose ya avisa de la mitad de abajo de este problema (el `target` explícito del Dockerfile del cliente, que servía un `dist/` viejo); lo que falta es que algo compare lo que sirve la pila con el commit que hay en el árbol. Un `/health` que devolviera la revisión construida lo resolvería, y es funcionalidad nueva | Demo 05-10-2026 |
+| 57 | **El desempate del reparto mide la fecha de alta, no la de asignación.** «Quien lleva más tiempo sin recibir uno» se calcula con la fecha en que se creó el prospecto más reciente de su cartera, porque el reparto ocurre en el alta y para lo que él reparte las dos fechas son la misma. Para un prospecto **reasignado a mano** no lo son: a quien el líder acaba de traspasar una ficha de hace tres meses le sigue constando que no recibe nada desde hace tres meses, y en un empate recibiría antes de lo que le toca. Se acepta a sabiendas —la carga de ese traspaso ya la cuenta el primer criterio, que es el que decide casi siempre—, y la alternativa es una columna `asignado_en` escrita en los cinco sitios que asignan, que es la forma de regla que el recorrido del 05-10-2026 pasó un día entero quitando | C46 |
+| 58 | **El interruptor del reparto no tiene pantalla.** Es `REPARTO_AUTOMATICO_ACTIVO` en `pila.env`, así que apagarlo exige tocar un archivo y reiniciar el backend: el líder lo pide a quien opera la pila en lugar de hacerlo él. Quedó fuera del encargo por escrito, y es la misma forma del punto 15 —una pantalla de configuración— con la diferencia de que aquí no hay ningún secreto que guardar, solo un booleano: cuando haya pantalla de configuración, este interruptor es el candidato más barato para estrenarla | C46 |
+| 59 | **El reparto no mira `capacity`, así que la cartera máxima declarada no limita nada.** La columna sigue usándose donde ya se usaba —el traspaso de la cartera de una baja avisa cuando el destino la supera—, pero el reparto automático reparte por carga abierta y no se detiene al llegar al tope de nadie: con todas las asesoras llenas, la siguiente ficha va a la menos llena igualmente. Era eso o no repartirla, y no repartirla la devuelve al punto 10. Que `capacity` sea un tope de verdad exige decidir qué pasa cuando se alcanza, y eso es funcionalidad | C46 |
 
 ---
 

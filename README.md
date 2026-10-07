@@ -34,7 +34,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 1700 pruebas en el backend (93 % de cobertura) y 748 en
+> **Calidad en las dos mitades.** 1734 pruebas en el backend (94 % de cobertura) y 748 en
 > el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
 > encendidas—, y 10 trabajos de integración continua con 59 guardas de regresión de
 > configuración peligrosa y seis guardas de propiedades.
@@ -575,8 +575,9 @@ secreto HMAC. Se defiende con límite por IP y por publicación, campo trampa, v
 estricta, «no disponible» cuando la publicación no existe o está desactivada, y **la misma
 respuesta exista o no el correo**, para que no sirva para averiguar quién está en la base.
 Por dentro usa `registrar_evento`: si el correo ya existe, la solicitud se suma al historial
-y **no pisa** los datos de la ficha. El prospecto llega atribuido a su publicación, sin asesor
-y con canal `LinkedIn`, que el listado marca como «Nuevo desde LinkedIn».
+y **no pisa** los datos de la ficha. El prospecto llega atribuido a su publicación, con canal
+`LinkedIn` —que el listado marca como «Nuevo desde LinkedIn»— y ya repartido: al responsable
+de la publicación si lo tiene y, si no, a quien decida el reparto automático.
 
 **Informe por publicación.** `GET /api/v1/publicaciones/{id}/informe` responde con tres
 números —perfiles recibidos, cuántos avanzaron de etapa (salieron de `NEW`) y score medio— y
@@ -716,15 +717,29 @@ a una campaña.
 
 | Camino | Quién lo manda | ¿Crea la ficha? | Si el correo ya existe | Campaña | Asesor |
 | :--- | :--- | :-: | :--- | :-: | :--- |
-| **Página de interés** `/interes/<enlace>` | La persona, desde el enlace de una publicación | Sí | Suma la solicitud al historial y **no pisa** la ficha | La publicación | Ninguno: lo reparte el líder |
-| **Alta en el panel** | Un asesor o el líder | Sí | Rechaza el alta (el correo es único) | La que se indique | El asesor que la crea; el líder elige |
-| **CRM** `POST /api/v1/crm/webhook` | El CRM, con firma HMAC | Sí | Actualiza cargo, empresa, sector, tamaño e ingresos | Ninguna | Automático solo si sale `HOT` |
-| **Formulario web y LinkedIn Lead Gen** `POST /api/v1/integraciones/<nombre>/eventos` | Cada sistema, con su propio secreto y su interruptor | Sí | Igual que el CRM | Ninguna | Automático solo si sale `HOT` |
+| **Página de interés** `/interes/<enlace>` | La persona, desde el enlace de una publicación | Sí | Suma la solicitud al historial y **no pisa** la ficha | La publicación | El responsable de la publicación; si no tiene, el reparto automático |
+| **Alta en el panel** | Un asesor o el líder | Sí | Rechaza el alta (el correo es único) | La que se indique | El asesor que la crea; el líder elige, y si no elige, el reparto automático |
+| **CRM** `POST /api/v1/crm/webhook` | El CRM, con firma HMAC | Sí | Actualiza cargo, empresa, sector, tamaño e ingresos | Ninguna | El reparto automático |
+| **Formulario web y LinkedIn Lead Gen** `POST /api/v1/integraciones/<nombre>/eventos` | Cada sistema, con su propio secreto y su interruptor | Sí | Igual que el CRM | Ninguna | El reparto automático |
 | **Calendly y WhatsApp** (mismas rutas) | Cada sistema, firmado | **No** | Suman reunión o mensaje a la ficha | — | — |
 
 Lo que no se puede atribuir a ninguna ficha —una reunión de Calendly con un correo que no
 existe— no se descarta ni crea una ficha a medias: va a la bandeja «Sin asociar», donde el líder
 lo vincula o lo descarta.
+
+**Reparto automático de prospectos** (capítulo 46). Una ficha nueva sin asesor y que no venga
+de una publicación con responsable se asigna sola a la cuenta activa que atiende cartera con
+**menos prospectos abiertos**; con empate, a la que lleva más tiempo sin recibir uno. Un trato
+ganado, uno perdido y un prospecto descartado no cuentan como cartera abierta: contarlos
+premiaría a quien menos cierra. Corre dentro del scoring, que es el paso por el que pasan los
+cinco caminos de arriba, y **una sola vez**: la prueba de que es un alta es que la ficha no
+tenga todavía ninguna instantánea de score, así que una reasignación hecha a mano no la
+deshace ningún recálculo. Cada reparto deja en la bitácora con qué regla se eligió y entre
+cuántos candidatos, sin actor —el alta la pudo pedir una persona, pero a quién le tocaba no lo
+decidió ella—. Si no hay ninguna cuenta donde repartir, la ficha queda sin asesor y el líder
+la ve en su contador, sin ningún error. Se apaga con `REPARTO_AUTOMATICO_ACTIVO=false`, y
+apagarlo no mueve nada de lo ya repartido. No mira el score, ni el sector, ni la zona, ni la
+capacidad declarada.
 
 ### La historia que se enseña: del post de LinkedIn al prospecto puntuado
 
@@ -737,11 +752,15 @@ lo vincula o lo descarta.
    correo, empresa, cargo, tamaño y sector (las listas que conoce el modelo), «¿Qué
    necesitas?» con botones de un toque y el aviso de privacidad. El teléfono y el perfil de
    LinkedIn van plegados bajo «Añadir más datos», y la facturación no se pregunta.
-4. **El sistema crea la ficha puntuada**, atribuida a la publicación, sin asesor y marcada
-   «Nuevo desde LinkedIn».
-5. **El líder la ve** en el contador «Nuevos de publicaciones, sin asesor», la abre y se la
-   asigna a un asesor desde la propia ficha. El asesor la encuentra con la tarjeta «Llegó
-   por»: de qué publicación, qué necesita, cuándo aceptó el aviso y su perfil de LinkedIn.
+4. **El sistema crea la ficha puntuada**, atribuida a la publicación, marcada «Nuevo desde
+   LinkedIn» y **ya repartida** a la asesora con menos cartera abierta (capítulo 46): esta
+   publicación no tiene responsable, así que decide el reparto, y con qué regla lo hizo queda
+   en la bitácora.
+5. **El líder la abre** y decide si la deja donde cayó o se la pasa a otra persona; lo que
+   reasigne a mano se queda. El contador «Nuevos de publicaciones, sin asesor» cuenta ahora lo
+   que el reparto **no pudo** colocar, así que con el equipo sembrado dice cero. El asesor la
+   encuentra con la tarjeta «Llegó por»: de qué publicación, qué necesita, cuándo aceptó el
+   aviso y su perfil de LinkedIn.
 6. **El líder compara publicaciones**: perfiles recibidos, cuántos avanzaron de etapa y score
    medio de cada una, y el informe de cada publicación con sus perfiles por score.
 7. **El trato se cierra diciendo por qué** (capítulo 30). Pasar a «Ganado» o «Perdido» no es

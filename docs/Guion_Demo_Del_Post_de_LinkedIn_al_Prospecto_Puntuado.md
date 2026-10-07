@@ -172,7 +172,7 @@ La firma va en dos cabeceras:
 
 **Falta:**
 - **H-6:** solo se asigna asesor de forma automática a las fichas `HOT` (`scoring_service.py`). Una ficha `WARM` o `COLD`, como la del ensayo, queda sin dueño hasta que el líder la asigna.
-- Tampoco hay pantalla para asignarla: el campo `assigned_rep_id` solo se cambia con `PUT /api/v1/leads/{id}`, y el repositorio lo reserva a quien puede reasignar cartera.
+- Tampoco hay pantalla para asignarla: el campo `assigned_rep_id` solo se cambia con `PUT /api/v1/leads/{id}`, y el repositorio lo reserva a quien puede reasignar cartera. Desde el capítulo 46 la primera asignación no la hace nadie: la ficha nueva sin asesor la reparte el reparto automático al puntuarla, por cartera abierta, y lo que se reasigne a mano después se queda.
 
 **Cómo se ensaya hoy:** tras el paso 3, la ficha aparece en el listado del líder con su score.
 
@@ -192,7 +192,7 @@ La firma va en dos cabeceras:
 
 **Cómo se ensaya hoy:** hay dos formas.
 - El líder asigna la ficha con `PUT /api/v1/leads/{id}` y `{"assigned_rep_id": <id del asesor>}` desde `/docs`, y el asesor la abre con su sesión.
-- Para ahorrarse la asignación, se usa en el paso 3 un perfil que salga `HOT`: se asigna solo, al asesor activo de mayor capacidad.
+- Ya no hay asignación que ahorrarse, y el truco de usar un perfil `HOT` en el paso 3 dejó de hacer falta: desde el capítulo 46 **toda** ficha nueva sin asesor se reparte sola, sin mirar el score, a la cuenta activa con menos cartera abierta. Lo que sí conviene saber es a quién le tocó, porque puede no ser la cuenta con la que se va a entrar después.
 
 ### Paso 6. El líder compara publicaciones
 
@@ -414,7 +414,7 @@ Ninguno se corrige en este documento. Van en orden de dependencia para la demo.
 | ~~H-2~~ | ~~Nada construye ni ofrece el enlace~~. **Cerrado en la fase 1**: enlace público con slug y botón «Copiar texto para LinkedIn». No usa UTM, porque el slug ya identifica la campaña | 2 | R-2 |
 | H-7 | País `México` y canal `Website` escritos por defecto cuando no llegan | 3, 4 | R-4 |
 | H-9 | Una segunda entrega reemplaza cinco campos de la ficha existente. La página de interés ya no lo hace; `formulario_web`, `linkedin_lead_gen` y el CRM sí | 4 | R-4 |
-| H-6 | **Parcial.** Ya se asigna desde la ficha 360 y el líder ve cuántos esperan («Nuevos de publicaciones, sin asesor»); la asignación automática sigue siendo solo para las `HOT` | 4, 5 | — |
+| H-6 | **Cerrado en el capítulo 46.** Se asigna desde la ficha 360, el líder ve cuántos esperan («Nuevos de publicaciones, sin asesor» cuenta ahora lo que el reparto no pudo colocar) y **toda** ficha nueva sin asesor se reparte sola: cartera abierta, con el tiempo sin recibir como desempate, entre cuentas activas que atienden cartera | 4, 5 | — |
 | — | Los vocabularios de industria, tamaño y canal no coinciden entre modelo, formularios y conectores | 3, 4 | R-3 |
 | H-5 | El conector `linkedin-lead-gen` no acepta la forma real de `leadFormResponses` (necesita cuenta) | 3 | R-1 |
 | ~~H-8~~ | ~~El informe compara campañas, no publicaciones~~. **Cerrado en la fase 3**: comparativa por publicación, con su informe y su tarjeta en la ficha | 6 | R-2 |

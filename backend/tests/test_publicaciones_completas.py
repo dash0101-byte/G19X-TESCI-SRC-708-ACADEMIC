@@ -14,6 +14,7 @@ Cada bloque prueba lo que promete y, sobre todo, lo que no puede pasar:
 import datetime
 
 import pytest
+from app.core.config import settings
 from app.core.publicaciones import MAX_NECESIDADES, NECESIDADES_POR_DEFECTO
 from app.models.entities import (
     ActivityType,
@@ -321,10 +322,28 @@ def test_con_responsable_la_ficha_nueva_llega_asignada(client, lead_headers, db_
     assert _ficha(db_session).assigned_rep_id == responsable.id
 
 
-def test_sin_responsable_llega_sin_asesor_al_lider(client, publicacion, db_session, sales_reps):
+def test_sin_responsable_la_publicacion_no_elige_asesor(
+    client, publicacion, db_session, sales_reps, monkeypatch
+):
+    """
+    La publicación no elige por nadie: sin responsable, la ficha no sale a nombre de nadie
+    por venir de ella. Hasta el capítulo 46 eso era todo y la ficha esperaba al líder; se
+    comprueba con el reparto apagado, que es lo que aísla la decisión de la publicación.
+    """
+    monkeypatch.setattr(settings, "REPARTO_AUTOMATICO_ACTIVO", False)
+
     _enviar(client, publicacion)
 
     assert _ficha(db_session).assigned_rep_id is None
+
+
+def test_sin_responsable_la_reparte_el_reparto_automatico(
+    client, publicacion, db_session, sales_reps
+):
+    """Capítulo 46: lo que la publicación no decide, lo decide el reparto por carga."""
+    _enviar(client, publicacion)
+
+    assert _ficha(db_session).assigned_rep_id in {rep.id for rep in sales_reps}
 
 
 def test_el_responsable_tiene_que_ser_un_asesor_activo(client, lead_headers, db_session, sales_reps):
@@ -349,12 +368,22 @@ def test_si_el_responsable_deja_de_ser_asesor_llega_sin_asesor(client, lead_head
 
 
 def test_una_ficha_que_ya_existia_no_se_reasigna(client, lead_headers, db_session, sales_reps):
+    """
+    El responsable de una publicación solo alcanza a las fichas que **nacen** de ella.
+
+    Desde el capítulo 46 la primera solicitud deja la ficha ya repartida, así que lo que esta
+    prueba comprueba es más fuerte que antes: el segundo envío, desde una publicación que sí
+    tiene responsable, no se la lleva de la cartera donde está. Afirmar que sigue sin asesor
+    habría dejado de medir eso el día que algo la asignara.
+    """
     sin_responsable = _crear(client, lead_headers)
     _enviar(client, sin_responsable)
+    dueno = _ficha(db_session).assigned_rep_id
     con_responsable = _crear(client, lead_headers, name="Post · Otro", responsable_id=sales_reps[1].id)
 
     _enviar(client, con_responsable)
-    assert _ficha(db_session).assigned_rep_id is None
+    assert _ficha(db_session).assigned_rep_id == dueno
+    assert dueno != sales_reps[1].id
 
 
 def test_el_asesor_no_elige_responsable(client, executive_headers, publicacion, sales_reps):

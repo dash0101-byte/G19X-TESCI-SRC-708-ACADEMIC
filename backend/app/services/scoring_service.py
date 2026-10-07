@@ -22,9 +22,9 @@ from app.models.entities import (
     Lead,
     ScoreCategory,
     ScoreHistory,
-    User,
 )
 from app.schemas.score import AIExplanation, ScoreResult
+from app.services import reparto_automatico
 
 logger = logging.getLogger(__name__)
 
@@ -285,25 +285,26 @@ class ScoringService:
                 heuristic_breakdown=breakdown,
             )
 
-        # 6. Auto-asignación inteligente a ejecutivo comercial si es HOT y no tiene asignado
+        # 6. Reparto automático: a quién le toca este prospecto (capítulo 46)
         #
-        # El destino es un `User` con `is_sales_rep`, no una fila de una tabla de asesores
-        # aparte: asignar a alguien que no puede iniciar sesión producía prospectos con
-        # dueño nominal y sin nadie capaz de abrirlos.
-        if category == ScoreCategory.HOT and not lead.assigned_rep_id:
-            available_rep = (
-                self.db.query(User)
-                .filter(User.is_sales_rep.is_(True), User.is_active.is_(True))
-                .order_by(User.capacity.desc().nullslast(), User.id.asc())
-                .first()
-            )
-            if available_rep:
-                lead.assigned_rep_id = available_rep.id
-                # Por identificador y no por correo: el registro de texto del contenedor no
-                # se puede editar después, y una supresión no lo alcanzaría (R-11).
-                logger.info(
-                    "Lead %s auto-asignado al ejecutivo %s", lead.id, available_rep.full_name
-                )
+        # Aquí, y no en cada sitio que crea una ficha, por el mismo motivo por el que el
+        # motor de reglas barre el estado en vez de engancharse a cada asignación: dar de
+        # alta ocurre en cuatro sitios —el alta del panel, la página de interés, las
+        # integraciones y el webhook del CRM— y los cuatro pasan obligatoriamente por aquí.
+        # El día que aparezca el quinto camino, repartirá sin que nadie se acuerde de
+        # enchufarlo.
+        #
+        # Hasta el capítulo 46 esto era un `if` que miraba dos cosas: que la ficha saliera
+        # HOT y que no tuviera dueño, y entonces la daba a quien tuviera el `capacity` más
+        # alto. Las dos mitades estaban mal. Una ficha WARM se quedaba sin asesor, y sin
+        # asesor el motor de reglas no tiene de quién hablar: ni tarea, ni aviso, ni bandeja.
+        # Y `capacity` es la cartera MÁXIMA declarada, no la que alguien tiene: ordenar por
+        # ella le entrega todos los prospectos a la misma persona hasta que cambie el número.
+        #
+        # El destino sigue siendo un `User` con `is_sales_rep`, no una fila de una tabla de
+        # asesores aparte: asignar a alguien que no puede iniciar sesión producía prospectos
+        # con dueño nominal y sin nadie capaz de abrirlos.
+        reparto_automatico.repartir(self.db, lead)
 
         # 7. Actualizar entidad Lead
         lead.current_score = final_score

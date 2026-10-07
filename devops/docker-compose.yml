@@ -280,6 +280,11 @@ services:
       # Ventana durante la que un mismo evento de CRM se considera repetido. La firma HMAC
       # no acredita novedad: reenviar una entrega capturada volvia a ingerirla entera.
       CRM_IDEMPOTENCY_WINDOW_SECONDS: ${CRM_IDEMPOTENCY_WINDOW_SECONDS:-900}
+      # El reparto automatico de prospectos (capitulo 46). Encendido, cada ficha nueva sin
+      # asesor va a la cuenta activa con menos cartera abierta; apagado, la reparte el lider.
+      # Va solo en este servicio: el reparto corre en el alta, y el alta ocurre aqui. La
+      # pasada de retencion no crea fichas, asi que alli la variable no decidiria nada.
+      REPARTO_AUTOMATICO_ACTIVO: ${REPARTO_AUTOMATICO_ACTIVO:-true}
       # En esta pila nginx sirve la SPA y hace de proxy de `/api/`, así que el navegador
       # habla siempre con el mismo origen y CORS no interviene: la lista vacía es la
       # configuración correcta. Solo hay que rellenarla si el frontend se despliega en
