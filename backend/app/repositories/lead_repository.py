@@ -284,7 +284,12 @@ class LeadRepository:
         # lista de campos obligatorios tenga UN dueño: la tabla. Y si alguna vez se colara,
         # no sería en silencio —la base lo rechaza, que es el modo de fallo que sí se ve—.
         for field, value in update_data.items():
-            if hasattr(lead, field):
+            # pragma: no branch — ningún campo de `LeadUpdate` deja de ser atributo de
+            # `Lead`, así que la salida contraria no se puede recorrer. Que siga siendo
+            # cierto lo comprueba `test_los_campos_de_la_edicion_son_todos_de_la_tabla`,
+            # derivándolo del esquema y del modelo: si alguien añade uno que no lo sea, se
+            # pone rojo ahí y este comentario deja de valer.
+            if hasattr(lead, field):  # pragma: no branch
                 setattr(lead, field, value)
         lead.updated_at = datetime.datetime.now(datetime.timezone.utc)
 

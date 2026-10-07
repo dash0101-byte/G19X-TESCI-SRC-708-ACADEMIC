@@ -762,3 +762,139 @@ def test_el_pragma_esta_en_el_motor_y_no_en_las_pruebas():
     assert 'event.listens_for(engine, "connect")' in fuente
     conftest = (Path(__file__).resolve().parent / "conftest.py").read_text(encoding="utf-8")
     assert "PRAGMA foreign_keys" not in conftest
+
+
+# ==============================================================================
+# Las otras dos redes de la carrera, y el alcance de la reasignacion
+# ==============================================================================
+
+def test_la_red_de_la_edicion_distingue_el_correo_de_lo_demas(
+    client, admin_headers, sample_leads, monkeypatch
+):
+    """
+    El mismo hueco que el del alta, en la edicion, y con el `else` que faltaba.
+
+    La comprobacion previa del correo mira si otra ficha lo tiene. Entre esa consulta y el
+    `commit` cabe otra transaccion que lo tome, y para eso esta la red. Lo que esta prueba
+    mide es que la red clasifique: hasta el capitulo 42 contestaba el 409 del correo para
+    cualquier cosa que la base rechazara, y desde entonces pregunta. El camino del correo
+    repetido -el unico que de verdad debe contestar esa frase- no lo recorria nadie.
+
+    Se deja pasar la comprobacion previa, que es lo que ocurre en la carrera: al preguntar el
+    correo estaba libre.
+    """
+    propia, ajena = sample_leads[0], sample_leads[1]
+    monkeypatch.setattr(
+        "app.repositories.lead_repository.LeadRepository.get_by_email", lambda self, email: None
+    )
+
+    respuesta = client.put(
+        f"/api/v1/leads/{propia.id}", headers=admin_headers, json={"email": ajena.email}
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    assert ajena.email in respuesta.json()["detail"]
+
+
+def test_la_red_del_alta_de_una_cuenta_contesta_el_conflicto_del_correo(
+    client, admin_headers, db_session, monkeypatch
+):
+    """
+    La tercera red, la de `POST /users`, y la unica que se puede provocar sin tocar su guarda.
+
+    La comprobacion previa es una consulta escrita en el propio endpoint, asi que no hay nada
+    que silenciar: lo que se hace es meter la fila que falta EN EL HUECO. `hash_password` se
+    llama entre la comprobacion y el `INSERT`, de modo que una cuenta creada desde ahi por
+    otra sesion es exactamente lo que hace otra peticion simultanea con el mismo correo.
+
+    Sin la clasificacion, `users` -con su restriccion unica y nueve columnas obligatorias-
+    contestaba el conflicto del correo tambien cuando la base habia rechazado otra cosa.
+    """
+    from app.api.v1.endpoints import users as endpoints_usuarios
+    from app.core.database import SessionLocal
+
+    correo = f"carrera-{datetime.datetime.now().timestamp()}@plurione.com".replace(".", "-", 1)
+    real = endpoints_usuarios.hash_password
+
+    def _mete_a_otro_en_el_hueco(contrasena):
+        otra = SessionLocal()
+        try:
+            otra.add(
+                User(
+                    email=correo,
+                    full_name="La Que Llego Primero",
+                    role="Commercial_Executive",
+                    hashed_password="!sin-contrasena:carrera",
+                    is_active=True,
+                )
+            )
+            otra.commit()
+        finally:
+            otra.close()
+        endpoints_usuarios.hash_password = real
+        return real(contrasena)
+
+    monkeypatch.setattr(endpoints_usuarios, "hash_password", _mete_a_otro_en_el_hueco)
+
+    respuesta = client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "email": correo,
+            "full_name": "La Que Llego Despues",
+            "role": "Commercial_Executive",
+            "password": "Una-Contrasena-Larga-2026!",
+        },
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    assert correo in respuesta.json()["detail"]
+
+
+def test_un_asesor_puede_editar_su_ficha_mandando_el_mismo_dueno(
+    client, executive_headers, cartera_repartida, db_session
+):
+    """
+    Reasignar es repartir trabajo, pero devolver el dueno que ya tenia no es reasignar.
+
+    Un formulario que manda todos los campos incluye `assigned_rep_id` aunque nadie lo haya
+    tocado. Si la comprobacion mirara solo si el campo viene, un asesor no podria editar el
+    telefono de su propia ficha desde la pantalla: el 403 llegaria sin que hubiera intentado
+    cambiar de dueno nada.
+    """
+    propias, _ = cartera_repartida
+    ficha = propias[0]
+
+    respuesta = client.put(
+        f"/api/v1/leads/{ficha.id}",
+        headers=executive_headers,
+        json={"assigned_rep_id": ficha.assigned_rep_id, "city": "Guadalajara"},
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    db_session.refresh(ficha)
+    assert ficha.city == "Guadalajara"
+
+
+def test_los_campos_de_la_edicion_son_todos_de_la_tabla():
+    """
+    La premisa del unico `pragma: no branch` del repositorio de prospectos.
+
+    `update` aplica lo que vino comprobando antes `hasattr(lead, campo)`. Esa comprobacion
+    nunca es falsa, porque cada campo de `LeadUpdate` es una columna de `leads`; por eso la
+    rama contraria esta marcada como no medible en lugar de fingir una prueba que la recorra.
+
+    Lo que no se puede dar por hecho es que siga siendo verdad. Se deriva del esquema y del
+    modelo, no de una lista escrita a mano: un campo nuevo que no sea columna pone esto rojo,
+    y entonces hay que decidir si la marca sigue valiendo o si el `hasattr` era la red que
+    hacia falta.
+    """
+    from app.schemas.lead import LeadUpdate
+
+    del_esquema = set(LeadUpdate.model_fields)
+    del_modelo = {columna.name for columna in Lead.__table__.columns}
+
+    assert del_esquema - del_modelo == set(), (
+        "la edicion acepta campos que no son columnas de `leads`: el `pragma: no branch` de "
+        "`LeadRepository.update` deja de estar justificado"
+    )
