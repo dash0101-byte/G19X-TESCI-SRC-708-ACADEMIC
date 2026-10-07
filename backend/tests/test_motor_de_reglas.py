@@ -736,3 +736,341 @@ def test_cerrar_lo_cumplido_no_confirma_por_su_cuenta(db_session, equipo):
     db_session.rollback()
 
     assert _tareas(db_session, PRIMER_CONTACTO)[0].estado == ABIERTA
+
+
+# ==============================================================================
+# Las vueltas que nadie dio: una tanda de uno no prueba un bucle
+# ==============================================================================
+#
+# Todas las pruebas de arriba montan UN prospecto, UNA reunion, UN destinatario. Una regla
+# que solo atendiera al primero de la tanda pasaria entera en verde, y eso no es una
+# hipotesis: es la septima linea de lo que este repositorio aprendio por las malas -«una
+# regla que reparte ordenando por un campo no reparte, ordena, y cada ficha sale con dueno,
+# asi que ninguna prueba de un caso lo ve»-. Lo que falta medir no es el caso: es la vuelta.
+
+def test_dos_llamadas_sin_contestar_dejan_dos_tareas_y_no_una(db_session, equipo):
+    """
+    La regla recorre la tanda entera, no el primero de la tanda.
+
+    Con una sola ficha, un `break` en lugar del final del bucle, o un `return` dentro de el,
+    darian exactamente el mismo resultado que el codigo correcto. Dos fichas los separan.
+    Y no es un bucle cualquiera: de aqui sale la lista de a quien hay que volver a llamar
+    hoy, asi que atender solo a la primera deja al resto sin llamada y sin rastro.
+    """
+    asesor, _ = equipo
+    primera = _prospecto(db_session, asesor, correo="llama.uno@ejemplo.com", creado=_hace(days=5))
+    segunda = _prospecto(db_session, asesor, correo="llama.dos@ejemplo.com", creado=_hace(days=5))
+    for lead in (primera, segunda):
+        _actividad(db_session, lead, ActivityType.PHONE_CALL,
+                   ocurrida=_hace(days=3), resultado=CallOutcome.NO_CONTESTO)
+
+    resultado = motor_de_reglas.regla_volver_a_llamar(
+        motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+    )
+    db_session.commit()
+
+    tareas = _tareas(db_session, VOLVER_A_LLAMAR)
+    assert resultado.tareas == 2
+    assert {t.lead_id for t in tareas} == {primera.id, segunda.id}
+
+
+def test_dos_reuniones_de_manana_se_recuerdan_las_dos(db_session, equipo):
+    """
+    Lo mismo en el recordatorio de reunion, que tiene su propio bucle y su propio salto.
+
+    Este tiene dos `continue` antes del cuerpo -la reunion sin fecha y la que todavia no
+    toca- y los dos estaban probados con un caso cada uno. Lo que no estaba probado es que
+    despues de uno de esos saltos el bucle SIGA: una reunion que no toca seguida de una que
+    si, que es el dia normal de cualquier semana con agenda.
+    """
+    asesor, _ = equipo
+    manana = (AHORA + datetime.timedelta(hours=20)).isoformat()
+    la_semana_que_viene = (AHORA + datetime.timedelta(days=8)).isoformat()
+    cerca = _prospecto(db_session, asesor, correo="reunion.cerca@ejemplo.com")
+    lejos = _prospecto(db_session, asesor, correo="reunion.lejos@ejemplo.com")
+    otra_cerca = _prospecto(db_session, asesor, correo="reunion.cerca2@ejemplo.com")
+    # En medio la que no toca, para que el salto tenga que dejar seguir al bucle.
+    for lead, cuando in ((cerca, manana), (lejos, la_semana_que_viene), (otra_cerca, manana)):
+        _actividad(db_session, lead, ActivityType.MEETING_SCHEDULED,
+                   datos={"inicio_de_la_reunion": cuando})
+
+    resultado = motor_de_reglas.regla_recordatorio_de_reunion(
+        motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+    )
+    db_session.commit()
+
+    assert resultado.tareas == 2
+    recordadas = {t.lead_id for t in _tareas(db_session, RECORDATORIO_DE_REUNION)}
+    assert recordadas == {cerca.id, otra_cerca.id}
+    assert lejos.id not in recordadas
+
+
+def test_un_dormido_sin_asesor_avisa_a_todos_los_lideres(db_session, equipo):
+    """
+    Sin dueno, el aviso va a CADA lider activo, y ahi el bucle de destinatarios da vueltas.
+
+    Es la unica regla con un bucle anidado -prospectos y, dentro, destinatarios- y la vuelta
+    de dentro no se recorria: las pruebas de dormido usaban fichas con asesor, o sea un
+    destinatario. Una ficha sin asesor que lleva un mes muerta es justo la que nadie va a
+    reclamar, asi que si el aviso se queda en el primer lider puede no llegarle a quien
+    reparte.
+    """
+    huerfano = _prospecto(
+        db_session, None, correo="dormido.sin.dueno@ejemplo.com",
+        creado=_hace(days=90), actividad=_hace(days=60),
+    )
+    lideres = sorted(_lideres(db_session))
+    assert len(lideres) >= 2, "la base de pruebas trae mas de un lider; de eso vive esta prueba"
+
+    resultado = motor_de_reglas.regla_prospecto_dormido(
+        motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=lideres)
+    )
+    db_session.commit()
+
+    avisados = {
+        a.usuario_id for a in _avisos(db_session, PROSPECTO_DORMIDO) if a.lead_id == huerfano.id
+    }
+    assert avisados == set(lideres)
+    assert resultado.avisos == len(lideres)
+
+
+# ==============================================================================
+# Las reglas de direccion cuando no hay direccion
+# ==============================================================================
+
+def test_sin_ningun_lider_activo_las_dos_reglas_que_le_hablan_no_hacen_nada(db_session, equipo):
+    """
+    Las dos reglas que escriben AL LIDER salen temprano si no hay ninguno.
+
+    No es un caso de laboratorio: una baja, o un cambio de rol, deja el sistema sin
+    `Sales_Lead` durante un rato, y la pasada de madrugada corre igual. Sin la salida
+    temprana, `regla_desenlaces_suficientes` haria antes sus consultas sobre la tabla de
+    desenlaces cada noche para no escribir nada.
+
+    Lo que esta prueba sujeta es que no se escribe nada **a nadie**: un aviso con
+    `usuario_id` vacio, o escalado al asesor en lugar del lider, seria contarle al asesor
+    justo lo que la regla existe para no contarle -que el lider ya sabe que no lo ha
+    atendido-.
+    """
+    sin_lideres = motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=[])
+    _prospecto(
+        db_session, equipo[0], correo="hot.desatendido@ejemplo.com",
+        creado=_hace(days=4), actividad=_hace(days=4), categoria=ScoreCategory.HOT,
+    )
+
+    del_lider = motor_de_reglas.regla_hot_sin_contacto_lider(sin_lideres)
+    de_desenlaces = motor_de_reglas.regla_desenlaces_suficientes(sin_lideres)
+    db_session.commit()
+
+    assert (del_lider.avisos, de_desenlaces.avisos) == (0, 0)
+    assert _avisos(db_session, HOT_SIN_CONTACTO_LIDER) == []
+
+
+# ==============================================================================
+# El barrido que repasa prospectos que ya no estan o que ya se cerraron
+# ==============================================================================
+
+def test_el_barrido_nunca_ve_una_tarea_sin_ficha(db_session, equipo):
+    """
+    La premisa del `pragma` del barrido, medida en sus propios terminos.
+
+    La primera version de esta prueba borraba el prospecto, dejaba su tarea y comprobaba que
+    el barrido «no levantaba». No comprobaba nada: `tareas.lead_id` declara
+    `ondelete=CASCADE`, asi que al irse la ficha se va su tarea y el barrido no se encuentra
+    ninguna huerfana. La prueba pasaba porque no habia nada que saltar, y el `if lead is
+    None` quedaba sin recorrer igual —lo decia la cobertura, no la prueba—.
+
+    Asi que lo que se mide es la premisa: borrar la ficha se lleva su tarea, de modo que la
+    lista que el barrido recorre no puede traer identificadores que no resuelvan. El `if`
+    queda marcado como red de ultimo recurso, con su motivo, y no fingido con una prueba que
+    no puede provocarlo. La clausula, derivada del esquema y no escrita a mano, la comprueba
+    `test_las_cascadas_declaradas.py` sobre las dieciocho claves.
+    """
+    asesor, _ = equipo
+    vivo = _prospecto(db_session, asesor, correo="sigue.vivo@ejemplo.com")
+    fantasma = _prospecto(db_session, asesor, correo="ya.no.esta@ejemplo.com")
+    for lead in (vivo, fantasma):
+        db_session.add(Tarea(
+            lead_id=lead.id, asesor_id=asesor.id, regla=PRIMER_CONTACTO,
+            clave=f"{lead.id}-barrido", estado=ABIERTA,
+            motivo="Contactar", vence_el=AHORA + datetime.timedelta(days=1),
+        ))
+    db_session.commit()
+    ido = fantasma.id
+
+    db_session.query(Lead).filter(Lead.id == ido).delete()
+    db_session.commit()
+
+    # La cascada se la llevo: no queda tarea que apunte a una ficha que no esta.
+    assert db_session.query(Tarea).filter(Tarea.lead_id == ido).count() == 0
+    abiertas = db_session.query(Tarea.lead_id).filter(Tarea.estado == ABIERTA).distinct().all()
+    vivos = {fila.id for fila in db_session.query(Lead.id).all()}
+    assert {fila.lead_id for fila in abiertas} <= vivos, (
+        "la lista que recorre el barrido no puede traer fichas que no existan"
+    )
+
+    # Y la pasada sigue funcionando sobre el que queda.
+    resultado = motor_de_reglas.regla_cerrar_lo_cumplido(
+        motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+    )
+    db_session.commit()
+
+    assert resultado.cerradas >= 0
+    assert db_session.query(Tarea).filter(Tarea.lead_id == vivo.id).count() == 1
+
+
+# ==============================================================================
+# Repetir la pasada: tres reglas con su propia idempotencia, y ninguna probada
+# ==============================================================================
+#
+# La pasada corre cada madrugada y `test_repetir_la_pasada_no_duplica_la_tarea` solo cubria
+# «primer contacto». Las otras tres escriben con su propia clave -la llamada concreta, la
+# reunion concreta, el episodio de silencio- y en las tres el camino de «ya estaba» pasa por
+# dentro del bucle: si la segunda pasada duplicara, el asesor abriria la bandeja con la misma
+# tarea siete veces el lunes siguiente, que es la forma de dejar de usar una bandeja.
+
+def test_repetir_la_pasada_no_duplica_la_tarea_de_volver_a_llamar(db_session, equipo):
+    """La clave es la llamada concreta: el mismo intento releido no es otra tarea."""
+    asesor, _ = equipo
+    lead = _prospecto(db_session, asesor, correo="llama.otra.vez@ejemplo.com", creado=_hace(days=5))
+    _actividad(db_session, lead, ActivityType.PHONE_CALL,
+               ocurrida=_hace(days=3), resultado=CallOutcome.NO_CONTESTO)
+    ctx = motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+
+    primera = motor_de_reglas.regla_volver_a_llamar(ctx)
+    db_session.commit()
+    segunda = motor_de_reglas.regla_volver_a_llamar(ctx)
+    db_session.commit()
+
+    assert (primera.tareas, segunda.tareas) == (1, 0)
+    assert len([t for t in _tareas(db_session, VOLVER_A_LLAMAR) if t.lead_id == lead.id]) == 1
+
+
+def test_repetir_la_pasada_no_duplica_el_recordatorio_de_reunion(db_session, equipo):
+    """La clave es la reunion concreta, no el dia: la vispera se recuerda una vez."""
+    asesor, _ = equipo
+    lead = _prospecto(db_session, asesor, correo="reunion.otra.vez@ejemplo.com")
+    _actividad(db_session, lead, ActivityType.MEETING_SCHEDULED,
+               datos={"inicio_de_la_reunion": (AHORA + datetime.timedelta(hours=20)).isoformat()})
+    ctx = motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+
+    primera = motor_de_reglas.regla_recordatorio_de_reunion(ctx)
+    db_session.commit()
+    segunda = motor_de_reglas.regla_recordatorio_de_reunion(ctx)
+    db_session.commit()
+
+    assert (primera.tareas, segunda.tareas) == (1, 0)
+    assert len([t for t in _tareas(db_session, RECORDATORIO_DE_REUNION) if t.lead_id == lead.id]) == 1
+
+
+def test_repetir_la_pasada_no_duplica_el_aviso_de_dormido(db_session, equipo):
+    """
+    Aqui la idempotencia esta DENTRO del bucle de destinatarios, y es la que faltaba.
+
+    `test_la_marca_evita_avisar_cada_manana` comprueba la otra mitad -la marca
+    `dormido_desde` hace que la regla ni mire a esa ficha-, asi que el camino de «el aviso ya
+    estaba» no se recorria nunca. Se provoca quitando la marca entre las dos pasadas, que es
+    lo que hace cualquier actividad: el prospecto se despierta, vuelve a dormirse, y el
+    episodio de silencio sigue siendo el mismo.
+    """
+    huerfano = _prospecto(
+        db_session, None, correo="dormido.repetido@ejemplo.com",
+        creado=_hace(days=90), actividad=_hace(days=60),
+    )
+    lideres = sorted(_lideres(db_session))
+    ctx = motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=lideres)
+
+    primera = motor_de_reglas.regla_prospecto_dormido(ctx)
+    db_session.commit()
+    # La marca se quita a mano: sin eso la regla no vuelve a mirar esta ficha y el camino de
+    # «el aviso ya estaba» no se recorre -que es por lo que no se recorria-.
+    huerfano.dormido_desde = None
+    db_session.commit()
+    segunda = motor_de_reglas.regla_prospecto_dormido(ctx)
+    db_session.commit()
+
+    assert primera.avisos == len(lideres)
+    assert segunda.avisos == 0, "el episodio de silencio es el mismo, asi que el aviso tambien"
+    assert segunda.marcados == 1, "la ficha se vuelve a marcar; lo que no se repite es el aviso"
+    del_huerfano = [a for a in _avisos(db_session, PROSPECTO_DORMIDO) if a.lead_id == huerfano.id]
+    assert len(del_huerfano) == len(lideres)
+
+
+def test_el_barrido_descarta_las_tareas_de_un_prospecto_ya_cerrado(db_session, equipo):
+    """
+    Un prospecto en una etapa sin seguimiento no tiene tareas que cumplir: se descartan.
+
+    Es el camino del capitulo 30 para lo que se cerro por fuera del servicio de cierre -una
+    carga del CRM, una edicion a mano, una ficha cerrada antes de que el desenlace
+    existiera-. Sin el, el asesor sigue viendo en su bandeja «contactar a X» de alguien que
+    ya compro o que ya dijo que no, que es la forma mas rapida de que una bandeja deje de
+    mirarse.
+    """
+    from app.models.entities import LeadStatus
+
+    asesor, _ = equipo
+    cerrado = _prospecto(db_session, asesor, correo="ya.cerrado@ejemplo.com")
+    cerrado.status = LeadStatus.LOST
+    db_session.add(Tarea(
+        lead_id=cerrado.id, asesor_id=asesor.id, regla=PRIMER_CONTACTO,
+        clave=f"{cerrado.id}-cerrado", estado=ABIERTA,
+        motivo="Contactar", vence_el=AHORA + datetime.timedelta(days=1),
+    ))
+    db_session.commit()
+    assert LeadStatus.LOST in motor_de_reglas._ETAPAS_SIN_SEGUIMIENTO
+
+    resultado = motor_de_reglas.regla_cerrar_lo_cumplido(
+        motor_de_reglas.Contexto(db=db_session, ahora=AHORA, lideres=sorted(_lideres(db_session)))
+    )
+    db_session.commit()
+
+    assert resultado.cerradas >= 1
+    quedan = db_session.query(Tarea).filter(
+        Tarea.lead_id == cerrado.id, Tarea.estado == ABIERTA
+    ).count()
+    assert quedan == 0
+
+
+def test_cerrar_lo_cumplido_con_commit_confirma_y_sin_el_no(db_session, equipo):
+    """
+    `commit=True` confirma de verdad; el valor por defecto no, y eso no es un detalle.
+
+    La funcion la llama `registrar_evento` EN MEDIO de una transaccion que todavia puede
+    fallar -la actividad, el score, la auditoria- y por eso no confirma por su cuenta:
+    cerrar la tarea de un contacto cuya actividad acabo rechazandose dejaria la bandeja
+    diciendo que algo se hizo. La pasada diaria, en cambio, la llama como barrido y si
+    quiere confirmar.
+
+    Se mide escuchando el evento `commit` de la sesion, que es la unica forma de distinguir
+    «se confirmo» de «se escribio y alguien confirmo despues»: con `pysqlite` las dos cosas
+    dejan la base igual. Es el mismo procedimiento que el sello del esquema.
+    """
+    from sqlalchemy import event
+
+    asesor, _ = equipo
+    lead = _prospecto(db_session, asesor, correo="despierta@ejemplo.com")
+    lead.dormido_desde = _hace(days=10)
+    db_session.add(Tarea(
+        lead_id=lead.id, asesor_id=asesor.id, regla=PRIMER_CONTACTO,
+        clave=f"{lead.id}-commit", estado=ABIERTA,
+        motivo="Contactar", vence_el=AHORA + datetime.timedelta(days=1),
+    ))
+    db_session.commit()
+    actividad = _actividad(db_session, lead, ActivityType.PHONE_CALL,
+                           ocurrida=_hace(hours=1), resultado=CallOutcome.CONECTO)
+
+    confirmaciones = []
+
+    def apuntar(_sesion):
+        confirmaciones.append(1)
+
+    event.listen(db_session, "after_commit", apuntar)
+    try:
+        cerradas = cerrar_lo_cumplido(db_session, lead, actividad, ahora=AHORA, commit=True)
+    finally:
+        event.remove(db_session, "after_commit", apuntar)
+
+    assert cerradas >= 1
+    assert confirmaciones, "con commit=True la funcion confirma ella misma"
+    # Y de paso lo despierta: la marca decia «nadie lo toca» y acaban de tocarlo.
+    assert lead.dormido_desde is None

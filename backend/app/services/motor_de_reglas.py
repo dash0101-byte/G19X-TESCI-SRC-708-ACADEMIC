@@ -642,10 +642,23 @@ def regla_desenlaces_suficientes(ctx: Contexto) -> ResultadoDeRegla:
         .offset(MINIMO_DE_CASOS - 1)
         .first()
     )
-    if el_que_inclino is None:
+    # pragma: no cover — esta salida no se puede recorrer, y no por falta de ganas de
+    # escribirle una prueba: `progreso.alcanzado` solo es cierto si hay al menos
+    # `MINIMO_DE_CASOS` desenlaces que cumplen un predicado MÁS ESTRICTO que el filtro de
+    # esta consulta —además de tener instantánea de la versión vigente, la exige
+    # *utilizable*—, así que el conjunto de arriba es un subconjunto del de aquí y
+    # `offset(MINIMO_DE_CASOS - 1)` no puede quedarse corto. Queda escrita como red: si
+    # algún día los dos filtros se separan, esto evita avisar de un reentrenamiento
+    # señalando un caso que no existe.
+    if el_que_inclino is None:  # pragma: no cover
         return resultado
     lead = ctx.db.get(Lead, el_que_inclino.lead_id)
-    if lead is None:
+    # pragma: no cover — `desenlaces.lead_id` declara `ondelete=CASCADE`, así que un
+    # desenlace no puede sobrevivir a su ficha. Que siga siendo cierto lo comprueba
+    # `test_borrar_el_destino_se_lleva_la_fila` de `test_las_cascadas_declaradas.py`,
+    # derivando las dieciocho claves del esquema: si alguien cambiara esa cláusula, se pone
+    # rojo ahí y esta marca deja de valer.
+    if lead is None:  # pragma: no cover
         return resultado
 
     clave = f"{MINIMO_DE_CASOS}-{MINIMO_POR_CLASE}"
@@ -845,7 +858,12 @@ def regla_cerrar_lo_cumplido(ctx: Contexto) -> ResultadoDeRegla:
     ids = [fila.lead_id for fila in ctx.db.query(Tarea.lead_id).filter(Tarea.estado == ABIERTA).distinct()]
     for lead_id in ids:
         lead = ctx.db.get(Lead, lead_id)
-        if lead is None:
+        # pragma: no cover — lo mismo que arriba y por la misma cláusula: `tareas.lead_id`
+        # declara `ondelete=CASCADE`, de modo que no hay tarea que pueda quedar sin ficha
+        # para que este barrido se la encuentre. Comprobado en
+        # `test_las_cascadas_declaradas.py` sobre el esquema, y aquí en los términos del
+        # barrido por `test_el_barrido_nunca_ve_una_tarea_sin_ficha`.
+        if lead is None:  # pragma: no cover
             continue
         if lead.status in _ETAPAS_SIN_SEGUIMIENTO:
             resultado.cerradas += descartar_por_desenlace(ctx.db, lead, ahora=ctx.ahora)

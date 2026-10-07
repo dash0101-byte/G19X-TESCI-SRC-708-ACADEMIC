@@ -489,3 +489,163 @@ def test_la_bitacora_va_la_ultima_para_no_llevarse_los_errores_de_la_misma_pasad
     quedaría sin rastro.
     """
     assert PLAZOS[-1].tabla == "audit_log"
+
+
+# ==============================================================================
+# El plazo de archivos cuando el disco no colabora
+# ==============================================================================
+#
+# Las pruebas de arriba cubren el caso bueno: hay un directorio, hay archivos, se borran los
+# vencidos. Lo que faltaba es lo que pasa cuando el sistema de archivos no se porta como un
+# diccionario -que es casi siempre, en una maquina de verdad-: un nombre que coincide con el
+# patron y no es un archivo, uno que desaparece mientras se borra, y un volumen que no deja
+# borrar. En las tres, lo que no puede ocurrir es que la pasada entera se caiga: los plazos
+# de la BASE ya se aplicaron antes y sus asientos estan escritos.
+
+def test_sin_directorio_configurado_se_purga_el_del_arbol(monkeypatch):
+    """
+    `REALIMENTACION_DIR` vacio significa «donde lo deja el extractor», no «ninguno».
+
+    En la pila el valor lo pone el volumen compartido; en un clon y en el CI esta vacio, que
+    es justo el caso que no se probaba. Devolver `None` o una ruta vacia aqui dejaria el
+    conjunto de realimentacion -que SI lleva datos de personas- sin purgar en todas las
+    instalaciones que no configuran la variable, y sin que nada fallara: el plazo diria cero
+    archivos y su asiento quedaria igual de verde.
+    """
+    for vacio in ("", "   ", None):
+        monkeypatch.setattr(settings, "REALIMENTACION_DIR", vacio)
+        assert directorio_de_realimentacion() == caducidad_service.DIRECTORIO_DE_REALIMENTACION_POR_DEFECTO
+
+    monkeypatch.setattr(settings, "REALIMENTACION_DIR", "/datos/realimentacion")
+    assert directorio_de_realimentacion() == pathlib.Path("/datos/realimentacion")
+
+
+def test_lo_que_coincide_con_el_patron_y_no_es_un_archivo_no_se_borra(directorio_del_conjunto):
+    """
+    Un directorio llamado como un conjunto no es un conjunto, y un enlace tampoco.
+
+    El patron es `leads_reales*.csv`, y nada impide que exista un directorio con ese nombre
+    -lo crea cualquiera que descomprima algo ahi-. Sin la comprobacion, `os.remove` sobre un
+    directorio es un `IsADirectoryError`/`PermissionError` que tumba el plazo entero: los
+    archivos que de verdad habia que borrar se quedan sin borrar por culpa de un nombre.
+
+    Y el enlace simbolico es la mitad de seguridad de esa misma linea, escrita en el
+    docstring de la funcion: un enlace que apuntara fuera convertiria esta purga en una forma
+    de borrar cualquier cosa de la maquina escribiendo un nombre en un directorio. Se
+    comprueba lo que se puede comprobar en este sistema -crear enlaces en Windows exige
+    privilegios que el CI no tiene-, y la propiedad que queda medida es la misma: lo que no
+    es un archivo regular no entra en la lista.
+    """
+    de_verdad = _archivo(directorio_del_conjunto, "leads_reales.csv", 400)
+    carpeta = directorio_del_conjunto / "leads_reales_una_carpeta.csv"
+    carpeta.mkdir()
+    # Y se le pone fecha vieja: si se dejara recien creada, lo que la mantendria fuera
+    # de la lista seria su mtime y no la comprobacion que esta prueba dice medir. Lo
+    # dijo el arnes: con la comprobacion neutralizada, la prueba seguia en verde.
+    antiguo = (AHORA - datetime.timedelta(days=400)).timestamp()
+    os.utime(carpeta, (antiguo, antiguo))
+
+    vencidos = archivos_vencidos(directorio_del_conjunto, AHORA - datetime.timedelta(days=30))
+
+    assert [ruta.name for ruta in vencidos] == [de_verdad.name]
+    assert (directorio_del_conjunto / "leads_reales_una_carpeta.csv").is_dir()
+
+
+def test_un_archivo_que_desaparece_mientras_se_borra_no_rompe_el_plazo(
+    db_session, directorio_del_conjunto, monkeypatch
+):
+    """
+    Entre listar y borrar cabe otra pasada, o alguien con un `rm`. Eso no es un fallo.
+
+    El estado al que el plazo quiere llegar -que el archivo no este- es el que hay. Sin el
+    `except`, el `FileNotFoundError` subiria al manejador de `OSError` de la pasada, el plazo
+    quedaria marcado con error y los archivos que venian detras no se borrarian: una carrera
+    inofensiva se convertiria en datos de personas conservados mas alla de su plazo, que es
+    justo lo que este servicio existe para que no pase.
+
+    Se provoca borrando el segundo archivo como efecto del borrado del primero, que es el
+    orden en que lo haria otra pasada corriendo a la vez.
+    """
+    primero = _archivo(directorio_del_conjunto, "leads_reales_a.csv", 400)
+    segundo = _archivo(directorio_del_conjunto, "leads_reales_b.csv", 400)
+    original = os.remove
+
+    def borrar_y_adelantarse(ruta, *args, **kwargs):
+        original(ruta, *args, **kwargs)
+        # Otra pasada se lleva el que venia detras justo despues de este.
+        if pathlib.Path(ruta).name == primero.name and segundo.exists():
+            original(segundo)
+
+    monkeypatch.setattr(caducidad_service.os, "remove", borrar_y_adelantarse)
+
+    resultados = {
+        r.plazo: r for r in aplicar_caducidad(
+            db_session, ahora=AHORA, plazos=[], plazos_de_archivos=PLAZOS_DE_ARCHIVOS
+        )
+    }
+    resultado = resultados["conjunto_de_realimentacion"]
+
+    assert resultado.error is None, "una carrera no deja el plazo en error"
+    # Uno contado y los dos fuera: el que desaparecio no se cuenta, porque no lo borro esto.
+    assert resultado.filas == 1
+    assert not primero.exists() and not segundo.exists()
+
+
+def test_un_volumen_que_no_deja_borrar_deja_el_plazo_en_error_y_la_pasada_sigue(
+    db_session, directorio_del_conjunto, monkeypatch
+):
+    """
+    Permisos, un volumen que no monto, un disco lleno: se informa y los demas plazos siguen.
+
+    Es la unica clase de fallo de este servicio que no puede resolverse sola, y por eso lo
+    que importa es que se NOTE sin tumbar nada: el plazo trae su `error` y su asiento, y los
+    plazos de la base -que corren antes y ya han escrito- no se deshacen. Si esto se
+    propagara, un volumen mal montado dejaria la purga diaria entera sin ejecutarse y nadie
+    se enteraria hasta que alguien mirase los registros.
+
+    Se comprueba tambien que el resultado nombra el directorio y la unidad, porque el asiento
+    de la bitacora se construye con eso: un error sin decir sobre que es un error que no se
+    puede atender.
+    """
+    def no_se_puede(*_a, **_k):
+        raise PermissionError("el volumen esta montado como solo lectura")
+
+    monkeypatch.setattr(caducidad_service, "_aplicar_a_archivos", no_se_puede)
+    un_plazo_de_base = [p for p in PLAZOS if p.tabla == "avisos"]
+
+    resultados = aplicar_caducidad(
+        db_session, ahora=AHORA, plazos=un_plazo_de_base, plazos_de_archivos=PLAZOS_DE_ARCHIVOS
+    )
+    por_plazo = {r.plazo: r for r in resultados}
+
+    archivos = por_plazo["conjunto_de_realimentacion"]
+    assert archivos.error == "PermissionError"
+    assert archivos.unidad == "archivos"
+    assert archivos.tabla == str(directorio_del_conjunto)
+    # Y el plazo de la base, que corrio antes, sigue en su sitio y sin error.
+    assert por_plazo["avisos"].error is None
+
+
+def test_pedir_los_plazos_de_archivos_a_mano_los_aplica_y_sin_pedirlos_no(
+    db_session, directorio_del_conjunto
+):
+    """
+    Las dos mitades de la regla que protege el disco de quien pide unos plazos concretos.
+
+    `aplicar_caducidad(plazos=[...])` NO arrastra los de archivos -eso ya estaba probado- y
+    la vuelta que faltaba es la de enfrente: nombrarlos explicitamente si los aplica. Sin
+    ella, la unica forma de purgar archivos seria la pasada completa, y una guarda que
+    quisiera comprobar justo ese plazo no podria sin borrar de paso todo lo demas.
+    """
+    vencido = _archivo(directorio_del_conjunto, "leads_reales.csv", 400)
+
+    sin_pedirlos = aplicar_caducidad(db_session, ahora=AHORA, plazos=[])
+    assert [r.plazo for r in sin_pedirlos] == []
+    assert vencido.exists(), "no se piden, no se tocan"
+
+    pedidos = aplicar_caducidad(
+        db_session, ahora=AHORA, plazos=[], plazos_de_archivos=PLAZOS_DE_ARCHIVOS
+    )
+
+    assert [r.plazo for r in pedidos] == ["conjunto_de_realimentacion"]
+    assert not vencido.exists()
