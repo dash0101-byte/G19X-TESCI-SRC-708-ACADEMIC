@@ -323,9 +323,19 @@ es un guion que se cae delante del sínodo.
 * **Los treinta segundos del formulario.** Están medidos en el navegador con ritmos de
   referencia, no con una persona y un cronómetro. La hoja de observación tiene su columna
   para el dato real.
-* **Que la tarjeta se vea bien al pegar el enlace en una red.** Exige una dirección pública;
-  la de la demostración es `localhost`.
-* **Que el código QR se lea.** Se comprueban sus propiedades estructurales; nadie ha
-  impreso uno y lo ha escaneado.
+* **Que la tarjeta se vea bien al pegar el enlace en una red.** El **06-10-2026**, con el
+  túnel levantado, se comprobó desde internet lo que una red lee: las nueve etiquetas `og:`
+  con la dirección del día y la imagen de 1200×630 servida con su tipo. Lo que sigue sin
+  verse es **cómo la compone cada red**, que solo lo enseña cada red con una cuenta dentro.
 
-Las cuatro están en `Congelacion_y_Trabajo_Futuro.md`, con lo que haría falta para cerrarlas.
+**Y una que ya no está pendiente.** *Que el código QR se lea* lo estuvo hasta el
+**06-10-2026**, y se cerró así: un decodificador de terceros —`jsQR 1.4.0`, nada del
+proyecto— leyó el enlace exacto que el panel pinta, con **0 discrepancias entre los 2025
+módulos pintados y la geometría del SVG** y 7,11 píxeles por módulo en pantalla; y después un
+teléfono lo escaneó de la pantalla, abrió el formulario **por internet** y el envío entró como
+prospecto ya repartido —`mas_tiempo_sin_recibir`, entre 6 candidatas, con su asiento— y con su
+tarea de primer contacto tras la pasada del motor. Es la vez que más cerca se ha estado de la
+prueba con personas sin que la haya.
+
+Las que quedan están en `Congelacion_y_Trabajo_Futuro.md`, con lo que haría falta para
+cerrarlas.
