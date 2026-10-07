@@ -28,6 +28,18 @@ from app.models.entities import (
     UnmatchedEvent,
 )
 from app.repositories.activity_repository import ActivityRepository
+from app.services import registro_de_actividad as registro
+from app.services.registro_de_actividad import (
+    ESTADO_DUPLICADA,
+    ESTADO_REGISTRADA,
+    ESTADO_SIN_ASOCIAR,
+    Contacto,
+    Evento,
+    EventoInvalido,
+    registrar_evento,
+    validar_evento,
+    vincular_evento_sin_asociar,
+)
 from app.services.scoring_service import ScoringService
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -706,3 +718,245 @@ def test_el_estado_del_prospecto_es_el_de_la_etapa(sample_lead):
     from app.services.registro_de_actividad import ETAPA_A_ACTIVIDAD
 
     assert set(ETAPA_A_ACTIVIDAD) == {LeadStatus.PROPOSAL_SENT, LeadStatus.MEETING_SCHEDULED}
+
+
+# ==============================================================================
+# Carreras, transacciones y la bandeja: lo que pasa cuando algo va mal
+#
+# La deduplicación tiene dos mitades —la consulta previa y el índice único— y la suite solo
+# ejercitaba la primera. La segunda es la que decide en el único caso que importa: dos
+# entregas del mismo evento tan seguidas que las dos consultan antes de que ninguna haya
+# confirmado. Si ese camino se rompe, el síntoma no es un error: es un evento contado dos
+# veces, y un score inflado que nadie puede explicar.
+# ==============================================================================
+
+def _evento_externo(identificador=None, **cambios):
+    base = {
+        "fuente": "crm",
+        "tipo": ActivityType.EMAIL_OPEN,
+        "ocurrido_en": _ahora() - datetime.timedelta(minutes=5),
+        "identificador_externo": identificador or f"crm:{uuid.uuid4().hex}",
+    }
+    base.update(cambios)
+    return Evento(**base)
+
+
+@pytest.mark.asyncio
+async def test_un_aviso_que_ya_esta_en_la_bandeja_no_entra_dos_veces(db_session):
+    """
+    La deduplicación también mira la bandeja «Sin asociar», no solo las actividades.
+
+    Un evento de una fuente que no crea fichas y cuyo correo no conocemos queda esperando
+    en la bandeja. Si la segunda entrega no reconociera la primera, la misma reunión
+    aparecería dos veces en la bandeja y alguien tendría que decidir a mano cuál vincular.
+    """
+    identificador = f"calendly:{uuid.uuid4().hex}"
+    evento = Evento(
+        fuente="calendly",
+        tipo=ActivityType.MEETING_SCHEDULED,
+        ocurrido_en=_ahora() - datetime.timedelta(minutes=5),
+        identificador_externo=identificador,
+        contacto=Contacto(email=f"desconocida-{uuid.uuid4().hex}@ejemplo.mx"),
+    )
+
+    primera = await registrar_evento(db_session, evento)
+    segunda = await registrar_evento(db_session, evento)
+
+    assert primera.estado == ESTADO_SIN_ASOCIAR
+    assert segunda.estado == ESTADO_DUPLICADA
+    assert segunda.sin_asociar.id == primera.sin_asociar.id
+    repetidos = (
+        db_session.query(UnmatchedEvent)
+        .filter(UnmatchedEvent.external_event_id == identificador)
+        .count()
+    )
+    assert repetidos == 1
+
+
+@pytest.mark.asyncio
+async def test_sin_correo_no_se_puede_crear_la_ficha(db_session):
+    """
+    Una fuente que crea prospectos y un evento que solo trae teléfono.
+
+    El correo es la clave por la que se busca y se deduplica una persona; una ficha sin él
+    no se puede volver a encontrar y la siguiente entrega crearía otra. Se rechaza en vez de
+    crear una ficha que nace huérfana.
+    """
+    evento = _evento_externo(
+        contacto=Contacto(telefono="+525512345678", nombre="Quien Llamó"),
+    )
+
+    with pytest.raises(EventoInvalido) as fallo:
+        await registrar_evento(db_session, evento)
+
+    assert fallo.value.campo == "email"
+    assert "correo" in fallo.value.motivo
+
+
+@pytest.mark.asyncio
+async def test_un_evento_que_no_identifica_a_nadie_no_entra_ni_en_la_bandeja(db_session):
+    """
+    La bandeja es para vincular después, y sin correo ni teléfono no hay con qué.
+
+    Una fila ahí que no identifica a nadie no se puede resolver nunca: se queda para
+    siempre ocupando la bandeja que alguien revisa a mano.
+    """
+    evento = Evento(
+        fuente="calendly",
+        tipo=ActivityType.MEETING_SCHEDULED,
+        ocurrido_en=_ahora() - datetime.timedelta(minutes=5),
+        identificador_externo=f"calendly:{uuid.uuid4().hex}",
+    )
+
+    with pytest.raises(EventoInvalido) as fallo:
+        await registrar_evento(db_session, evento)
+
+    assert fallo.value.campo == "contacto"
+    assert "no identifica a nadie" in fallo.value.motivo
+
+
+def test_un_evento_sin_atributos_no_toca_la_fecha_de_modificacion(db_session, sample_lead):
+    """
+    `updated_at` dice cuándo cambió la ficha, no cuándo le pasó algo.
+
+    Una entrega del CRM que solo cuenta una apertura de correo no trae atributos del
+    prospecto: moverle la fecha de modificación haría que toda la cartera pareciera editada
+    cada noche, y es la columna por la que se ordena «lo último que cambió».
+    """
+    antes = sample_lead.updated_at
+    sin_atributos = validar_evento(_evento_externo(prospecto={}))
+
+    registro._actualizar_prospecto(sample_lead, sin_atributos)
+
+    assert sample_lead.updated_at == antes
+
+    con_atributos = validar_evento(_evento_externo(prospecto={"job_title": "CTO"}))
+
+    registro._actualizar_prospecto(sample_lead, con_atributos)
+
+    assert sample_lead.job_title == "CTO"
+    assert sample_lead.updated_at != antes
+
+
+@pytest.mark.asyncio
+async def test_sin_confirmar_el_aviso_de_la_bandeja_se_deshace_con_la_transaccion(db_session):
+    """
+    `commit=False` es lo que usa el webhook del CRM para que todo vaya junto.
+
+    El aviso de la bandeja y el registro de la integración tienen que caer o quedarse a la
+    vez: si el aviso se confirmara por su cuenta, un fallo posterior dejaría una fila en la
+    bandeja que ninguna entrega volvería a traer —el identificador ya estaría «visto»—.
+    """
+    evento = Evento(
+        fuente="calendly",
+        tipo=ActivityType.MEETING_SCHEDULED,
+        ocurrido_en=_ahora() - datetime.timedelta(minutes=5),
+        identificador_externo=f"calendly:{uuid.uuid4().hex}",
+        contacto=Contacto(email=f"desconocida-{uuid.uuid4().hex}@ejemplo.mx"),
+    )
+
+    resultado = await registrar_evento(db_session, evento, commit=False)
+    pendiente_id = resultado.sin_asociar.id
+    assert resultado.estado == ESTADO_SIN_ASOCIAR
+
+    db_session.rollback()
+
+    assert db_session.get(UnmatchedEvent, pendiente_id) is None
+
+
+@pytest.mark.asyncio
+async def test_dos_entregas_a_la_vez_del_mismo_evento_dejan_una_sola_actividad(
+    db_session, sample_lead, monkeypatch
+):
+    """
+    La mitad de la deduplicación que no se ejercitaba: el índice único.
+
+    La consulta previa no sirve de nada cuando las dos entregas consultan antes de que
+    ninguna haya confirmado —las dos ven «no está»—. Lo que decide entonces es
+    `uq_lead_activities_source_external_event`, y lo que hace esta función al chocar con él:
+    deshacer, volver a mirar y devolver lo que registró la otra, sin puntuar otra vez.
+
+    La carrera se reproduce saltándose la consulta previa UNA vez, que es exactamente lo que
+    ve la segunda entrega: la primera ya escribió y todavía no era visible para ella.
+    """
+    identificador = f"crm:{uuid.uuid4().hex}"
+    evento = _evento_externo(identificador, contacto=Contacto(email=sample_lead.email))
+
+    primera = await registrar_evento(db_session, evento, lead=sample_lead)
+    assert primera.estado == ESTADO_REGISTRADA
+    actividad_id = primera.actividad.id
+
+    consultada = []
+    de_verdad = registro._ya_registrado
+
+    def _como_en_una_carrera(db, v):
+        consultada.append(1)
+        return None if len(consultada) == 1 else de_verdad(db, v)
+
+    monkeypatch.setattr(registro, "_ya_registrado", _como_en_una_carrera)
+
+    segunda = await registrar_evento(db_session, evento, lead=sample_lead)
+
+    assert segunda.estado == ESTADO_DUPLICADA
+    assert segunda.actividad.id == actividad_id
+    registradas = (
+        db_session.query(LeadActivity)
+        .filter(LeadActivity.external_event_id == identificador)
+        .count()
+    )
+    assert registradas == 1
+
+
+@pytest.mark.asyncio
+async def test_un_fallo_de_integridad_que_no_es_un_duplicado_no_se_tapa(
+    db_session, sample_lead, monkeypatch
+):
+    """
+    El `except` captura `IntegrityError`, que es más que la restricción de unicidad.
+
+    Si al deshacer y volver a mirar no aparece el duplicado, lo que pasó no era la carrera:
+    es otra restricción del esquema. Tragárselo dejaría el evento sin registrar y a quien lo
+    mandó con un 200 en la mano.
+    """
+    identificador = f"crm:{uuid.uuid4().hex}"
+    evento = _evento_externo(identificador, contacto=Contacto(email=sample_lead.email))
+    await registrar_evento(db_session, evento, lead=sample_lead)
+
+    monkeypatch.setattr(registro, "_ya_registrado", lambda db, v: None)
+
+    with pytest.raises(IntegrityError):
+        await registrar_evento(db_session, evento, lead=sample_lead)
+
+    db_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_si_la_vinculacion_falla_el_aviso_vuelve_a_la_bandeja(db_session, sample_lead):
+    """
+    Vincular retira la fila de la bandeja ANTES de registrar, y eso hay que poder deshacerlo.
+
+    Se retira primero porque, si no, el propio aviso contaría como duplicado de sí mismo y
+    la vinculación devolvería «ya estaba» sin registrar nada. El precio es que un fallo
+    posterior borraría el aviso sin dejar la actividad: el evento desaparecería del sistema.
+
+    Se provoca con una fila de la bandeja que su propia fuente no admite —Calendly no
+    registra llamadas—, que es la forma que tiene esto de romperse de verdad: una fila
+    escrita por una versión anterior del conector.
+    """
+    pendiente = UnmatchedEvent(
+        source="calendly",
+        external_event_id=f"calendly:{uuid.uuid4().hex}",
+        activity_type=ActivityType.PHONE_CALL,
+        channel="Teléfono",
+        contact_email=f"desconocida-{uuid.uuid4().hex}@ejemplo.mx",
+        occurred_at=_ahora() - datetime.timedelta(minutes=5),
+        received_at=_ahora(),
+    )
+    db_session.add(pendiente)
+    db_session.commit()
+    pendiente_id = pendiente.id
+
+    with pytest.raises(EventoInvalido):
+        await vincular_evento_sin_asociar(db_session, pendiente, sample_lead)
+
+    assert db_session.get(UnmatchedEvent, pendiente_id) is not None
