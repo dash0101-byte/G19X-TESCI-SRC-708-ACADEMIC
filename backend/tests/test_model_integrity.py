@@ -13,6 +13,7 @@ Dos problemas distintos que viven en el mismo módulo:
 """
 import asyncio
 import hashlib
+import logging
 import time
 
 import pytest
@@ -122,6 +123,52 @@ def test_sin_huella_fijada_el_comportamiento_no_cambia(artefacto_falso, monkeypa
 
     assert adaptador.model == "modelo"
     assert adaptador.model_sha256 == SHA_DEL_CONTENIDO
+
+
+def test_cargar_el_artefacto_sin_huella_en_produccion_avisa(artefacto_falso, monkeypatch, caplog):
+    """
+    Fuera de producción no anclar la huella es una decisión; dentro, es un aviso.
+
+    El comportamiento es el mismo —se carga igual, y eso es deliberado—, así que lo único
+    que separa un despliegue anclado de uno sin anclar es esta línea del registro. Si deja
+    de escribirse, un `joblib.load` sin verificar queda indistinguible de uno verificado y
+    A-10 vuelve a ser invisible: pickle ejecuta código al cargar, y la ruta viene de
+    configuración.
+
+    El aviso lleva dentro la huella encontrada, que es lo que hay que pegar en
+    `ML_MODEL_SHA256` para anclarlo. Un aviso que dijera «defina ML_MODEL_SHA256» sin el
+    valor obligaría a calcularlo a mano en el servidor.
+    """
+    caplog.set_level(logging.DEBUG)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(modulo_ml.joblib, "load", lambda *a, **k: "modelo")
+
+    adaptador = NativeMLScoringAdapter(model_path=artefacto_falso, expected_sha256="")
+
+    assert adaptador.model == "modelo", "sin huella se carga igual: no negarse es la decisión"
+    avisos = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert avisos, "en un entorno endurecido, cargar sin huella tiene que avisar"
+    escrito = avisos[0].getMessage()
+    assert f"ML_MODEL_SHA256={SHA_DEL_CONTENIDO}" in escrito
+    assert "pickle" in escrito
+
+
+def test_un_artefacto_cargado_sin_huella_se_declara_asi(tmp_path):
+    """
+    `ml:sin-huella`: la salvaguarda de que la versión del motor nunca sea `ml:` y un error.
+
+    Hoy ningún camino del constructor produce este estado —la huella se calcula antes de
+    deserializar, así que un modelo cargado siempre tiene la suya—, y el estado se monta a
+    mano a propósito. La línea se queda porque lo que escribe `version_del_motor()` va a
+    cada asiento de la auditoría: sin ella, un modelo cargado por otra vía dejaría caer un
+    `TypeError` dentro del scoring en lugar de anotar lo que sabe.
+    """
+    adaptador = NativeMLScoringAdapter(model_path=str(tmp_path / "no-existe.joblib"))
+    assert adaptador.version_del_motor() == "heuristico"
+
+    adaptador.model = object()
+
+    assert adaptador.version_del_motor() == "ml:sin-huella"
 
 
 def test_un_artefacto_inexistente_no_revienta(tmp_path):

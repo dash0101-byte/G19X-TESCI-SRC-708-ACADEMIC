@@ -24,7 +24,7 @@ engine_kwargs = {
     "pool_pre_ping": not IS_SQLITE,
 }
 
-if IS_IN_MEMORY_SQLITE:
+if IS_IN_MEMORY_SQLITE:  # pragma: no branch - una sola DATABASE_URL por proceso; la otra salida es otro arranque
     # Cada conexión nueva a SQLite en memoria abre su PROPIA base de datos vacía. Con el
     # pool por defecto, la sesión que escribe y la que lee acabarían en bases distintas y
     # la configuración `DATABASE_URL=sqlite://` sería inservible. `StaticPool` mantiene una
@@ -35,7 +35,7 @@ if IS_IN_MEMORY_SQLITE:
 # Creación de motor SQLAlchemy
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
-if IS_SQLITE:
+if IS_SQLITE:  # pragma: no branch - lo mismo: con la URL de la suite no puede ser falsa
     @event.listens_for(engine, "connect")
     def _exigir_las_claves_ajenas(conexion_dbapi, _registro) -> None:
         """
