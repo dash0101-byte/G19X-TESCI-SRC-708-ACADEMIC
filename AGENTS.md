@@ -53,7 +53,9 @@ antes. Antes de dar por bueno algo visual, **reconstruir**; está anotado como p
 Puertas: panel en **3000**, puerta pública en **127.0.0.1:8080**, API en **127.0.0.1:8000**.
 PostgreSQL no se publica salvo con el overlay `--dev`.
 
-Para operar sin programar: [**Si algo falla**](docs/Si_Algo_Falla.md).
+Para operar sin programar: [**Si algo falla**](docs/Si_Algo_Falla.md). Para publicarlo bajo
+un dominio de la empresa: [**Poner la dirección de la empresa**](docs/Poner_la_Direccion_de_la_Empresa.md)
+—una sola variable, y no vive en el repositorio—.
 
 ---
 

@@ -212,6 +212,8 @@ cosas y ninguna es código**:
 3. Los enlaces de los posts dejan de caducar, y con eso la difusión en redes deja de tener
    fecha de caducidad.
 
+Qué archivo se toca para eso —y cuáles no— está en [**Poner la dirección de la empresa**](Poner_la_Direccion_de_la_Empresa.md), escrito para quien lo vaya a hacer sin leer el código.
+
 Qué haría falta y qué cuesta está en el Reporte 32 (§34.7). En resumen: un dominio (unos
 **10-15 USD al año**), la cuenta gratuita de Cloudflare, y una tarde de configuración. El
 certificado y el plan que hace falta son gratuitos.
