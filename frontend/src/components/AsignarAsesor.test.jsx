@@ -32,6 +32,21 @@ const ASESORES = {
 
 const FICHA = { id: 13, assigned_rep_id: null };
 
+// A quién se le asigna en las pruebas que asignan. Sale de la lista de arriba y no escrito
+// a mano: el identificador que se elige y el nombre que se espera tienen que ser los del
+// mismo asesor, o la espera vigila a uno y la elección pide otro.
+const ELEGIDA = ASESORES.items[1];
+
+// `findByLabelText('Asignar a')` se cumple con el selector VACÍO: el componente lo dibuja
+// en el primer render, antes de que `fetchSalesReps` conteste, así que esperar la etiqueta
+// NO espera a los asesores. Pasaba por los pelos —el doble resolvía en el mismo tick— y el
+// 8 de octubre de 2026 el CI se puso en rojo con «Value "4" not found in options» sin que
+// nada del árbol hubiera cambiado: la máquina iba más cargada ese día. Quien va a elegir
+// espera la OPCIÓN, que es lo que la línea siguiente necesita; a la etiqueta solo la espera
+// quien comprueba que el selector se ofrece.
+const esperarAlEquipo = () =>
+  screen.findByRole('option', { name: new RegExp(ELEGIDA.full_name) });
+
 beforeEach(() => {
   fetchSalesReps.mockReset().mockResolvedValue(ASESORES);
   updateLead.mockReset().mockResolvedValue({});
@@ -59,13 +74,16 @@ describe('asignar', () => {
     const usuario = userEvent.setup();
     const recargar = vi.fn();
     render(<AsignarAsesor lead={FICHA} onAsignado={recargar} />);
-    await screen.findByLabelText('Asignar a');
+    await esperarAlEquipo();
 
-    await usuario.selectOptions(screen.getByLabelText('Asignar a'), '4');
+    await usuario.selectOptions(screen.getByLabelText('Asignar a'), String(ELEGIDA.id));
     await usuario.click(screen.getByRole('button', { name: 'Asignar' }));
 
-    await waitFor(() => expect(updateLead).toHaveBeenCalledWith(13, { assigned_rep_id: 4 }));
-    expect(recargar).toHaveBeenCalled();
+    await waitFor(() => expect(updateLead).toHaveBeenCalledWith(13, { assigned_rep_id: ELEGIDA.id }));
+    // Y la recarga con su propia espera: el componente la pide DESPUÉS de que el PUT
+    // conteste, mientras que el `waitFor` de arriba se cumple en cuanto la llamada sale.
+    // Afirmarla seguido daba por comprobado un efecto que todavía no había ocurrido.
+    await waitFor(() => expect(recargar).toHaveBeenCalled());
   });
 
   it('sin elegir a nadie, el botón no hace nada', async () => {
@@ -79,9 +97,9 @@ describe('asignar', () => {
     const usuario = userEvent.setup();
     updateLead.mockRejectedValue(new Error('No puede cambiar el asesor asignado.'));
     render(<AsignarAsesor lead={FICHA} />);
-    await screen.findByLabelText('Asignar a');
+    await esperarAlEquipo();
 
-    await usuario.selectOptions(screen.getByLabelText('Asignar a'), '4');
+    await usuario.selectOptions(screen.getByLabelText('Asignar a'), String(ELEGIDA.id));
     await usuario.click(screen.getByRole('button', { name: 'Asignar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No puede cambiar el asesor');
