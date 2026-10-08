@@ -1050,9 +1050,34 @@ jobs:
             sleep 2
           done
 
+          # Las dos cosas que los dos contenedores necesitan, escritas una vez: el paso de
+          # abajo las repetia y ahora hacen falta en dos sitios.
+          clave=clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real
+          url=postgresql+psycopg2://plurione:contrasena-de-verificacion-de-ci-no-reutilizada@pg-ci:5432/lead_scoring_db
+
+          # Las migraciones PRIMERO, con la misma imagen y en un contenedor que muere al
+          # terminar: es exactamente lo que hace el servicio `migrate` del compose, del que
+          # el backend depende antes de arrancar.
+          #
+          # Sin esto, este paso probaba lo contrario de lo que su nombre dice. La imagen
+          # lleva ENVIRONMENT=production, asi que `init_db()` no crea nada: comprueba que el
+          # esquema este sellado por Alembic y se niega a servir si no lo esta. Esa guarda es
+          # correcta -es la del capitulo que descubrio que la pila no arrancaba sobre un
+          # volumen nuevo- y es justo el motivo de que el compose tenga un servicio aparte.
+          # Aqui nadie aplicaba las migraciones, asi que el contenedor moria con «la base no
+          # tiene ninguna migracion aplicada» y el trabajo fallaba sobre una imagen sana.
+          #
+          # Llevaba asi desde que se escribio, y no se vio porque este paso NUNCA se habia
+          # ejecutado: el trabajo moria antes -en la auditoria de los paquetes de la imagen,
+          # por un aviso de pyjwt- y un paso en rojo deja sin correr todos los de detras.
+          docker run --rm --name migrate-ci --network ci-net -w /app \
+            -e SECRET_KEY="$clave" \
+            -e DATABASE_URL="$url" \
+            plurione-backend:ci alembic upgrade head
+
           docker run -d --name backend-ci --network ci-net -p 8000:8000 \
-            -e SECRET_KEY=clave-de-verificacion-de-ci-sin-uso-en-ningun-despliegue-real \
-            -e DATABASE_URL=postgresql+psycopg2://plurione:contrasena-de-verificacion-de-ci-no-reutilizada@pg-ci:5432/lead_scoring_db \
+            -e SECRET_KEY="$clave" \
+            -e DATABASE_URL="$url" \
             plurione-backend:ci
 
           echo "Esperando al backend..."
