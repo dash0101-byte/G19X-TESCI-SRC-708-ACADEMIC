@@ -1068,7 +1068,7 @@ jobs:
           [ "$codigo" = "503" ] || { echo "FALLO: se esperaba 503, llegó $codigo"; exit 1; }
           # La respuesta no debe filtrar la cadena de conexion ni el nombre del servidor:
           # un 503 que devuelve el traceback de psycopg2 regala la topologia interna.
-          if echo "$cuerpo" | grep -qiE "password|postgresql://|psycopg2"; then
+          if grep -qiE "password|postgresql://|psycopg2" <<< "$cuerpo"; then
             echo "FALLO: /health filtra detalles de la conexion"; exit 1
           fi
           echo "El healthcheck depende de verdad de la base de datos."
@@ -1112,7 +1112,7 @@ jobs:
           aviso() { echo "FALLO: $1"; fallos=$((fallos + 1)); }
 
           cabeceras=$(curl -sS -D - -o /tmp/pagina.html http://127.0.0.1:8099/)
-          csp=$(printf '%s\n' "$cabeceras" | tr -d '\r' | sed -n 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy: //p')
+          csp=$(tr -d '\r' <<< "$cabeceras" | sed -n 's/^[Cc]ontent-[Ss]ecurity-[Pp]olicy: //p')
           echo "politica servida: $csp"
           [ -n "$csp" ] || aviso "la respuesta no trae Content-Security-Policy"
 
@@ -1139,7 +1139,14 @@ jobs:
           # Y las fuentes, una por una. El `try_files` de la SPA devuelve index.html con
           # codigo 200 para cualquier ruta que no exista, asi que comprobar el codigo no
           # basta: se mira la firma 'wOF2' del propio archivo.
-          css=$(printf '%s\n' "$recursos" | grep '\.css$' | head -1)
+          # El `|| true` y la linea de abajo son el UNICO sitio donde esta tanda cambia un
+          # veredicto, y a proposito. Antes era `grep '\.css$' | head -1`: con `pipefail`, si
+          # la pagina no enlazaba ninguna hoja de estilo el `grep` devolvia 1, la tuberia
+          # entera devolvia 1 y `set -e` mataba el paso AHI, sin una linea que dijera por
+          # que. Es el mismo defecto que esta tanda persigue -un control que falla callado-,
+          # asi que el caso se nombra y el fallo lo cuenta `fallos` como todos los demas.
+          css=$(grep -m1 '\.css$' <<< "$recursos" || true)
+          [ -n "$css" ] || aviso "la pagina servida no enlaza ninguna hoja de estilo"
           curl -sS -o /tmp/bundle.css "http://127.0.0.1:8099$css"
           fuentes=$(grep -oE 'url\(([^)]*\.woff2)\)' /tmp/bundle.css | sed -E 's/url\(([^)]*)\)/\1/' | tr -d '"' | sort -u)
           [ -n "$fuentes" ] || aviso "el CSS servido no declara ninguna fuente .woff2"
@@ -1369,7 +1376,7 @@ jobs:
           set -euo pipefail
           # Se miran las DIRECTIVAS, no el archivo entero: el comentario que explica el
           # arreglo nombra `$proxy_add_x_forwarded_for` y no debe hacer fallar la guarda.
-          if grep -vE '^[[:space:]]*#' frontend/nginx.conf | grep 'X-Forwarded-For' | grep -q 'proxy_add_x_forwarded_for'; then
+          if grep -q 'proxy_add_x_forwarded_for' <<< "$(grep -vE '^[[:space:]]*#' frontend/nginx.conf | grep 'X-Forwarded-For')"; then
             echo ""
             echo "FALLO: nginx AÑADE la IP real detrás de lo que mandó el cliente."
             echo "El backend lee el primer elemento de la cadena, que seguiría siendo el"
@@ -1377,7 +1384,7 @@ jobs:
             echo "tope por IP no llega a aplicarse nunca (N-6)."
             exit 1
           fi
-          grep -vE '^[[:space:]]*#' frontend/nginx.conf | grep -q 'proxy_set_header X-Forwarded-For \$remote_addr;'
+          grep -q 'proxy_set_header X-Forwarded-For \$remote_addr;' <<< "$(grep -vE '^[[:space:]]*#' frontend/nginx.conf)"
           echo "nginx sobrescribe la cabecera con la IP real del cliente."
 
       - name: La pila aplica las migraciones antes de servir
@@ -1429,7 +1436,7 @@ jobs:
           # los asientos de auditoría de esa persona.
           if grep -nE 'db\.delete\(usuario\)|\.query\(User\)\.filter\([^)]*\)\.delete\(\)' backend/app/api/v1/endpoints/users.py; then
             echo ""
-            echo "FALLO: la gestión de cuentas borra filas de `users`."
+            echo "FALLO: la gestión de cuentas borra filas de \`users\`."
             echo "La baja es lógica: el rastro de auditoría de esa persona debe seguir"
             echo "teniendo sujeto (N-4)."
             exit 1
@@ -1537,7 +1544,7 @@ jobs:
           # La LLAMADA, no el nombre. Buscar 'recuperar_trabajos_huerfanos' a secas daba
           # por buena la línea del `import`: se podía dejar de invocar la función y la
           # guarda seguía en verde. Se comprobó reintroduciendo justo ese defecto.
-          grep -vE '^[[:space:]]*#' backend/app/main.py | grep -q 'recuperar_trabajos_huerfanos()' || {
+          grep -q 'recuperar_trabajos_huerfanos()' <<< "$(grep -vE '^[[:space:]]*#' backend/app/main.py)" || {
             echo ""
             echo "FALLO: nadie barre los recálculos huérfanos al arrancar."
             echo "Importar la función no es llamarla: un reinicio tras una caída dejaría"
@@ -1585,7 +1592,7 @@ jobs:
           # Se miran las LINEAS DE CODIGO, no el archivo entero: el comentario que
           # justifica `compare_digest` lo nombra, y buscarlo en el texto completo dejaba la
           # guarda satisfecha por su propia explicación aunque el código usara '=='.
-          grep -vE '^[[:space:]]*#' backend/app/main.py | grep -q 'compare_digest' || {
+          grep -q 'compare_digest' <<< "$(grep -vE '^[[:space:]]*#' backend/app/main.py)" || {
             echo ""
             echo "FALLO: el testigo de /metrics se compara con '=='."
             echo "La comparación de cadenas corta en el primer byte distinto y ese"
@@ -1623,12 +1630,12 @@ jobs:
           # entero metia tambien `volumes:` y `networks:` —11 en vez de 8— y la guarda
           # fallaba sobre un arbol correcto. Una guarda que siempre falla acaba
           # desactivada, que es peor que no tenerla.
-          bloque=$(printf '%s\n' "$directivas" | sed -n '/^services:/,/^volumes:/p')
-          servicios=$(printf '%s\n' "$bloque" | grep -cE '^  [a-z][a-z0-9_-]*:' || true)
+          bloque=$(sed -n '/^services:/,/^volumes:/p' <<< "$directivas")
+          servicios=$(grep -cE '^  [a-z][a-z0-9_-]*:' <<< "$bloque" || true)
           echo "servicios declarados: $servicios"
           faltan=0
           for clave in "no-new-privileges:true" "cap_drop" "max-size"; do
-            veces=$(printf '%s\n' "$bloque" | grep -c -- "$clave" || true)
+            veces=$(grep -c -- "$clave" <<< "$bloque" || true)
             echo "  '$clave': $veces de $servicios"
             if [ "$veces" -lt "$servicios" ]; then
               echo "FALLO: '$clave' falta en $((servicios - veces)) servicio(s)."
@@ -1637,7 +1644,7 @@ jobs:
           done
           # `read_only` admite exactamente una excepción: PostgreSQL, que escribe fuera del
           # volumen al inicializar. Cualquier otra ausencia es un descuido.
-          solo_lectura=$(printf '%s\n' "$bloque" | grep -c 'read_only: true' || true)
+          solo_lectura=$(grep -c 'read_only: true' <<< "$bloque" || true)
           echo "  'read_only: true': $solo_lectura de $servicios (se espera $((servicios - 1)))"
           if [ "$solo_lectura" -lt "$((servicios - 1))" ]; then
             echo "FALLO: hay más de un servicio con el sistema de ficheros escribible."
@@ -1668,27 +1675,27 @@ jobs:
           ordenes() { grep -vE '^[[:space:]]*#' "$1"; }
 
           # Que pg_dump termine no significa que el archivo sirva.
-          ordenes devops/backup/respaldo.sh | grep -q 'pg_restore --list' || {
+          grep -q 'pg_restore --list' <<< "$(ordenes devops/backup/respaldo.sh)" || {
             echo "FALLO: el volcado se da por bueno sin comprobar que se puede leer."
             exit 1
           }
           # Sin --exit-on-error, pg_restore informa de los errores y sale con codigo 0:
           # una restauracion a medias se leeria como un exito.
-          ordenes devops/backup/prueba_de_restauracion.sh | grep -q -- '--exit-on-error' || {
+          grep -q -- '--exit-on-error' <<< "$(ordenes devops/backup/prueba_de_restauracion.sh)" || {
             echo ""
             echo "FALLO: la prueba de restauración no falla cuando la restauración falla."
             echo "Sin '--exit-on-error' el informe diría que las copias funcionan."
             exit 1
           }
-          ordenes devops/backup/prueba_de_restauracion.sh | grep -q 'trap retirar_base_desechable EXIT' || {
+          grep -q 'trap retirar_base_desechable EXIT' <<< "$(ordenes devops/backup/prueba_de_restauracion.sh)" || {
             echo ""
             echo "FALLO: la base desechable solo se retira en la salida feliz."
             echo "Con 'set -e', un pg_restore que falla aborta antes del DROP y deja una"
             echo "base a medias en el servidor por cada intento."
             exit 1
           }
-          ordenes devops/backup/restaurar.sh | grep -q 'CONFIRMO_SOBRESCRIBIR:-'
-          ordenes devops/backup/restaurar.sh | grep -q -- '--single-transaction'
+          grep -q 'CONFIRMO_SOBRESCRIBIR:-' <<< "$(ordenes devops/backup/restaurar.sh)"
+          grep -q -- '--single-transaction' <<< "$(ordenes devops/backup/restaurar.sh)"
           echo "Copias verificadas y restauración ensayable."
 
       # ------------------------------------------------------------------
@@ -1704,10 +1711,10 @@ jobs:
           marcado=$(sed 's/<!--.*-->//g' frontend/index.html | sed 's/data:[^"]*//g')
           politica=$(grep -vE '^[[:space:]]*#' frontend/security-headers.conf)
 
-          if printf '%s\n' "$marcado" | grep -qE 'https?://'; then
+          if grep -qE 'https?://' <<< "$marcado"; then
             echo ""
             echo "FALLO: index.html vuelve a enlazar un origen externo."
-            printf '%s\n' "$marcado" | grep -E 'https?://'
+            grep -E 'https?://' <<< "$marcado"
             echo "La CSP dice font-src 'self' y style-src 'self': el navegador lo"
             echo "bloqueara en produccion SIN error visible, y la aplicacion caera a"
             echo "las fuentes del sistema (N-7)."
@@ -1733,11 +1740,11 @@ jobs:
 
           # `font-src 'self'` a secas. Con `data:` la politica admite mas de lo que hace
           # falta y deja de servir para detectar que algo cambio.
-          printf '%s\n' "$politica" | grep -q "font-src 'self';" || {
+          grep -q "font-src 'self';" <<< "$politica" || {
             echo "FALLO: la CSP ya no restringe las fuentes al propio origen (N-7)."
             exit 1
           }
-          if printf '%s\n' "$politica" | grep -qE 'googleapis|gstatic'; then
+          if grep -qE 'googleapis|gstatic' <<< "$politica"; then
             echo "FALLO: la CSP admite un origen de Google."
             exit 1
           fi
@@ -1757,8 +1764,8 @@ jobs:
 
           # La regla que justifica instalar eslint, y en 'error'. Como aviso se acumula
           # y se ignora, y entonces no protege de nada.
-          grep -vE '^\s*//' frontend/eslint.config.js \
-            | grep -q "'react-hooks/exhaustive-deps': 'error'" || {
+          grep -q "'react-hooks/exhaustive-deps': 'error'" \
+            <<< "$(grep -vE '^\s*//' frontend/eslint.config.js)" || {
             echo ""
             echo "FALLO: exhaustive-deps ya no es un error."
             echo "Una lista de dependencias incompleta no rompe la pantalla: el efecto se"
@@ -1782,7 +1789,7 @@ jobs:
           # `echo`. Fallaba igual, pero sin decir por que, que es el caso que este control
           # existe para nombrar.
           umbrales=$(grep -vE '^\s*//' frontend/vite.config.js \
-            | sed -n '/thresholds: {/,/}/p' | grep -oE '[0-9]+(\.[0-9]+)?' | sort -g | head -1             || true)
+            | sed -n '/thresholds: {/,/}/p' | grep -oE '[0-9]+(\.[0-9]+)?' | sort -g | sed -n 1p             || true)
           echo "  suelo de cobertura mas bajo: ${umbrales:-ninguno}"
           [ -n "${umbrales:-}" ] \
             && awk -v suelo="$umbrales" 'BEGIN { exit !(suelo + 0 >= 80) }' || {
@@ -1822,7 +1829,7 @@ jobs:
           fi
 
           # El destino que consume el bundle ya compilado tiene que existir...
-          grep -vE '^\s*#' frontend/Dockerfile | grep -q 'AS desde-artefacto' || {
+          grep -q 'AS desde-artefacto' <<< "$(grep -vE '^\s*#' frontend/Dockerfile)" || {
             echo "FALLO: el Dockerfile del cliente ya no tiene el destino desde-artefacto (N-17)."
             exit 1
           }
@@ -1839,13 +1846,13 @@ jobs:
           bloque_imagenes=$(sed -n '/^  imagenes:/,/^  configuracion-peligrosa:/p' \
             .github/workflows/ci.yml | grep -vE '^\s*#')
 
-          printf '%s\n' "$bloque_imagenes" | grep -q 'target: desde-artefacto' || {
+          grep -q 'target: desde-artefacto' <<< "$bloque_imagenes" || {
             echo ""
             echo "FALLO: el pipeline vuelve a recompilar la SPA dentro de la imagen."
             echo "Lo que se prueba y lo que se despliega dejarian de ser el mismo archivo (N-17)."
             exit 1
           }
-          printf '%s\n' "$bloque_imagenes" | grep -q 'sha256sum /usr/share/nginx/html' || {
+          grep -q 'sha256sum /usr/share/nginx/html' <<< "$bloque_imagenes" || {
             echo "FALLO: nadie comprueba que la imagen lleve el bundle que se probo (N-17)."
             exit 1
           }
@@ -1863,7 +1870,7 @@ jobs:
           bloque_imagenes=$(sed -n '/^  imagenes:/,/^  configuracion-peligrosa:/p' .github/workflows/ci.yml | grep -vE '^\s*#')
 
           # `npm audit` con su umbral: sin `--audit-level` la orden informa y sale con 0.
-          printf '%s\n' "$bloque_deps" | grep -q -- 'npm audit --audit-level=high' || {
+          grep -q -- 'npm audit --audit-level=high' <<< "$bloque_deps" || {
             echo ""
             echo "FALLO: el cliente ya no se audita (N-10)."
             echo "Sin '--audit-level=high' npm audit informa y sale con codigo 0: el"
@@ -1872,14 +1879,14 @@ jobs:
           }
 
           # Trivy con `--exit-code 1`: sin eso escanea, imprime y no falla nunca.
-          printf '%s\n' "$bloque_imagenes" | grep -q -- '--exit-code 1' || {
+          grep -q -- '--exit-code 1' <<< "$bloque_imagenes" || {
             echo ""
             echo "FALLO: el escaneo de imagenes ya no tumba el pipeline (N-10)."
             exit 1
           }
           # Y con `--ignore-unfixed`: sin eso la puerta se queda en rojo por 55 avisos
           # que nadie de este proyecto puede resolver, y una puerta asi se desactiva.
-          printf '%s\n' "$bloque_imagenes" | grep -q -- '--ignore-unfixed' || {
+          grep -q -- '--ignore-unfixed' <<< "$bloque_imagenes" || {
             echo "FALLO: la puerta de Trivy falla por avisos sin arreglo publicado (N-10)."
             exit 1
           }
@@ -1890,45 +1897,45 @@ jobs:
           # linea `- name: Lista de materiales de las imagenes (syft, CycloneDX)`: se
           # podia sustituir la orden entera por un `true` y la guarda seguia en verde.
           # Es el mismo error que la linea del `import` en la fase anterior.
-          printf '%s\n' "$bloque_imagenes" | grep -q 'anchore/syft' || {
+          grep -q 'anchore/syft' <<< "$bloque_imagenes" || {
             echo "FALLO: ya no se genera la lista de materiales de las imagenes (N-10)."
             exit 1
           }
           # Y que el formato siga siendo intercambiable: una SBOM en el formato propio
           # de una herramienta no sirve para responderle a otra.
-          printf '%s\n' "$bloque_imagenes" | grep -q 'cyclonedx-json' || {
+          grep -q 'cyclonedx-json' <<< "$bloque_imagenes" || {
             echo "FALLO: la lista de materiales ya no sale en CycloneDX (N-10)."
             exit 1
           }
-          printf '%s\n' "$bloque_imagenes" | grep -q 'name: seguridad-imagenes' || {
+          grep -q 'name: seguridad-imagenes' <<< "$bloque_imagenes" || {
             echo "FALLO: los informes de seguridad de las imagenes no se publican (N-10)."
             exit 1
           }
           # R-2: se audita lo INSTALADO desde los locks, sin volver a resolver rangos. Y la
           # lista auditada no puede salir vacia: un `pip-audit` sobre cero paquetes tambien
           # dice «No known vulnerabilities found».
-          printf '%s\n' "$bloque_deps" | grep -q -- '--no-deps --disable-pip' || {
+          grep -q -- '--no-deps --disable-pip' <<< "$bloque_deps" || {
             echo ""
             echo "FALLO: pip-audit vuelve a resolver versiones en lugar de auditar lo instalado (R-2)."
             exit 1
           }
-          if printf '%s\n' "$bloque_deps" | grep -qE 'pip-audit --requirement backend/requirements(-dev)?\.txt'; then
+          if grep -qE 'pip-audit --requirement backend/requirements(-dev)?\.txt' <<< "$bloque_deps"; then
             echo "FALLO: se vuelven a auditar los rangos de requirements.txt (R-2)."
             exit 1
           fi
           # La COMPROBACION, no solo el listado: las dos ordenes llaman al mismo guion, y
           # quitar la que compara dejando la que lista seguiria auditando sin saber si lo
           # auditado es lo fijado.
-          printf '%s\n' "$bloque_deps" | grep -qE 'comprobar_instalado.py backend/requirements.lock --ignorar pip$' || {
+          grep -qE 'comprobar_instalado.py backend/requirements.lock --ignorar pip$' <<< "$bloque_deps" || {
             echo "FALLO: ya no se comprueba que lo instalado sea lo fijado (R-2)."
             exit 1
           }
-          { printf '%s\n' "$bloque_imagenes" | grep -q 'comprobar_instalado.py /verificacion/requirements.lock' \
-            && printf '%s\n' "$bloque_imagenes" | grep -qx '          verificar'; } || {
+          { grep -q 'comprobar_instalado.py /verificacion/requirements.lock' <<< "$bloque_imagenes" \
+            && grep -qx '          verificar' <<< "$bloque_imagenes"; } || {
             echo "FALLO: ya no se comprueba lo que la imagen lleva instalado (R-2)."
             exit 1
           }
-          printf '%s\n' "$bloque_imagenes" | grep -q 'test -s instalado-imagen.txt' || {
+          grep -q 'test -s instalado-imagen.txt' <<< "$bloque_imagenes" || {
             echo "FALLO: se audita la lista de la imagen sin comprobar que no este vacia (R-2)."
             exit 1
           }
@@ -1950,18 +1957,18 @@ jobs:
         run: |
           set -euo pipefail
           dockerfile=$(grep -vE '^\s*#' backend/Dockerfile)
-          printf '%s\n' "$dockerfile" | grep -q 'pip install --require-hashes -r /tmp/requirements.lock' || {
+          grep -q 'pip install --require-hashes -r /tmp/requirements.lock' <<< "$dockerfile" || {
             echo ""
             echo "FALLO: la imagen del backend ya no instala desde el lock con huellas (R-2)."
             exit 1
           }
-          if printf '%s\n' "$dockerfile" | grep -nE 'requirements(-dev)?\.txt|pip install --upgrade'; then
+          if grep -nE 'requirements(-dev)?\.txt|pip install --upgrade' <<< "$dockerfile"; then
             echo ""
             echo "FALLO: la imagen vuelve a instalar desde rangos, o a actualizar pip sin version (R-2)."
             exit 1
           fi
           resto=$(sed '/^  configuracion-peligrosa:/,/^  migraciones:/d' .github/workflows/ci.yml | grep -vE '^\s*#')
-          sueltas=$(printf '%s\n' "$resto" | grep -nE '(^|[ /])pip install' | grep -vE 'pip install --require-hashes -r backend/requirements(-dev)?\.lock' || true)
+          sueltas=$(grep -nE '(^|[ /])pip install' <<< "$resto" | grep -vE 'pip install --require-hashes -r backend/requirements(-dev)?\.lock' || true)
           if [ -n "$sueltas" ]; then
             echo "$sueltas"
             echo ""
@@ -1969,7 +1976,7 @@ jobs:
             exit 1
           fi
           # El lock tiene que llegar al contexto de construccion de la imagen.
-          if grep -vE '^\s*#' .dockerignore | grep -qxE '/?backend/requirements\.lock|\*\*/\*\.lock|/?backend'; then
+          if grep -qxE '/?backend/requirements\.lock|\*\*/\*\.lock|/?backend' <<< "$(grep -vE '^\s*#' .dockerignore)"; then
             echo "FALLO: .dockerignore deja fuera el lock que la imagen instala (R-2)."
             exit 1
           fi
@@ -1982,8 +1989,8 @@ jobs:
         run: |
           set -euo pipefail
           servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
-          { printf '%s\n' "$servicio" | grep -q '/app/scripts/retencion_historial.py' \
-            && printf '%s\n' "$servicio" | grep -q -- '--cada'; } || {
+          { grep -q '/app/scripts/retencion_historial.py' <<< "$servicio" \
+            && grep -q -- '--cada' <<< "$servicio"; } || {
             echo ""
             echo "FALLO: la purga del historial ya no esta programada en la pila (R-3)."
             exit 1
@@ -1997,11 +2004,11 @@ jobs:
             exit 1
           }
           purga=$(grep -vE '^\s*#' backend/app/services/retencion_service.py)
-          printf '%s\n' "$purga" | grep -q 'protegidas = filas_protegidas(db, lead_ids)' || {
+          grep -q 'protegidas = filas_protegidas(db, lead_ids)' <<< "$purga" || {
             echo "FALLO: la purga ya no protege la instantanea de entrada ni la puntuacion vigente (R-3)."
             exit 1
           }
-          printf '%s\n' "$purga" | grep -q 'if borradas != len(candidatas):' || {
+          grep -q 'if borradas != len(candidatas):' <<< "$purga" || {
             echo "FALLO: la purga resume lo que leyo en lugar de lo que borro (R-3)."
             exit 1
           }
@@ -2014,12 +2021,12 @@ jobs:
         run: |
           set -euo pipefail
           borrado=$(sed -n '/^def delete_lead(/,/^@router/p' backend/app/api/v1/endpoints/leads.py | grep -vE '^\s*#')
-          printf '%s\n' "$borrado" | grep -q 'suprimir_prospecto(db, condenado)' || {
+          grep -q 'suprimir_prospecto(db, condenado)' <<< "$borrado" || {
             echo ""
             echo "FALLO: el borrado de prospectos ya no pasa por la supresion completa (R-11)."
             exit 1
           }
-          if printf '%s\n' "$borrado" | grep -nE 'anotar\(.*(email|empresa)='; then
+          if grep -nE 'anotar\(.*(email|empresa)=' <<< "$borrado"; then
             echo ""
             echo "FALLO: el asiento del borrado vuelve a guardar datos de la persona borrada (R-11)."
             exit 1
@@ -2055,11 +2062,11 @@ jobs:
             exit 1
           fi
           manual=$(sed -n '/^async def add_lead_activity(/,/^@router/p' backend/app/api/v1/endpoints/leads.py | grep -vE '^\s*#')
-          printf '%s\n' "$manual" | grep -q 'registro_de_actividad.registrar_evento(db, evento, lead=lead)' || {
+          grep -q 'registro_de_actividad.registrar_evento(db, evento, lead=lead)' <<< "$manual" || {
             echo "FALLO: el registro desde la ficha ya no pasa por registrar_evento (Fase 15)."
             exit 1
           }
-          grep -vE '^\s*#' backend/app/services/crm_service.py | grep -q 'await registrar_evento(' || {
+          grep -q 'await registrar_evento(' <<< "$(grep -vE '^\s*#' backend/app/services/crm_service.py)" || {
             echo "FALLO: la ingesta del CRM ya no pasa por registrar_evento (Fase 15)."
             exit 1
           }
@@ -2075,23 +2082,23 @@ jobs:
           # Entre comillas: literales de codigo. La documentacion del modulo nombra esos
           # valores para contar que ya no se usan, y la primera version de esta guarda
           # fallaba sobre el arbol correcto por leerla.
-          if printf '%s\n' "$crm" | grep -nE 'ActivityType\.FORM_SUBMIT|"Tecnolog|"1-10"|"Empresa no identificada"|"No especificado"|"Sin Apellido"'; then
+          if grep -nE 'ActivityType\.FORM_SUBMIT|"Tecnolog|"1-10"|"Empresa no identificada"|"No especificado"|"Sin Apellido"' <<< "$crm"; then
             echo ""
             echo "FALLO: la ingesta del CRM vuelve a rellenar con valores inventados (Fase 15)."
             exit 1
           fi
           registro=$(grep -vE '^\s*#' backend/app/services/registro_de_actividad.py)
-          { printf '%s\n' "$registro" | grep -q 'if not v.fuente.crea_prospecto:' \
-            && printf '%s\n' "$registro" | grep -q 'return _a_la_bandeja(db, v, commit)'; } || {
+          { grep -q 'if not v.fuente.crea_prospecto:' <<< "$registro" \
+            && grep -q 'return _a_la_bandeja(db, v, commit)' <<< "$registro"; } || {
             echo "FALLO: un correo desconocido vuelve a crear ficha desde cualquier fuente (Fase 15)."
             exit 1
           }
           scoring=$(grep -vE '^\s*#' backend/app/services/scoring_service.py)
-          printf '%s\n' "$scoring" | grep -q 'if act.call_outcome == CallOutcome.CONECTO.value:' || {
+          grep -q 'if act.call_outcome == CallOutcome.CONECTO.value:' <<< "$scoring" || {
             echo "FALLO: una llamada que no conecto vuelve a contar como conversacion (Fase 15)."
             exit 1
           }
-          printf '%s\n' "$scoring" | grep -q '"company_size": lead.company_size or "",' || {
+          grep -q '"company_size": lead.company_size or "",' <<< "$scoring" || {
             echo "FALLO: el extractor vuelve a suponer un tamano de empresa que no llego (Fase 15)."
             exit 1
           }
@@ -2109,10 +2116,10 @@ jobs:
         run: |
           set -euo pipefail
           modelo=$(grep -vE '^\s*#' backend/app/models/entities.py)
-          printf '%s\n' "$modelo" | grep -q 'country = Column(String(100), nullable=True)' || {
+          grep -q 'country = Column(String(100), nullable=True)' <<< "$modelo" || {
             echo ""
-            echo "FALLO: la columna `country` vuelve a ser obligatoria o a tener valor por defecto."
-            echo "Con `default=\"Mexico\", nullable=False`, la ficha de quien no indico pais"
+            echo "FALLO: la columna \`country\` vuelve a ser obligatoria o a tener valor por defecto."
+            echo "Con \`default=\"Mexico\", nullable=False\`, la ficha de quien no indico pais"
             echo "AFIRMA un pais que nadie dijo (capitulo 32)."
             exit 1
           }
@@ -2121,17 +2128,17 @@ jobs:
           # buena seguia encontrandolo alli mientras `LeadBase` volvia a escribir «Mexico».
           # Es el disparo en falso al reves, y es el que no se ve.
           esquema=$(grep -vE '^\s*#' backend/app/schemas/lead.py)
-          if printf '%s\n' "$esquema" | grep -nE 'country: *str *= *Field\(|country:.*Field\(["'"'"']'; then
+          if grep -nE 'country: *str *= *Field\(|country:.*Field\(["'"'"']' <<< "$esquema"; then
             echo ""
             echo "FALLO: el esquema de la API vuelve a rellenar el pais que no llega (capitulo 32)."
             exit 1
           fi
-          [ "$(printf '%s\n' "$esquema" | grep -c 'country: Optional\[str\] = Field(None, max_length=MAX_COUNTRY)')" -eq 2 ] || {
+          [ "$(grep -c 'country: Optional\[str\] = Field(None, max_length=MAX_COUNTRY)' <<< "$esquema")" -eq 2 ] || {
             echo "FALLO: el alta o la edicion dejaron de declarar el pais como opcional (capitulo 32)."
             exit 1
           }
           registro=$(grep -vE '^\s*#' backend/app/services/registro_de_actividad.py)
-          if printf '%s\n' "$registro" | grep -nE 'country=datos\.get\("country", *"'; then
+          if grep -nE 'country=datos\.get\("country", *"' <<< "$registro"; then
             echo "FALLO: el alta del registro de actividad vuelve a suponer el pais (capitulo 32)."
             exit 1
           fi
@@ -2151,15 +2158,15 @@ jobs:
         run: |
           set -euo pipefail
           for esquema in lead user; do
-            grep -vE '^\s*#' "backend/app/schemas/$esquema.py" \
-              | grep -q 'from app.core.telefono import validador_de_telefono' || {
+            grep -q 'from app.core.telefono import validador_de_telefono' \
+              <<< "$(grep -vE '^\s*#' "backend/app/schemas/$esquema.py")" || {
               echo ""
               echo "FALLO: backend/app/schemas/$esquema.py ya no normaliza con app.core.telefono (capitulo 32)."
               exit 1
             }
           done
           usuarios=$(grep -vE '^\s*#' backend/app/schemas/user.py)
-          [ "$(printf '%s\n' "$usuarios" | grep -c '_phone = field_validator("phone")(validador_de_telefono)')" -eq 2 ] || {
+          [ "$(grep -c '_phone = field_validator("phone")(validador_de_telefono)' <<< "$usuarios")" -eq 2 ] || {
             echo "FALLO: el alta o la edicion de una cuenta dejo de normalizar el telefono (capitulo 32)."
             exit 1
           }
@@ -2172,20 +2179,20 @@ jobs:
         run: |
           set -euo pipefail
           crm=$(grep -vE '^\s*#' backend/app/services/crm_service.py)
-          [ "$(printf '%s\n' "$crm" | grep -c 'payload=minimizar(payload.model_dump())')" -eq 2 ] || {
+          [ "$(grep -c 'payload=minimizar(payload.model_dump())' <<< "$crm")" -eq 2 ] || {
             echo "FALLO: lo que se guarda de la entrega del CRM ya no pasa por minimizar (Fase 15)."
             exit 1
           }
-          grep -vE '^\s*#' backend/app/services/registro_de_actividad.py | grep -q 'datos = minimizar(dict(evento.datos or {}))' || {
+          grep -q 'datos = minimizar(dict(evento.datos or {}))' <<< "$(grep -vE '^\s*#' backend/app/services/registro_de_actividad.py)" || {
             echo "FALLO: los datos de la actividad ya no se minimizan antes de guardarse (Fase 15)."
             exit 1
           }
           entrada=$(grep -vE '^\s*#' backend/app/api/v1/endpoints/integraciones.py)
-          printf '%s\n' "$entrada" | grep -q 'verificar_firma_de_entrega(request, integracion.secreto, integracion.nombre)' || {
+          grep -q 'verificar_firma_de_entrega(request, integracion.secreto, integracion.nombre)' <<< "$entrada" || {
             echo "FALLO: las integraciones ya no firman cada una con su secreto (Fase 15)."
             exit 1
           }
-          printf '%s\n' "$entrada" | grep -q 'aplicar_limite(integracion, request)' || {
+          grep -q 'aplicar_limite(integracion, request)' <<< "$entrada" || {
             echo "FALLO: las integraciones ya no tienen limite propio (Fase 15)."
             exit 1
           }
@@ -2210,30 +2217,30 @@ jobs:
         run: |
           set -euo pipefail
           guion=$(grep -vE '^\s*#' backend/scripts/retencion_historial.py)
-          printf '%s\n' "$guion" | grep -q 'for resultado in aplicar_caducidad(db, simular=simular):' || {
+          grep -q 'for resultado in aplicar_caducidad(db, simular=simular):' <<< "$guion" || {
             echo ""
             echo "FALLO: la pasada diaria ya no aplica los plazos de conservacion (capitulo 22)."
             exit 1
           }
           plazos=$(grep -vE '^\s*#' backend/app/services/caducidad_service.py)
           for tabla in refresh_tokens scoring_jobs crm_integration_logs unmatched_events; do
-            printf '%s\n' "$plazos" | grep -q "\"$tabla\"" || {
+            grep -q "\"$tabla\"" <<< "$plazos" || {
               echo "FALLO: $tabla vuelve a no tener plazo (capitulo 22)."
               exit 1
             }
           done
           # La funcion que ya existia, no una segunda: el defecto era que nadie la llamaba.
-          printf '%s\n' "$plazos" | grep -q 'purgar_tokens_caducados(db, margen_dias=dias, ahora=ahora)' || {
+          grep -q 'purgar_tokens_caducados(db, margen_dias=dias, ahora=ahora)' <<< "$plazos" || {
             echo "FALLO: la purga de sesiones ya no pasa por purgar_tokens_caducados (capitulo 22)."
             exit 1
           }
-          printf '%s\n' "$plazos" | grep -q 'ScoringJob.status.in_(ESTADOS_TERMINALES)' || {
+          grep -q 'ScoringJob.status.in_(ESTADOS_TERMINALES)' <<< "$plazos" || {
             echo "FALLO: la caducidad de recalculos ya no se limita a los terminados (capitulo 22)."
             exit 1
           }
           servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
           for ajuste in CONSERVACION_SESIONES_DIAS CONSERVACION_TRABAJOS_DIAS CONSERVACION_REGISTROS_CRM_DIAS CONSERVACION_SIN_ASOCIAR_DIAS; do
-            printf '%s\n' "$servicio" | grep -q "^      $ajuste:" || {
+            grep -q "^      $ajuste:" <<< "$servicio" || {
               echo "FALLO: $ajuste no llega al servicio que aplica el plazo (capitulo 22)."
               exit 1
             }
@@ -2249,7 +2256,7 @@ jobs:
           set -euo pipefail
           plazos=$(grep -vE '^\s*#' backend/app/services/caducidad_service.py)
 
-          printf '%s\n' "$plazos" | grep -q '"bitacora", "audit_log", "CONSERVACION_AUDITORIA_DIAS"' || {
+          grep -q '"bitacora", "audit_log", "CONSERVACION_AUDITORIA_DIAS"' <<< "$plazos" || {
             echo ""
             echo "FALLO: la bitacora vuelve a no tener plazo en la aplicacion (capitulo 32)."
             exit 1
@@ -2258,7 +2265,7 @@ jobs:
           # misma pasada el asiento de ERROR que otro plazo acababa de escribir, y el fallo
           # del dia quedaria sin rastro.
           lista=$(sed -n '/^PLAZOS: List\[Plazo\] = \[/,/^\]/p' backend/app/services/caducidad_service.py | grep -vE '^\s*#')
-          ultima=$(printf '%s\n' "$lista" | grep -oE '"[a-z_]+", "[a-z_]+", "CONSERVACION_[A-Z_]+_DIAS"' | tail -1)
+          ultima=$(grep -oE '"[a-z_]+", "[a-z_]+", "CONSERVACION_[A-Z_]+_DIAS"' <<< "$lista" | tail -1)
           case "$ultima" in
             *'"audit_log"'*) echo "La bitacora se purga la ultima." ;;
             *) echo "FALLO: la purga de la bitacora ya no va la ultima ($ultima); capitulo 32."; exit 1 ;;
@@ -2268,14 +2275,14 @@ jobs:
           # patron es ESTRECHO a proposito: en ese mismo directorio vive leads_historical.csv,
           # el conjunto sintetico con el que se entrena, que no lleva datos de nadie y no
           # tiene plazo. Un `*.csv` se lo habria llevado a los treinta dias.
-          printf '%s\n' "$plazos" | grep -q 'PATRONES_DE_REALIMENTACION = ("leads_reales\*.csv", "leads_reales\*_manifiesto.json")' || {
+          grep -q 'PATRONES_DE_REALIMENTACION = ("leads_reales\*.csv", "leads_reales\*_manifiesto.json")' <<< "$plazos" || {
             echo ""
             echo "FALLO: el patron de la purga del conjunto cambio (capitulo 32)."
             echo "Con un patron ancho, la purga diaria borra leads_historical.csv y el"
             echo "entrenamiento del artefacto que sirve hoy deja de poder repetirse."
             exit 1
           }
-          printf '%s\n' "$plazos" | grep -q 'if ruta.is_symlink() or not ruta.is_file():' || {
+          grep -q 'if ruta.is_symlink() or not ruta.is_file():' <<< "$plazos" || {
             echo "FALLO: la purga vuelve a seguir enlaces simbolicos (capitulo 32)."
             echo "Quien pudiera escribir un nombre en ese directorio haria que la pasada"
             echo "diaria borrara cualquier archivo de la maquina."
@@ -2283,24 +2290,24 @@ jobs:
           }
           # Pedir unos plazos concretos no puede arrastrar los de archivos: guarda_del_motor
           # _de_reglas.py aplica los de `tareas` y `avisos` para comprobar otra cosa.
-          printf '%s\n' "$plazos" | grep -q 'plazos_de_archivos = \[\] if plazos is not None else PLAZOS_DE_ARCHIVOS' || {
+          grep -q 'plazos_de_archivos = \[\] if plazos is not None else PLAZOS_DE_ARCHIVOS' <<< "$plazos" || {
             echo "FALLO: una pasada restringida vuelve a borrar archivos de paso (capitulo 32)."
             exit 1
           }
 
           servicio=$(sed -n '/^  retencion-historial:/,/^  redis:/p' devops/docker-compose.yml | grep -vE '^\s*#')
           for ajuste in CONSERVACION_AUDITORIA_DIAS CONSERVACION_REALIMENTACION_DIAS REALIMENTACION_DIR; do
-            printf '%s\n' "$servicio" | grep -q "^      $ajuste:" || {
+            grep -q "^      $ajuste:" <<< "$servicio" || {
               echo "FALLO: $ajuste no llega al servicio que aplica el plazo (capitulo 32)."
               exit 1
             }
           done
           # Y el volumen: sin el, la purga aplicaria su corte sobre un directorio vacio cada
           # dia —cero archivos, cierto— mientras el CSV sigue en el otro contenedor.
-          directorio=$(printf '%s\n' "$servicio" | sed -n 's/^      REALIMENTACION_DIR: //p')
+          directorio=$(sed -n 's/^      REALIMENTACION_DIR: //p' <<< "$servicio")
           for bloque in backend retencion-historial; do
-            sed -n "/^  $bloque:/,/^  [a-z-]*:$/p" devops/docker-compose.yml \
-              | grep -q "realimentacion:$directorio" || {
+            grep -q "realimentacion:$directorio" \
+              <<< "$(sed -n "/^  $bloque:/,/^  [a-z-]*:$/p" devops/docker-compose.yml)" || {
               echo "FALLO: el servicio '$bloque' no monta el volumen de realimentacion (capitulo 32)."
               exit 1
             }
@@ -2323,14 +2330,14 @@ jobs:
 
           # 1. El bucle del repositorio aplica lo que vino, incluido el vacio.
           repo=$(grep -vE '^\s*#' backend/app/repositories/lead_repository.py)
-          if printf '%s\n' "$repo" | grep -qE 'if hasattr\(lead, field\) and value is not None'; then
+          if grep -qE 'if hasattr\(lead, field\) and value is not None' <<< "$repo"; then
             echo ""
             echo "FALLO: la actualizacion parcial vuelve a ignorar los campos vaciados (capitulo 33)."
             echo "Un dato escrito por error se podra cambiar por otro, no retirar, y la"
             echo "pantalla dira que si lo hizo (punto 24 de §6.1)."
             exit 1
           fi
-          printf '%s\n' "$repo" | grep -q 'update_data = lead_in.model_dump(exclude_unset=True)' || {
+          grep -q 'update_data = lead_in.model_dump(exclude_unset=True)' <<< "$repo" || {
             echo ""
             echo "FALLO: la edicion dejo de distinguir lo que el cliente envio (capitulo 33)."
             echo "Sin exclude_unset, cada edicion vaciaria todo lo que el formulario no"
@@ -2423,13 +2430,13 @@ jobs:
 
           # 3. La bitacora distingue lo vaciado, y sigue anotando nombres y no valores.
           endpoint=$(grep -vE '^\s*#' backend/app/api/v1/endpoints/leads.py)
-          printf '%s\n' "$endpoint" | grep -q 'campos_vaciados=sorted(campo for campo, valor in enviados.items() if valor is None)' || {
+          grep -q 'campos_vaciados=sorted(campo for campo, valor in enviados.items() if valor is None)' <<< "$endpoint" || {
             echo ""
             echo "FALLO: la bitacora ya no distingue los campos vaciados (capitulo 33)."
             echo "Borrar el dato de una persona y corregirlo dejarian el mismo asiento."
             exit 1
           }
-          printf '%s\n' "$endpoint" | grep -q 'campos=sorted(enviados.keys())' || {
+          grep -q 'campos=sorted(enviados.keys())' <<< "$endpoint" || {
             echo ""
             echo "FALLO: el asiento de la edicion ya no anota solo los NOMBRES (R-11)."
             echo "La bitacora se consulta con otro criterio de acceso que la tabla de"
@@ -2443,14 +2450,14 @@ jobs:
           # donde hacerse por mucho que el servidor la aceptara.
           ficha=$(grep -vE '^\s*(//|\*|/\*)' frontend/src/components/LeadDetailModal.jsx)
           for campo in lead-company lead-job-title; do
-            bloque=$(printf '%s\n' "$ficha" | grep -A 5 "id=\"$campo\"") || {
+            bloque=$(grep -A 5 "id=\"$campo\"" <<< "$ficha") || {
               echo ""
               echo "FALLO: $campo desaparecio del formulario de la ficha (capitulo 33)."
               echo "La guarda no puede comprobar lo que ya no esta; si el campo se renombro,"
               echo "hay que renombrarlo tambien aqui."
               exit 1
             }
-            if printf '%s\n' "$bloque" | grep -q 'required'; then
+            if grep -q 'required' <<< "$bloque"; then
               echo ""
               echo "FALLO: el formulario de la ficha vuelve a exigir $campo (capitulo 33)."
               echo "La tabla declara esa columna nullable: el panel estaria prohibiendo algo"
@@ -2458,7 +2465,7 @@ jobs:
               exit 1
             fi
           done
-          printf '%s\n' "$ficha" | grep -q 'const obligatorio = (valor, original) =>' || {
+          grep -q 'const obligatorio = (valor, original) =>' <<< "$ficha" || {
             echo ""
             echo "FALLO: el cliente vuelve a omitir los campos obligatorios vacios (capitulo 33)."
             echo "Omitirlos hace que borrar un apellido responda «Prospecto actualizado» y"
@@ -2496,7 +2503,7 @@ jobs:
 
           # 1. La red final. Sin ella la lista deja de ser blanca y un endpoint nuevo nace
           # publicado en vez de nacer fuera.
-          printf '%s\n' "$puerta" | tr '\n' ' ' | grep -qE 'location / \{ *return 404; *\}' || {
+          grep -qE 'location / \{ *return 404; *\}' <<< "$(tr '\n' ' ' <<< "$puerta")" || {
             echo ""
             echo "FALLO: la puerta ya no niega por defecto (capitulo 34)."
             echo "Con la negativa por defecto, un endpoint nuevo nace FUERA de internet."
@@ -2507,7 +2514,7 @@ jobs:
           # 2. Ninguna `location` con expresion puede publicar algo que no sea la pagina.
           # Es la comprobacion que caza el atajo previsible: recortar `/api/` para que la
           # pagina pueda pedir un endpoint mas, y publicar la gestion entera de paso.
-          malas=$(printf '%s\n' "$puerta" | grep -oE 'location +~ +"[^"]+"' | grep -v 'interes' || true)
+          malas=$(grep -oE 'location +~ +"[^"]+"' <<< "$puerta" | grep -v 'interes' || true)
           if [ -n "$malas" ]; then
             echo ""
             echo "FALLO: la puerta publica rutas que no son de la pagina de interes (capitulo 34):"
@@ -2519,7 +2526,7 @@ jobs:
 
           # 3. Los `location` de prefijo: solo `/assets/` (el bundle que la pagina necesita
           # para dibujarse) y el `/` del 404.
-          prefijos=$(printf '%s\n' "$puerta" | grep -oE 'location +/[A-Za-z0-9_./-]* *\{' \
+          prefijos=$(grep -oE 'location +/[A-Za-z0-9_./-]* *\{' <<< "$puerta" \
             | sed -E 's/location +//; s/ *\{//' | sort -u)
           for prefijo in $prefijos; do
             case "$prefijo" in
@@ -2598,28 +2605,28 @@ jobs:
           # 1. El secreto se DERIVA, no se guarda. Es la propiedad que hace que la base no
           # contenga nada que cifrar, y la que un cambio bienintencionado —«guardemos el
           # secreto para poder re-cifrarlo al rotar la clave»— tiraria sin romper nada.
-          printf '%s\n' "$servicio" | grep -q 'hmac.new(' || {
+          grep -q 'hmac.new(' <<< "$servicio" || {
             echo ""
             echo "FALLO: el secreto del segundo factor ya no se deriva (capitulo 35)."
             echo "Si se guarda, la base pasa a contener un secreto, y entonces hay que"
             echo "cifrarlo: un volcado de users bastaria para generar codigos de cualquiera."
             exit 1
           }
-          if printf '%s\n' "$esquemas" | grep -qE 'totp_secreto|totp_clave|totp_seed'; then
+          if grep -qE 'totp_secreto|totp_clave|totp_seed' <<< "$esquemas"; then
             echo ""
             echo "FALLO: aparecio una columna con el secreto del segundo factor (capitulo 35)."
             echo "La tabla guarda una SAL; el secreto sale de ella y de SECRET_KEY, que vive"
             echo "en el entorno. Guardarlo deshace esa propiedad entera."
             exit 1
           fi
-          printf '%s\n' "$esquemas" | grep -q 'totp_sal = Column(String(64), nullable=True)' || {
+          grep -q 'totp_sal = Column(String(64), nullable=True)' <<< "$esquemas" || {
             echo "FALLO: desaparecio la sal del segundo factor (capitulo 35)."
             exit 1
           }
 
           # 2. La baja borra la sal. Con la sal y la clave se recalcula el secreto, asi que
           # dejarla mantiene vivo el telefono de alguien que ya no usa esa cuenta.
-          printf '%s\n' "$servicio" |  grep -A 20 'def desactivar' | grep -q 'usuario.totp_sal = None' || {
+          grep -q 'usuario.totp_sal = None' <<< "$(grep -A 20 'def desactivar' <<< "$servicio")" || {
             echo ""
             echo "FALLO: la baja del segundo factor ya no borra la sal (capitulo 35)."
             exit 1
@@ -2627,13 +2634,13 @@ jobs:
 
           # 3. El desafio del login es de un TIPO PROPIO. Sin eso seria un access token de
           # vida corta, y el segundo factor se saltaria sencillamente no pidiendolo.
-          printf '%s\n' "$seguridad" | grep -q 'TOKEN_TYPE_DESAFIO' || {
+          grep -q 'TOKEN_TYPE_DESAFIO' <<< "$seguridad" || {
             echo ""
             echo "FALLO: el desafio del segundo factor dejo de tener tipo propio (capitulo 35)."
             echo "Si sirve como Authorization, el primer paso basta para entrar."
             exit 1
           }
-          printf '%s\n' "$rutas" | grep -q 'decode_token(datos.desafio, TOKEN_TYPE_DESAFIO)' || {
+          grep -q 'decode_token(datos.desafio, TOKEN_TYPE_DESAFIO)' <<< "$rutas" || {
             echo "FALLO: el segundo paso ya no exige que el desafio sea de su tipo (capitulo 35)."
             exit 1
           }
@@ -2641,24 +2648,24 @@ jobs:
           # 4. Un codigo no vale dos veces. La tolerancia de reloj da a cada codigo noventa
           # segundos de vida; sin esta memoria, uno leido por encima del hombro se reutiliza
           # dentro de esa ventana.
-          printf '%s\n' "$nucleo" | grep -q 'contador_minimo' || {
+          grep -q 'contador_minimo' <<< "$nucleo" || {
             echo ""
             echo "FALLO: el TOTP ya no recuerda el ultimo periodo usado (capitulo 35)."
             exit 1
           }
-          printf '%s\n' "$servicio" | grep -q 'contador_minimo=(usuario.totp_ultimo_contador or -1) + 1' || {
+          grep -q 'contador_minimo=(usuario.totp_ultimo_contador or -1) + 1' <<< "$servicio" || {
             echo "FALLO: la comprobacion dejo de rechazar un codigo ya usado (capitulo 35)."
             exit 1
           }
           # Y la comparacion es en tiempo constante, en las dos formas.
-          [ "$(printf '%s\n' "$nucleo$servicio" | grep -c 'hmac.compare_digest')" -ge 2 ] || {
+          [ "$(grep -c 'hmac.compare_digest' <<< "$nucleo$servicio")" -ge 2 ] || {
             echo "FALLO: alguna comparacion de codigos dejo de ser en tiempo constante (capitulo 35)."
             exit 1
           }
 
           # 5. La tolerancia de reloj es UNO. Subirla multiplica la vida de cada codigo:
           # RFC 6238 §5.2 recomienda «como mucho uno», y con dos serian 150 segundos.
-          printf '%s\n' "$nucleo" | grep -qE '^DERIVA_DE_RELOJ = 1$' || {
+          grep -qE '^DERIVA_DE_RELOJ = 1$' <<< "$nucleo" || {
             echo ""
             echo "FALLO: la tolerancia al reloj desfasado dejo de ser un periodo (capitulo 35)."
             echo "Cada periodo de mas triplica el tiempo que sirve un codigo robado."
@@ -2669,12 +2676,12 @@ jobs:
           # no puede quitarselo. Sin ella, darse de baja siendo el unico deja el sistema sin
           # administracion utilizable, que es justo el motivo por el que esto no se hizo
           # durante dieciseis capitulos.
-          printf '%s\n' "$servicio" | grep -q 'def administradores_con_segundo_factor' || {
+          grep -q 'def administradores_con_segundo_factor' <<< "$servicio" || {
             echo ""
             echo "FALLO: desaparecio la comprobacion de la ultima administracion (capitulo 35)."
             exit 1
           }
-          printf '%s\n' "$rutas" | grep -q 'segundo_factor.administradores_con_segundo_factor(db, excluyendo=user.id) == 0' || {
+          grep -q 'segundo_factor.administradores_con_segundo_factor(db, excluyendo=user.id) == 0' <<< "$rutas" || {
             echo ""
             echo "FALLO: la baja ya no comprueba si es la ultima administracion (capitulo 35)."
             echo "Quitarselo siendo el unico deja el sistema sin administracion utilizable."
@@ -2683,7 +2690,7 @@ jobs:
 
           # 7. La exigencia se comprueba en la resolucion de identidad, no con una lista de
           # rutas: asi un endpoint nuevo nace cerrado para esas cuentas.
-          printf '%s\n' "$seguridad" | grep -q 'exige_segundo_factor(user.role)' || {
+          grep -q 'exige_segundo_factor(user.role)' <<< "$seguridad" || {
             echo ""
             echo "FALLO: la exigencia del segundo factor salio de la resolucion de identidad (capitulo 35)."
             echo "Con una lista de rutas, el siguiente endpoint nace ABIERTO para una cuenta"
@@ -2692,7 +2699,7 @@ jobs:
           }
           # Y la excepcion se pide por su nombre, solo desde las rutas que sirven para dejar
           # de no tenerlo. Si aparece una tercera, hay que mirarla.
-          usos=$(printf '%s\n' "$rutas" | grep -c 'get_current_user_sin_segundo_factor' || true)
+          usos=$(grep -c 'get_current_user_sin_segundo_factor' <<< "$rutas" || true)
           [ "$usos" -le 4 ] || {
             echo ""
             echo "FALLO: demasiadas rutas admiten no tener segundo factor (capitulo 35)."
@@ -2701,7 +2708,7 @@ jobs:
           }
 
           # 8. Los codigos de recuperacion se guardan como resumen, nunca en claro.
-          printf '%s\n' "$servicio" | grep -q 'hashlib.sha256(_normalizar(codigo).encode' || {
+          grep -q 'hashlib.sha256(_normalizar(codigo).encode' <<< "$servicio" || {
             echo ""
             echo "FALLO: los codigos de recuperacion dejaron de guardarse como resumen (capitulo 35)."
             exit 1
@@ -2715,17 +2722,17 @@ jobs:
           set -euo pipefail
           monitor=$(grep -vE '^\s*#' ml_pipeline/src/drift_monitor.py)
           for motivo in MOTIVO_PERFIL_AUSENTE MOTIVO_PERFIL_ILEGIBLE MOTIVO_PERFIL_AJENO; do
-            printf '%s\n' "$monitor" | grep -q "return _negarse($motivo," || {
+            grep -q "return _negarse($motivo," <<< "$monitor" || {
               echo ""
               echo "FALLO: el monitor vuelve a negarse en silencio por $motivo (§19.9)."
               exit 1
             }
           done
-          printf '%s\n' "$monitor" | grep -q 'procesar_negativa(args.estado, MOTIVO_EVALUACION_FALLIDA, exc.__class__.__name__)' || {
+          grep -q 'procesar_negativa(args.estado, MOTIVO_EVALUACION_FALLIDA, exc.__class__.__name__)' <<< "$monitor" || {
             echo "FALLO: una evaluacion fallida en bucle ya no avisa, o avisa con el mensaje de la excepcion (§19.9)."
             exit 1
           }
-          sed -n '/^def emitir_negativa(/,/^def /p' ml_pipeline/src/drift_monitor.py | grep -vE '^\s*#' | grep -q '_entregar_a_webhook(evento)' || {
+          grep -q '_entregar_a_webhook(evento)' <<< "$(sed -n '/^def emitir_negativa(/,/^def /p' ml_pipeline/src/drift_monitor.py | grep -vE '^\s*#')" || {
             echo "FALLO: la negativa ya no se entrega al webhook de las alertas (§19.9)."
             exit 1
           }
@@ -2749,19 +2756,21 @@ jobs:
           seguridad=$(grep -vE '^\s*#' backend/app/core/security.py)
           # Dentro de create_access_token: el refresh token lleva la misma linea, y buscarla
           # en el archivo entero la encontraba aunque el access token la hubiera perdido.
-          sed -n '/^def create_access_token(/,/^def create_refresh_token(/p' backend/app/core/security.py \
-            | grep -vE '^\s*#' | grep -q '"ver": user.token_version,' || {
+          grep -q '"ver": user.token_version,' \
+            <<< "$(sed -n '/^def create_access_token(/,/^def create_refresh_token(/p' backend/app/core/security.py \
+              | grep -vE '^\s*#')" || {
             echo ""
             echo "FALLO: el access token ya no lleva la version de la cuenta (capitulo 23)."
             exit 1
           }
-          sed -n '/^def _resolver_identidad(/,/^def get_current_user(/p' backend/app/core/security.py \
-            | grep -vE '^\s*#' | grep -q 'if payload.get("ver") != user.token_version:' || {
+          grep -q 'if payload.get("ver") != user.token_version:' \
+            <<< "$(sed -n '/^def _resolver_identidad(/,/^def get_current_user(/p' backend/app/core/security.py \
+              | grep -vE '^\s*#')" || {
             echo "FALLO: la resolucion de identidad ya no compara la version del token (capitulo 23)."
             echo "Un access token robado volveria a sobrevivir al logout de su victima."
             exit 1
           }
-          printf '%s\n' "$seguridad" | grep -q '"require": \[' || {
+          grep -q '"require": \[' <<< "$seguridad" || {
             echo "FALLO: decode_token ya no exige los claims obligatorios; un token sin exp valdria siempre."
             exit 1
           }
@@ -2783,15 +2792,16 @@ jobs:
         run: |
           set -euo pipefail
           politica=$(grep -vE '^\s*#' backend/app/core/passwords.py)
-          printf '%s\n' "$politica" | grep -q 'in contrasenas_filtradas()' || {
+          grep -q 'in contrasenas_filtradas()' <<< "$politica" || {
             echo ""
             echo "FALLO: la politica ya no consulta la lista de contrasenas filtradas (capitulo 23)."
             exit 1
           }
           # La comparacion de la huella, no un `raise` cualquiera: el de las entradas solo
           # detecta una lista con otro tamano, no una sustituida por otra del mismo.
-          sed -n '/^def contrasenas_filtradas(/,/^def /p' backend/app/core/passwords.py | grep -vE '^\s*#' \
-            | grep -A1 -F 'if hashlib.sha256(datos).hexdigest() != manifiesto.get("sha256"):' | grep -q 'raise ListaDeFiltradasInvalida' || {
+          grep -q 'raise ListaDeFiltradasInvalida' \
+            <<< "$(sed -n '/^def contrasenas_filtradas(/,/^def /p' backend/app/core/passwords.py | grep -vE '^\s*#' \
+              | grep -A1 -F 'if hashlib.sha256(datos).hexdigest() != manifiesto.get("sha256"):')" || {
             echo "FALLO: una lista vaciada o sustituida se usaria en silencio (capitulo 23)."
             exit 1
           }
@@ -2808,7 +2818,7 @@ jobs:
             exit 1
           }
           for puerta in backend/app/api/v1/endpoints/users.py backend/app/api/v1/endpoints/auth.py; do
-            grep -vE '^\s*#' "$puerta" | grep -q 'exigir(' || {
+            grep -q 'exigir(' <<< "$(grep -vE '^\s*#' "$puerta")" || {
               echo "FALLO: $puerta ya no pasa las contrasenas por la politica (capitulo 23)."
               exit 1
             }
@@ -3037,7 +3047,7 @@ jobs:
 
           # 1. Cinco caracteres, y la constante no es configurable. Mas estrecharia el
           #    conjunto en el que la contrasena se esconde; menos devolveria megabytes.
-          printf '%s\n' "$codigo" | grep -qE '^PREFIJO = 5$' || {
+          grep -qE '^PREFIJO = 5$' <<< "$codigo" || {
             echo "FALLO: PREFIJO ya no es 5 en $MODULO, o se volvio configurable."
             echo "Cinco caracteres hexadecimales son los 20 bits de k-anonymity que hacen"
             echo "aceptable preguntar a un tercero. No es un ajuste."
@@ -3047,17 +3057,17 @@ jobs:
           # 2. La peticion lleva el prefijo y nada mas. Lo que se vigila es que a `httpx` no
           #    le llegue nunca la contrasena ni el resumen entero: `huella_partida` devuelve
           #    el resumen YA partido para que ninguna funcion lo tenga a mano completo.
-          printf '%s\n' "$codigo" | grep -q 'URL_DE_RANGO + prefijo' || {
+          grep -q 'URL_DE_RANGO + prefijo' <<< "$codigo" || {
             echo "FALLO: la peticion ya no se construye con el prefijo solo."
             exit 1
           }
-          [ "$(printf '%s\n' "$codigo" | grep -c 'hexdigest()')" -eq 1 ] || {
+          [ "$(grep -c 'hexdigest()' <<< "$codigo")" -eq 1 ] || {
             echo "FALLO: hay mas de un sitio que calcula el resumen completo en $MODULO."
             echo "El resumen entero solo debe existir dentro de huella_partida(), que lo"
             echo "devuelve ya partido precisamente para que nadie lo mande por descuido."
             exit 1
           }
-          printf '%s\n' "$codigo" | grep -q 'def huella_partida' || {
+          grep -q 'def huella_partida' <<< "$codigo" || {
             echo "FALLO: desaparecio huella_partida(); el resumen vuelve a existir entero."
             exit 1
           }
@@ -3066,17 +3076,17 @@ jobs:
           #    este servicio es un intermediario, y seguirla manda el prefijo a donde nadie
           #    decidio mandarlo. `certifi` rechaza los certificados de una salida TLS
           #    interceptada y convierte un servicio sano en un falso «no contesta».
-          printf '%s\n' "$codigo" | grep -q 'URL_DE_RANGO = "https://' || {
+          grep -q 'URL_DE_RANGO = "https://' <<< "$codigo" || {
             echo "FALLO: la URL del servicio ya no es https."
             exit 1
           }
-          printf '%s\n' "$codigo" | grep -q 'ssl.create_default_context()' || {
+          grep -q 'ssl.create_default_context()' <<< "$codigo" || {
             echo "FALLO: la salida ya no usa el contexto TLS del sistema."
             echo "Con el paquete certifi, una maquina con el TLS interceptado recibe un"
             echo "«no contesta» de un servicio que contesta perfectamente (capitulo 34)."
             exit 1
           }
-          printf '%s\n' "$codigo" | grep -q 'follow_redirects=False' || {
+          grep -q 'follow_redirects=False' <<< "$codigo" || {
             echo "FALLO: la peticion volvio a seguir redirecciones."
             exit 1
           }
@@ -3084,7 +3094,7 @@ jobs:
           # del modulo explica por extenso por que NO se usa certifi, y un `grep certifi` a
           # secas disparaba con su propia explicacion. Es el disparo en falso que convierte
           # un control en algo que la gente desactiva.
-          if printf '%s\n' "$codigo" | grep -nE 'verify=False|verify=None|^import certifi|certifi\.where'; then
+          if grep -nE 'verify=False|verify=None|^import certifi|certifi\.where' <<< "$codigo"; then
             echo "FALLO: o se dejo de verificar el certificado, o se volvio a certifi."
             exit 1
           fi
@@ -3093,7 +3103,7 @@ jobs:
           #    nadie fijo, y convierte un tercero caido en un alta que parece colgada.
           # Otra vez anclado a la forma y no a la palabra: el modulo explica en su cabecera
           # por que NO reintenta, y buscar «reintent» disparaba con esa explicacion.
-          if printf '%s\n' "$codigo" | grep -nE 'for [a-z_]+ in range\(|time\.sleep|while True|Retry\(|transport=|max_retries'; then
+          if grep -nE 'for [a-z_]+ in range\(|time\.sleep|while True|Retry\(|transport=|max_retries' <<< "$codigo"; then
             echo "FALLO: aparecio un reintento o una espera en la consulta a un tercero."
             echo "El tope corto existe para que un servicio caido no retenga a nadie."
             exit 1
@@ -3101,7 +3111,7 @@ jobs:
 
           # 5. La bitacora no escribe el secreto. Un registro con el resumen completo seria
           #    el diccionario que no se quiso mandar, y encima guardado en disco.
-          if printf '%s\n' "$codigo" | grep -nE 'logger\.[a-z]+\([^)]*(sufijo|contrasena|resumen)'; then
+          if grep -nE 'logger\.[a-z]+\([^)]*(sufijo|contrasena|resumen)' <<< "$codigo"; then
             echo "FALLO: la bitacora recibe la contrasena, su sufijo o su resumen."
             echo "Solo puede registrarse el prefijo, que es lo que de todas formas ya viajo."
             exit 1
@@ -3112,13 +3122,13 @@ jobs:
           #    con False como con None- y no con `is not None`, que rechazaria a quien tuvo
           #    la mala suerte de darse de alta durante un corte de internet.
           politica=$(grep -vE '^\s*#' backend/app/core/passwords.py)
-          printf '%s\n' "$politica" | grep -q 'if veredicto.filtrada:' || {
+          grep -q 'if veredicto.filtrada:' <<< "$politica" || {
             echo "FALLO: la politica ante el veredicto cambio de forma (capitulo 37)."
             echo "Debe ser «if veredicto.filtrada:», que trata «no se pudo preguntar» igual"
             echo "que «no esta filtrada»: sin servicio, el sistema se comporta como ayer."
             exit 1
           }
-          if printf '%s\n' "$politica" | grep -nE 'veredicto\.filtrada is not None|not veredicto\.se_pudo_preguntar'; then
+          if grep -nE 'veredicto\.filtrada is not None|not veredicto\.se_pudo_preguntar' <<< "$politica"; then
             echo "FALLO: el fallo del servicio volvio a tener consecuencias para el usuario."
             echo "Un tercero caido no puede impedir que nadie fije su contrasena: la lista"
             echo "local del capitulo 23 ya ha decidido antes de llegar ahi."
@@ -3126,13 +3136,13 @@ jobs:
           fi
           # Y que se pregunte DESPUES de las listas locales, no antes: no hay motivo para
           # mandar ni cinco caracteres de algo que ya esta rechazado.
-          printf '%s\n' "$politica" | grep -q 'elif preguntar_fuera:' || {
+          grep -q 'elif preguntar_fuera:' <<< "$politica" || {
             echo "FALLO: la consulta al servicio dejo de ir detras de las listas locales."
             exit 1
           }
 
           # 7. Las dos guardas que impiden que la suite salga a internet.
-          printf '%s\n' "$codigo" | grep -q 'settings.ENVIRONMENT == "test"' || {
+          grep -q 'settings.ENVIRONMENT == "test"' <<< "$codigo" || {
             echo "FALLO: desaparecio la guarda que impide abrir sockets con ENVIRONMENT=test."
             exit 1
           }
