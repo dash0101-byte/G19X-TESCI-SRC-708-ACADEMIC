@@ -5448,12 +5448,35 @@ jobs:
           #    de modelo nombra una columna. Se pregunta a los modelos por sus columnas en
           #    vez de buscar una lista de palabras, y se mira la frase con la que cada
           #    validador rechaza, no todo el archivo.
-          sys.path.insert(0, "backend")
-          from app.models import entities  # noqa: E402
-
+          #    Y las columnas se LEEN del archivo, no se importa el modulo. Importar
+          #    `app.models.entities` necesita SQLAlchemy y este trabajo no instala ninguna
+          #    dependencia a proposito -son pasos que leen archivos-, asi que este control
+          #    moria con «ModuleNotFoundError: No module named 'sqlalchemy'» en cuanto el CI
+          #    llegaba a el. Nunca llegaba: es el paso 61 de 62 y algo anterior caia primero.
+          #    En una maquina de trabajo pasa, porque alli el entorno si tiene SQLAlchemy;
+          #    ese es exactamente el fallo que nadie ve. Lo que no cambia es la propiedad: se
+          #    le sigue preguntando al esquema por sus columnas en vez de llevar una lista
+          #    escrita a mano, solo que leyendolo en vez de ejecutandolo.
+          arbol = ast.parse(
+              pathlib.Path("backend/app/models/entities.py").read_text(encoding="utf-8")
+          )
           columnas = set()
-          for tabla in entities.Base.metadata.tables.values():
-              columnas.update(c.name for c in tabla.columns)
+          for clase in (n for n in ast.walk(arbol) if isinstance(n, ast.ClassDef)):
+              for sentencia in clase.body:
+                  if not isinstance(sentencia, ast.Assign) or not isinstance(sentencia.value, ast.Call):
+                      continue
+                  llamada = sentencia.value.func
+                  cual = llamada.id if isinstance(llamada, ast.Name) else getattr(llamada, "attr", "")
+                  if cual not in ("Column", "mapped_column"):
+                      continue
+                  # `Column("otro_nombre", ...)` manda sobre el nombre del atributo.
+                  primero = sentencia.value.args[0] if sentencia.value.args else None
+                  if isinstance(primero, ast.Constant) and isinstance(primero.value, str):
+                      columnas.add(primero.value)
+                      continue
+                  for destino in sentencia.targets:
+                      if isinstance(destino, ast.Name):
+                          columnas.add(destino.id)
           # Las que ademas son una palabra del castellano, nombradas con su motivo: no se
           # pueden buscar dentro de una frase escrita en castellano.
           columnas -= {
