@@ -181,7 +181,13 @@ def registrar_cierre(
     ahora = ahora or utc_now()
 
     alta = lead.created_at
-    if alta is not None:
+    # pragma: no branch — `leads.created_at` es `NOT NULL`, así que una ficha que viene de
+    # la base siempre la trae y la salida contraria no se puede recorrer: el motor rechaza
+    # el `UPDATE` que la pondría a nulo. Queda escrita como red porque la comprobación de
+    # abajo compara fechas y un `None` ahí sería un `TypeError` dentro del cierre. Que la
+    # premisa siga valiendo lo comprueba `test_el_alta_de_una_ficha_no_puede_faltar`,
+    # derivándola de la columna del modelo.
+    if alta is not None:  # pragma: no branch
         dia_de_alta = alta.date() if isinstance(alta, datetime.datetime) else alta
         if cierre.cerrado_el < dia_de_alta:
             raise CierreInvalido(

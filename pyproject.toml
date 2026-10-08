@@ -74,3 +74,23 @@ branch = true
 # Dos decimales porque la diferencia entre «92,64» y «93» es justo la que decide si un
 # suelo pegado a lo medido es un trinquete o un sello de goma.
 precision = 2
+
+# Los quince `__repr__` de `models/entities.py` -dieciseis lineas, el 95,7 % de lo que le
+# faltaba a ese archivo- no se prueban: se excluyen. Un `__repr__` existe para que una traza
+# y una sesion interactiva se lean, y una prueba que compare su cadena con la misma cadena
+# escrita a mano no comprueba nada; lo unico que consigue es que cambiar el texto de una
+# traza ponga la suite en rojo. Si alguno dejara de ser solo una cadena -si calculara algo o
+# consultara la base- esta exclusion dejaria de valer, y entonces hay que probarlo.
+#
+# Va como UNA regla aqui y no como quince marcas repartidas por el modelo, por lo mismo que
+# el resto de este repositorio: una regla se escribe una vez, y quince sitios son quince
+# donde el siguiente se olvida. Ademas el control de marcas del trabajo
+# `configuracion-peligrosa` cuenta `pragma`, asi que quince habrian inflado su trinquete con
+# algo que no es una decision por archivo.
+#
+# Y los cuerpos de los metodos abstractos de `adapters/base.py`: cuatro `pass` que no se
+# ejecutan nunca porque cada subclase los sustituye. Instanciar la clase abstracta para
+# recorrerlos no se puede -`ABC` lo impide- y llamarlos con `super()` seria escribir una
+# prueba cuyo unico sujeto es la palabra `pass`. Lo que SI se prueba de ese archivo es
+# `version_del_motor`, que tiene cuerpo de verdad y una razon para tenerlo.
+exclude_also = ["def __repr__", "@(abc\\.)?abstractmethod"]
