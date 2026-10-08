@@ -79,11 +79,23 @@ export default defineConfig({
       // **Capítulo 40.** Entra `erroresDeFormulario.js` en la lista de arriba y la medida
       // sube, no baja: el módulo está al 98.5 / 94.5 / 100 / 100. Que un archivo nuevo
       // suba la media solo pasa si llega probado; si no, el suelo se encarga de decirlo.
+      //
+      // **07-10-2026.** Lo medido es 96.65 / 91.75 / 98.52 / 98.68 y el suelo estaba en
+      // números enteros, con hasta 1.75 puntos de holgura en ramas. Esa holgura no es
+      // teórica: sobre estos seis archivos una rama vale 0.27 puntos y una sentencia 0.22,
+      // así que un suelo entero dejaba perder entre dos y seis de ellas sin decir nada —y
+      // el capítulo 36 ya enseñó cómo acaba eso: cinco funciones sin una sola prueba y el
+      // suelo roto en `main` antes de que alguien lo mirara—.
+      //
+      // Ahora los cuatro van pegados a la medición con dos decimales, de modo que perder
+      // UNA sentencia, UNA rama, UNA función o UNA línea pone el cliente en rojo. No se
+      // pegan al valor exacto sino una centésima por debajo: así una reordenación que no
+      // cambia nada medible no hace fallar el pipeline, y cualquier pérdida real sí.
       thresholds: {
-        statements: 96,
-        branches: 90,
-        functions: 98,
-        lines: 98,
+        statements: 96.6,
+        branches: 91.7,
+        functions: 98.5,
+        lines: 98.6,
       },
     },
   },

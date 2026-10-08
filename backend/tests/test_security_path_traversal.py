@@ -46,7 +46,44 @@ ENCODED_HTTP_PATHS = [
 
 
 @pytest.fixture(scope="module")
-def canary_file():
+def dist_minimo():
+    """
+    Garantiza un `dist/` con un `index.html` dentro, y deja el árbol como estaba.
+
+    Hace falta porque **el cliente compilado no viaja en el repositorio** y el trabajo
+    `pruebas` del CI no lo construye: declara `needs: modelo` y nada más, de modo que ahí
+    `frontend/dist` no existe. Las dos pruebas de abajo son las del RESOLUTOR —no necesitan
+    que el comodín esté montado, solo que haya un directorio contra el que resolver— y sin
+    esto eran lo único rojo de la suite en el CI desde que se escribieron: una por el
+    `index.html` que no estaba, y diez por la precondición del cebo, que en Linux es falsa
+    porque el núcleo resuelve `dist/..` y `dist` no existe (en Windows el `..` se normaliza
+    antes y la precondición pasaba, que es por lo que en local nunca se vio).
+
+    Se crea en lugar de saltarse a propósito: son las pruebas de regresión de C-1, una
+    lectura de cualquier archivo del host, y saltarlas justo en el único sitio que corre
+    solo las convierte en diez renglones verdes que no comprueban nada. Lo que sí se queda
+    saltado es lo de más abajo, que necesita `dist/assets` para que el comodín se monte, y
+    eso se decide al importar `app.main`: ninguna fixture llega a tiempo.
+    """
+    creados = []
+    if not os.path.isdir(dist_path):
+        os.makedirs(dist_path)
+        creados.append(dist_path)
+    indice = os.path.join(dist_path, "index.html")
+    if not os.path.isfile(indice):
+        with open(indice, "w", encoding="utf-8") as fh:
+            fh.write("<!doctype html><title>SPA de pruebas</title>")
+        creados.append(indice)
+
+    yield dist_path
+
+    # Se retira solo lo que esta fixture creó: un `dist/` de verdad no se toca.
+    for ruta in reversed(creados):
+        os.remove(ruta) if os.path.isfile(ruta) else os.rmdir(ruta)
+
+
+@pytest.fixture(scope="module")
+def canary_file(dist_minimo):
     """Crea el cebo en el directorio padre de dist/ y lo elimina al terminar."""
     path = os.path.join(os.path.dirname(os.path.realpath(dist_path)), CANARY_NAME)
     with open(path, "w", encoding="utf-8") as fh:
@@ -63,7 +100,7 @@ def test_resolver_rechaza_rutas_fuera_de_dist(canary_file, payload):
     assert resolve_dist_file(payload) is None
 
 
-def test_resolver_sirve_archivos_legitimos_dentro_de_dist():
+def test_resolver_sirve_archivos_legitimos_dentro_de_dist(dist_minimo):
     """El resolutor sigue devolviendo archivos reales contenidos en dist/."""
     resolved = resolve_dist_file("index.html")
     assert resolved is not None

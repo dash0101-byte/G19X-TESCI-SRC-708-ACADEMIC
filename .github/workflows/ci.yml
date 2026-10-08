@@ -24,17 +24,63 @@ env:
   NODE_VERSION: "20"
   # Suelo de cobertura del paquete de aplicacion, sobre la cifra CON RAMAS: desde el 7
   # de octubre de 2026 es la que se mide, y no se declara aqui sino en el pyproject (ver
-  # el paso de la suite). Lo medido es 92.64 % combinado —94.42 % de sentencias y 84.10 %
-  # de ramas—. Este comentario decia «la medicion actual es del 88 %» y daba el suelo por
-  # tres puntos por debajo cuando ya eran casi ocho: con esa holgura deja pasar una
-  # regresion enorme sin decir nada, que es tanto como no tenerlo. Es un trinquete: solo
-  # deberia subir, y sube pegado a lo medido.
-  COBERTURA_MINIMA: "85"
-  # El suelo del cliente lo aplica Vitest desde `vite.config.js` (96/90/98/98 desde el
-  # capitulo 40, sobre los seis modulos con logica; aqui decia 95/89/98/98 y cinco, que
-  # es lo que fue hasta que el capitulo 40 metio `erroresDeFormulario.js` en la lista y
-  # subio el suelo). No se repite aqui a proposito: dos numeros para lo mismo se
-  # desincronizan, y el que manda es el que corre.
+  # el paso de la suite). Este comentario decia «la medicion actual es del 88 %» y daba el
+  # suelo por tres puntos por debajo cuando ya eran casi ocho: con esa holgura deja pasar
+  # una regresion enorme sin decir nada, que es tanto como no tenerlo. Es un trinquete:
+  # solo deberia subir, y sube pegado a lo medido.
+  #
+  # Lo medido al cerrar el trabajo de cobertura: 99.11 % combinado -99.37 % de sentencias
+  # y 97.88 % de ramas-, con 67 de los 89 archivos al 100 %. Partia de 92.64 %.
+  #
+  # Y se midio APARTANDO `frontend/dist`, que es la condicion en la que corre este
+  # trabajo: `main.py` decide en tiempo de importacion si registra el comodin de la SPA
+  # segun si existe el bundle, y `pruebas` declara `needs: modelo` y nada mas, asi que no
+  # lo tiene. En una maquina de trabajo, con el bundle compilado, la cifra sale MAS ALTA:
+  # un suelo pegado a lo medido alli pondria este trabajo en rojo sobre un arbol correcto,
+  # que es el unico fallo que un trinquete no se puede permitir. Son 15 lineas y 2 ramas
+  # de `main.py` que aqui no se pueden cubrir de ninguna manera; esta anotado como punto
+  # 64 de §6.4.
+  #
+  # Los dos numeros van truncados a la DECIMA y no a la centesima -99.1 y no 99.11- por
+  # una sola razon, y no por holgura: la medicion se tomo en Windows y esto corre en
+  # Linux. De las omisiones que dependen del entorno, las dos que divergen lo hacen hacia
+  # arriba -el enlace simbolico que Windows no deja crear sin privilegios, y el limitador
+  # apagado en esa pasada, los dos SI corren aqui-, asi que lo medido es un suelo inferior
+  # al de este trabajo y no al contrario. La decima cubre la linea sola de diferencia que
+  # podria quedar al resolver rutas, que ya mordio una vez: `frontend/dist/../x` es un
+  # archivo para Windows, que normaliza el `..` sin mirar el disco, y no lo es para Linux,
+  # que resuelve `dist` y no lo encuentra.
+  COBERTURA_MINIMA: "99.1"
+  # Suelo de RAMAS, aparte. `--cov-fail-under` solo acepta un numero y en modo ramas ese
+  # numero es el COMBINADO, asi que con el suelo combinado solo, 1554 ramas pueden perder
+  # decenas de puntos mientras las 7444 sentencias sostienen la media. Hasta el 7 de
+  # octubre de 2026 era exactamente lo que pasaba: la cifra publicada era 94 % de
+  # sentencias con 214 ramas a medio recorrer que ningun numero nombraba. Lo lee del
+  # `coverage.xml` el paso de aqui abajo, que es el unico sitio donde esa cifra viaja
+  # sola.
+  RAMAS_MINIMAS: "97.8"
+  # Cuantas SENTENCIAS de `backend/app` admite excluidas de la medicion con una marca
+  # (`pragma: no cover` / `no branch`). Son diez, cada una con su motivo escrito al lado y
+  # su premisa comprobada por una prueba derivada del codigo. El control «Ninguna marca de
+  # cobertura sin motivo» las deriva de los archivos y falla si aparece una sin motivo o si
+  # el total pasa de aqui: una marca es la forma mas barata de subir el suelo de cobertura
+  # sin probar nada -ocho caracteres- y la unica defensa es que aparecer una obligue a
+  # cambiar este numero a mano. Es un trinquete al reves que el de cobertura: solo deberia
+  # BAJAR, y va pegado a lo contado y no redondeado hacia arriba, porque seis marcas de
+  # holgura son seis lineas que nadie prueba y nadie ve aparecer.
+  #
+  # Cuenta marcas sobre una SENTENCIA, no comentarios: el motivo ocupa parrafo y vive en el
+  # comentario de encima, asi que contar los comentarios haria que el trinquete midiera
+  # comentarios. Son diez sentencias repartidas en siete sitios.
+  PRAGMAS_MAXIMOS: "10"
+  # El suelo del cliente lo aplica Vitest desde `vite.config.js`: desde el 7 de octubre
+  # de 2026 es 96.6/91.7/98.5/98.6 sobre los seis modulos con logica, pegado con dos
+  # decimales a lo medido —96.65/91.75/98.52/98.68— de modo que perder UNA sentencia, UNA
+  # rama, UNA funcion o UNA linea lo pone en rojo. Antes eran enteros (96/90/98/98, y
+  # 95/89/98/98 sobre cinco modulos hasta el capitulo 40), con hasta 1.75 puntos de
+  # holgura en ramas, que ahi son seis ramas que se podian perder en silencio.
+  # No se repite aqui a proposito: dos numeros para lo mismo se desincronizan, y el que
+  # manda es el que corre.
 
 jobs:
 
@@ -648,6 +694,48 @@ jobs:
             --cov-report=xml \
             --cov-fail-under=${{ env.COBERTURA_MINIMA }} \
             --color=yes
+
+      # El suelo de RAMAS, que no cabe en el paso anterior: `--cov-fail-under` toma un
+      # solo numero y en modo ramas ese numero es el combinado, de modo que las ramas
+      # pueden hundirse mientras las sentencias sostienen la media. Se lee del
+      # `coverage.xml` que acaba de escribirse, que es el unico sitio donde `branch-rate`
+      # viaja aparte de `line-rate`.
+      #
+      # Falla tambien si el archivo no esta o no trae el atributo, en vez de dar por
+      # bueno lo que no ha podido leer: un paso que pasa cuando no encuentra lo que mide
+      # es un paso que pasa siempre. Y rechaza un total de cero ramas, que es lo que
+      # devolveria una configuracion con `branch = false` -el modo en que este suelo no
+      # significa nada-.
+      - name: Las ramas tienen su propio suelo
+        if: always()
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, sys, xml.etree.ElementTree as ET
+
+          suelo = float(os.environ["RAMAS_MINIMAS"])
+          if not os.path.exists("coverage.xml"):
+              sys.exit("No hay coverage.xml: la suite no llego a escribirlo.")
+
+          raiz = ET.parse("coverage.xml").getroot()
+          tasa = raiz.get("branch-rate")
+          if tasa is None:
+              sys.exit("El coverage.xml no trae `branch-rate`: la medicion no cuenta ramas.")
+
+          total = sum(
+              1
+              for clase in raiz.iter("class")
+              for linea in clase.iter("line")
+              if linea.get("branch") == "true"
+          )
+          if total == 0:
+              sys.exit("El coverage.xml no declara ninguna rama: `branch = true` no esta puesto.")
+
+          medido = float(tasa) * 100
+          print(f"Ramas: {medido:.2f} % sobre un suelo de {suelo} % ({total} lineas con rama)")
+          if medido < suelo:
+              sys.exit(f"Las ramas bajaron a {medido:.2f} %, por debajo del suelo de {suelo} %.")
+          PY
 
       - name: Publicar informe de cobertura
         if: always()
@@ -5279,6 +5367,101 @@ jobs:
           print(f"contexto, ninguna frase de los esquemas nombra una de las {len(columnas)}")
           print(f"columnas, y las {len(claves)} clases de rechazo tienen frase en castellano")
           print("en un solo archivo, que es el que ven todas las pantallas.")
+          PY
+
+      # Una marca de cobertura es la unica forma que tiene este repositorio de decir «esta
+      # linea no se prueba, y por esto». Sin motivo escrito al lado es lo contrario: una
+      # forma de que el suelo de cobertura suba sin que nadie pruebe nada, y de las mas
+      # baratas, porque son ocho caracteres. El control exige el motivo y cuenta cuantas
+      # hay, con trinquete: una marca nueva obliga a subir el numero a mano, y subirlo a
+      # mano obliga a que alguien lo lea.
+      #
+      # El motivo vale en la propia linea o en el bloque de comentario inmediatamente
+      # encima, porque asi estan escritas las que hay: el motivo ocupa parrafo y la marca
+      # va sobre la sentencia. Exigirlo solo en la misma linea pondria en rojo las que
+      # estan bien.
+      #
+      # La lista se DERIVA de los archivos de backend/app. Es la tercera vez que este
+      # repositorio tropieza con un inventario escrito a mano -capitulos 42, 44 y 46- y la
+      # leccion ya esta escrita en AGENTS.md: una guarda que mide bien sobre una lista
+      # incompleta mide la lista.
+      - name: Ninguna marca de cobertura sin motivo
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          # Del bloque de entorno, y no interpolado en el heredoc: `${{ }}` se sustituye
+          # antes de que el shell lo vea, asi que un valor con comillas o vacio produciria
+          # un error de sintaxis de Python en lugar de un mensaje legible.
+          MAXIMAS = int(os.environ["PRAGMAS_MAXIMOS"])
+          MARCA = re.compile(r"#\s*pragma:\s*no\s+(cover|branch)\b(?P<resto>.*)$")
+
+          def tiene_motivo(resto, anteriores):
+              """El motivo esta detras de la marca, o en el comentario de encima."""
+              if resto.strip(" -\u2014:"):
+                  return True
+              for linea in reversed(anteriores):
+                  desnuda = linea.strip()
+                  if not desnuda:
+                      return False
+                  if not desnuda.startswith("#"):
+                      return False
+                  encontrada = MARCA.search(desnuda)
+                  if encontrada and encontrada.group("resto").strip(" -\u2014:"):
+                      return True
+              return False
+
+          marcas, sin_motivo = [], []
+          for ruta in sorted(pathlib.Path("backend/app").rglob("*.py")):
+              lineas = ruta.read_text(encoding="utf-8").splitlines()
+              for numero, linea in enumerate(lineas):
+                  encontrada = MARCA.search(linea)
+                  if not encontrada:
+                      continue
+                  # Solo cuentan las marcas sobre una SENTENCIA, que son las que excluyen
+                  # algo de la medicion. Una linea que es solo comentario -donde vive el
+                  # motivo cuando ocupa parrafo- no excluye ninguna linea de codigo, y
+                  # contarla haria que el trinquete midiera comentarios.
+                  if not linea[:encontrada.start()].strip():
+                      continue
+                  # El bloque de comentario de encima: el motivo suele ocupar un parrafo.
+                  anteriores = lineas[max(0, numero - 12):numero]
+                  donde = f"{ruta.as_posix()}:{numero + 1}"
+                  marcas.append(donde)
+                  if not tiene_motivo(encontrada.group("resto"), anteriores):
+                      sin_motivo.append(donde)
+
+          if not marcas:
+              sys.exit(
+                  "FALLO: no se encontro ninguna marca de cobertura en backend/app. "
+                  "El recorrido esta roto: hay marcas y este control dejo de verlas."
+              )
+
+          if sin_motivo:
+              print("FALLO: hay marcas de cobertura sin motivo escrito al lado.")
+              print("Una marca sin motivo sube el suelo de cobertura sin probar nada, y")
+              print("dentro de un ano nadie sabe si la linea sigue siendo imposible de")
+              print("recorrer o si solo era incomoda. Escriba por que, en la propia linea o")
+              print("en el comentario de encima.")
+              for donde in sin_motivo:
+                  print(f"  - {donde}")
+              sys.exit(1)
+
+          if len(marcas) > MAXIMAS:
+              print(f"FALLO: hay {len(marcas)} marcas de cobertura y el trinquete admite {MAXIMAS}.")
+              print("Cada marca es una linea que nadie prueba. Si la nueva esta justificada,")
+              print("suba PRAGMAS_MAXIMOS a mano en el bloque de entorno y dejelo dicho; si no,")
+              print("escriba la prueba. Lo que no vale es que aparezcan en silencio.")
+              for donde in marcas:
+                  print(f"  - {donde}")
+              sys.exit(1)
+
+          print(f"Las {len(marcas)} marcas de cobertura de backend/app llevan su motivo, y no")
+          print(f"son mas de las {MAXIMAS} inventariadas.")
           PY
 
   # ============================================================================

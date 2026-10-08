@@ -3,7 +3,7 @@ El sello que impide servir sobre una base sin migrar, y la sesión que abre cada
 
 `core/database.py` era el peor archivo medido del paquete —50,6 % contando ramas— y lo que
 le faltaba no era decoración: `verificar_esquema`, `revision_aplicada`, `revision_esperada`
-y `_directorio_alembic` no aparecían en una sola prueba de las 1743. Son lo que sustituye a
+y `_directorio_alembic` no aparecían en una sola prueba de las 1743 que había entonces. Son lo que sustituye a
 `create_all()` en producción: si dejan de funcionar, el backend arranca contra una base de
 otra revisión, sirve tráfico y falla con `UndefinedColumn` en la primera petición que toque
 la columna que falta —a veces horas después y solo en un endpoint—. Eso es exactamente el

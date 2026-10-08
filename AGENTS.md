@@ -96,8 +96,8 @@ comprobación y conviene no confundirlas:
 
 | Clase | Cuántas | Qué es |
 | :--- | :---: | :--- |
-| Pruebas | 1743 servidor · 748 cliente | Comprueban **casos** |
-| Controles de configuración peligrosa | 59 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
+| Pruebas | 2064 servidor · 748 cliente | Comprueban **casos** |
+| Controles de configuración peligrosa | 60 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
 | Guardas de propiedades | 7 | Programas que levantan la aplicación y comprueban **propiedades**, no casos |
 
 Las guardas de propiedades, con su orden propio y nombre propio en el CI:
@@ -115,8 +115,8 @@ python scripts/renovar_imagenes.py --solo-fijacion  # que ninguna imagen quede s
 Las suites:
 
 ```bash
-python -m pytest backend/tests -q                   # ~9 min
-python -m pytest backend/tests -q --cov=backend/app --cov-fail-under=85
+python -m pytest backend/tests -q                   # 2064 pruebas
+python -m pytest backend/tests -q --cov=backend/app --cov-fail-under=99.1  # 13 min 5 s
 cd frontend && npx vitest run && npx eslint src && npm run build
 ruff check backend/ scripts/
 ```
