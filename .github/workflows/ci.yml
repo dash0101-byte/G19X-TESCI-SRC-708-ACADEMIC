@@ -1769,10 +1769,23 @@ jobs:
 
           # El suelo de cobertura, con su valor. Que exista el bloque `thresholds` no
           # dice nada si dentro pone 0.
+          #
+          # Lee DECIMALES, y no solo enteros. Hasta el 7 de octubre de 2026 sacaba
+          # `[0-9]+` y comparaba con `-ge`, que es aritmetica de enteros: en cuanto los
+          # suelos pasaron de 96/90/98/98 a 96.6/91.7/98.5/98.6, un `96.6` se partia en
+          # «96» y «6», el minimo salia 5 y el control daba FALLO sobre una configuracion
+          # que habia SUBIDO los cuatro suelos. Un control que se rompe al apretar lo que
+          # vigila no vigila el valor: vigila su forma.
+          #
+          # El `|| true` esta para que un bloque `thresholds` VACIO llegue al mensaje: sin
+          # el, `grep` no encuentra nada, devuelve 1, y `set -e` mata el paso antes del
+          # `echo`. Fallaba igual, pero sin decir por que, que es el caso que este control
+          # existe para nombrar.
           umbrales=$(grep -vE '^\s*//' frontend/vite.config.js \
-            | sed -n '/thresholds: {/,/}/p' | grep -oE '[0-9]+' | sort -n | head -1)
+            | sed -n '/thresholds: {/,/}/p' | grep -oE '[0-9]+(\.[0-9]+)?' | sort -g | head -1             || true)
           echo "  suelo de cobertura mas bajo: ${umbrales:-ninguno}"
-          [ -n "${umbrales:-}" ] && [ "$umbrales" -ge 80 ] || {
+          [ -n "${umbrales:-}" ] \
+            && awk -v suelo="$umbrales" 'BEGIN { exit !(suelo + 0 >= 80) }' || {
             echo "FALLO: el suelo de cobertura del cliente esta ausente o por debajo del 80 %."
             exit 1
           }
