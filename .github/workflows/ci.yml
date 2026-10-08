@@ -2338,24 +2338,57 @@ jobs:
             exit 1
           }
 
-          # 2. La lista de campos obligatorios se DERIVA de la tabla. Escrita a mano acierta
-          # el dia que se escribe y calla en la primera migracion que toque un nullable.
-          esquema=$(grep -vE '^\s*#' backend/app/schemas/lead.py)
-          printf '%s\n' "$esquema" | grep -q 'Lead.__table__.columns if not columna.nullable' || {
+          # 2. La lista de campos obligatorios se DERIVA de la tabla, y este control ya no
+          # da por hecho en que archivo vive esa derivacion.
+          #
+          # Lo que habia escrito aqui era un trozo literal de `schemas/lead.py`: la expresion
+          # que recorria «Lead.__table__.columns» quedandose los «not columna.nullable». El
+          # capitulo 41 mudo esa derivacion a `app/core/texto.py` para compartirla con
+          # `Campaign` y `User`, y los CUATRO greps de este bloque dejaron de encontrar nada
+          # a la vez. El trabajo lo dijo en el primero y salio con `exit 1`, asi que los otros
+          # tres no se volvieron a mirar: llevaban desde el 41 comprobando nada, y uno de
+          # ellos fijaba siete nombres de columna de los que el 41 habia quitado uno.
+          #
+          # Es la cuarta vez que este repositorio tropieza con un inventario escrito a mano,
+          # y esta vez el inventario escrito a mano era el control.
+          #
+          # De ahi la forma nueva: se busca la PROPIEDAD en todo `backend/app`, no un
+          # fragmento en una ruta. Mudar el codigo de modulo deja de romper el control; lo
+          # unico que lo rompe es que la propiedad deje de cumplirse, que es lo que vigila.
+          grep -rq '__table__\.columns if not columna\.nullable' backend/app --include='*.py' || {
             echo ""
             echo "FALLO: los campos que no admiten vacio ya no salen de la tabla (capitulo 33)."
             echo "Una copia escrita a mano se queda atras sin que nada se ponga rojo, y el"
             echo "fallo aparece meses despues del cambio que lo causo."
             exit 1
           }
-          printf '%s\n' "$esquema" | grep -q 'prohibidos = sorted(vacios & CAMPOS_QUE_NO_ADMITEN_VACIO)' || {
+          # Y el esquema de la ficha la PIDE en vez de escribirla. Lo que no puede aparecer en
+          # esa linea es una comilla: un nombre de columna escrito ahi es la copia a mano
+          # entrando por la puerta de al lado.
+          asignacion=$(grep -rh '^CAMPOS_QUE_NO_ADMITEN_VACIO *=' backend/app --include='*.py' || true)
+          grep -q 'campos_sin_los_que_no_existe' <<< "${asignacion:-}" || {
+            echo ""
+            echo "FALLO: la ficha ya no pide sus campos obligatorios a la tabla (capitulo 33)."
+            echo "Sin esa llamada la lista es una copia, y la primera migracion que toque un"
+            echo "NOT NULL la deja atras en silencio."
+            exit 1
+          }
+          if grep -q "[\"']" <<< "$asignacion"; then
+            echo ""
+            echo "FALLO: hay nombres escritos a mano en los campos que no admiten vacio."
+            echo "Es el defecto del capitulo 33 otra vez: una lista asi acierta el dia que se"
+            echo "escribe y calla en la primera migracion que toque un nullable."
+            exit 1
+          fi
+          # El rechazo aplica esa lista, y mira lo que el cliente ENVIO y no lo que vale None.
+          grep -rq 'vacios_prohibidos(self, CAMPOS_QUE_NO_ADMITEN_VACIO)' backend/app --include='*.py' || {
             echo ""
             echo "FALLO: el esquema ya no rechaza el vacio sobre un campo obligatorio (capitulo 33)."
             echo "Sin ese 422, el nulo llega a la base y un 500 del INSERT sustituye a un"
             echo "mensaje que nombraba el campo."
             exit 1
           }
-          printf '%s\n' "$esquema" | grep -q 'campo for campo in self.model_fields_set' || {
+          grep -rq 'for campo in enviados\.model_fields_set' backend/app --include='*.py' || {
             echo ""
             echo "FALLO: el rechazo ya no mira lo que el cliente ENVIO (capitulo 33)."
             echo "Mirando solo que valgan None, un campo ausente se confundiria con uno"
@@ -2365,11 +2398,26 @@ jobs:
           # Y el vacio tiene que ser UNO. El formulario manda "" en los campos de texto y
           # null en los que pasan por un conversor; si cada forma dejara una cosa distinta,
           # la misma pantalla produciria dos vacios en la misma fila.
-          printf '%s\n' "$esquema" | grep -q '"company", "job_title", "industry", "company_size", "country", "city", "source"' || {
+          #
+          # Aqui tambien habia una lista literal —los siete nombres de los campos de texto— y
+          # tambien se quedo atras. Asi que se comprueban las dos mitades por separado: que la
+          # normalizacion se aplique sobre la constante declarada, y que los NOMBRES de esa
+          # constante los cruce una prueba contra las columnas de texto de la tabla. Esa lista
+          # si esta escrita a mano, a proposito y con su motivo escrito al lado; lo que no
+          # puede estar escrito dos veces es en este archivo tambien.
+          grep -rq 'field_validator(\*TEXTOS_QUE_ADMITEN_VACIO)' backend/app --include='*.py' || {
             echo ""
             echo "FALLO: los textos en blanco de la edicion ya no se normalizan (capitulo 33)."
             echo "Vaciar un campo volveria a significar dos cosas —cadena vacia o NULL—"
             echo "segun por que camino se vaciara, y toda consulta tendria que saberlo."
+            exit 1
+          }
+          grep -rq 'set(TEXTOS_QUE_ADMITEN_VACIO) == de_la_tabla' backend/tests --include='*.py' || {
+            echo ""
+            echo "FALLO: nadie cruza los textos que se anulan con las columnas de la tabla."
+            echo "Esa lista esta escrita a mano a proposito, y lo que la sostiene es la prueba"
+            echo "que la compara con las columnas de texto que admiten nulo. Sin esa prueba"
+            echo "vuelve a ser una copia que acierta solo el dia que se escribio."
             exit 1
           }
 
@@ -3676,16 +3724,37 @@ jobs:
           if not prueba.exists():
               fallos.append("desaparecio frontend/src/pruebas/tokens.test.js")
           else:
-              codigo = sin_comentarios(prueba, prueba.read_text(encoding="utf-8"))
+              # Se lee la prueba Y los modulos locales que importa, siguiendo sus `import`.
+              #
+              # Lo que habia era `readdirSync` buscado DENTRO de tokens.test.js. El capitulo
+              # 40 saco el recorrido de archivos a `pruebas/codigo.js` para que lo
+              # compartieran dos pruebas, y esta guarda se quedo en rojo sin que nada
+              # estuviera mal: pinchaba una RUTA en vez de una propiedad. Lo que importa es
+              # que la lista de archivos se recorra, no en que archivo esta el bucle.
+              fuentes = [prueba]
+              for vecino in re.findall(r"from '(\./[\w./-]+)'", prueba.read_text(encoding="utf-8")):
+                  ruta = (prueba.parent / vecino).resolve()
+                  if ruta.exists():
+                      fuentes.append(ruta)
+              codigo = "\n".join(
+                  sin_comentarios(r, r.read_text(encoding="utf-8")) for r in fuentes
+              )
               for simbolo, porque in [
-                  ("readdirSync", "recorre los archivos en vez de llevar una lista escrita"),
+                  # Con el parentesis: `readdirSync` a secas lo satisface la linea del
+                  # `import`, que mantiene el nombre vivo aunque nadie lo llame. Es la
+                  # leccion del capitulo 37, y al ensanchar esta guarda a los modulos que la
+                  # prueba importa habria entrado por esa puerta -el modulo importa el
+                  # nombre arriba y el bucle podria haberse ido-.
+                  ("readdirSync(", "recorre los archivos en vez de llevar una lista escrita"),
                   (r"matchAll(/var\(", "saca los tokens del codigo con una expresion"),
                   ("sinComentarios", "quita los comentarios antes de buscar, para no satisfacerse con su propia cabecera"),
                   ("toBeGreaterThan(40)", "comprueba que leyo la paleta de verdad"),
                   ("toBeGreaterThan(30)", "comprueba que leyo los archivos de verdad"),
               ]:
                   if simbolo not in codigo:
-                      fallos.append(f"tokens.test.js perdio «{simbolo}»: {porque}")
+                      fallos.append(
+                          f"ni tokens.test.js ni los modulos que importa tienen «{simbolo}»: {porque}"
+                      )
 
           if fallos:
               print("FALLO: el marcado vuelve a nombrar colores que la paleta no tiene.")
@@ -4337,19 +4406,39 @@ jobs:
           if not componente.exists():
               sys.exit("FALLO: desaparecio frontend/src/components/MensajeDeCampo.jsx.")
 
-          codigo = modulo.read_text(encoding="utf-8")
-          limpio = re.sub(r"/\*.*?\*/", "", codigo, flags=re.S)
-          limpio = "\n".join(re.sub(r"^\s*//.*$", "", l) for l in limpio.splitlines())
+          def sin_comentarios(ruta):
+              texto = ruta.read_text(encoding="utf-8")
+              texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+              return "\n".join(re.sub(r"^\s*//.*$", "", l) for l in texto.splitlines())
+
+          limpio = sin_comentarios(modulo)
+
+          # Y la TABLA de traducciones, que desde el capitulo 45 no vive aqui: se mudo a
+          # `services/rechazos.js` porque la necesitaba una segunda pantalla, y
+          # `erroresDeFormulario.js` la reexporta. La guarda buscaba «Falta este campo.»
+          # dentro de este modulo y se quedo en rojo sin que nada estuviera mal -el mismo
+          # defecto que la lista de tokens y que el inventario del capitulo 33-. Asi que los
+          # dos textos de la tabla se buscan en este modulo Y en lo que importa; lo que
+          # COMPRUEBA este modulo -que no devuelva el ingles del servidor- sigue mirandose
+          # solo aqui, porque es suyo y no de la tabla.
+          tabla = [limpio]
+          for vecino in re.findall(r"from '(\.[\w./-]+)'", limpio):
+              ruta = (modulo.parent / vecino).resolve()
+              for candidata in (ruta, ruta.with_suffix(".js"), ruta.with_suffix(".jsx")):
+                  if candidata.is_file():
+                      tabla.append(sin_comentarios(candidata))
+                      break
+          tabla = "\n".join(tabla)
 
           # El mensaje en ingles de Pydantic no puede acabar en la pantalla. La forma de que
           # eso pase es devolver `item.msg` tal cual cuando el tipo no se conoce, asi que la
           # guarda busca la salida generica y la ausencia de ese atajo.
-          if "'No se admite este valor.'" not in limpio:
+          if "'No se admite este valor.'" not in tabla:
               fallos.append("erroresDeFormulario perdio la salida generica: un tipo nuevo volveria a enseñar ingles")
           if re.search(r"return\s+String\(item\.msg", limpio) or re.search(r"return\s+item\.msg", limpio):
               fallos.append("erroresDeFormulario devuelve el msg del servidor tal cual: volveria el ingles")
-          if "'Falta este campo.'" not in limpio:
-              fallos.append("erroresDeFormulario ya no traduce `missing`")
+          if "'Falta este campo.'" not in tabla:
+              fallos.append("nadie traduce `missing`: ni erroresDeFormulario ni la tabla que importa")
           # Se buscan USOS y no nombres. Es la leccion del capitulo 37 -buscar una forma y
           # no una palabra-, y aqui tiene una vuelta mas: renombrar solo la DEFINICION deja
           # el nombre en los usos, asi que una guarda que busque el nombre sigue verde con
@@ -4628,7 +4717,13 @@ jobs:
                   "app/core/database.py ya no enciende las claves ajenas: SQLite las "
                   "ignora por omision y el esquema vuelve a ser decorativo"
               )
-          if not re.search(r"if IS_SQLITE:\s*\n\s*@event\.listens_for\(engine, \"connect\"\)", fuente_motor):
+          # Se quitan los comentarios de linea antes de mirar la FORMA. Una marca de
+          # cobertura al final del `if` -«# pragma: no branch», puesta al apretar el suelo de
+          # ramas- se metio entre los dos renglones que esta expresion exige pegados, y el
+          # control se puso rojo sin que el codigo cambiara de comportamiento. Un comentario
+          # no puede romper una guarda ni satisfacerla.
+          estructura = "\n".join(re.sub(r"\s*#.*$", "", l) for l in fuente_motor.splitlines())
+          if not re.search(r"if IS_SQLITE:\s*\n\s*@event\.listens_for\(engine, \"connect\"\)", estructura):
               fallos.append(
                   "el oyente del pragma ya no se registra para SQLite en el motor"
               )
