@@ -5394,9 +5394,18 @@ jobs:
           import re
           import sys
 
-          # Del bloque de entorno, y no interpolado en el heredoc: `${{ }}` se sustituye
-          # antes de que el shell lo vea, asi que un valor con comillas o vacio produciria
-          # un error de sintaxis de Python en lugar de un mensaje legible.
+          # Del bloque de entorno, y NO con una interpolacion del flujo: esa se sustituye
+          # antes de que el shell vea el heredoc, asi que un valor con comillas o vacio
+          # produciria un error de sintaxis de Python en lugar de un mensaje legible.
+          #
+          # Y tampoco se escribe aqui como ejemplo. Este comentario llevaba la secuencia
+          # literal entre acentos graves, y GitHub la busca en TODO el archivo -tambien
+          # dentro de un `run`, y tambien en un comentario-: una interpolacion vacia es un
+          # error de sintaxis que invalida el flujo ENTERO. El resultado no es un trabajo
+          # en rojo sino una ejecucion sin ningun trabajo, titulada con la ruta del archivo
+          # en vez de con el nombre del flujo, y el 7 de octubre de 2026 costo entenderlo
+          # porque la API no devuelve el motivo. Un comentario que explica una sintaxis no
+          # la escribe.
           MAXIMAS = int(os.environ["PRAGMAS_MAXIMOS"])
           MARCA = re.compile(r"#\s*pragma:\s*no\s+(cover|branch)\b(?P<resto>.*)$")
 
