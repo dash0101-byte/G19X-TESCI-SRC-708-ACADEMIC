@@ -1241,12 +1241,20 @@ jobs:
             echo "=============== $imagen"
             # Informe completo primero, con TODAS las severidades: que la puerta deje
             # pasar lo moderado no significa que nadie deba mirarlo.
+            # El espacio antes de `image` NO es de adorno: `image` es el subcomando de
+            # Trivy, y sin el se pega al final de la huella. La referencia queda en
+            # «…c1969image», docker contesta «invalid reference format» y sale con 125, asi
+            # que este paso no escaneaba nada: fallaba antes de arrancar el escaner. Llevaba
+            # asi desde que se escribio y no se vio porque nunca se habia ejecutado -delante
+            # estaba la auditoria de los paquetes de la imagen, que un aviso de pyjwt
+            # tumbaba, y un paso en rojo deja sin correr los que vienen detras-.
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-              -v "$PWD/informes:/informes" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969image \
-              --scanners vuln --quiet --format json --output "/informes/trivy-$nombre.json" "$imagen"
+              -v "$PWD/informes:/informes" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+              image --scanners vuln --quiet --format json --output "/informes/trivy-$nombre.json" "$imagen"
             # Y ahora la puerta.
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-              aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969image --scanners vuln --quiet \
+              aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+              image --scanners vuln --quiet \
               --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$imagen"
             echo "  sin vulnerabilidades ALTAS ni CRITICAS con arreglo publicado."
           }

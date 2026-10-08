@@ -72,6 +72,15 @@ USO_DE_ACCION = re.compile(
 )
 HUELLA_DE_COMMIT = re.compile(r"[0-9a-f]{40}")
 
+# Una huella tiene que ACABAR donde acaba la referencia. El 8 de octubre de 2026 el paso de
+# Trivy llevaba `aquasec/trivy:0.74.0@sha256:…c1969image`: faltaba el espacio antes de
+# `image`, que es el subcomando del escáner, y el nombre del subcomando se pegó al final de
+# la huella. Docker contestaba «invalid reference format» y salía con 125, así que ese paso no
+# escaneaba nada —y esta guarda lo daba por fijado, porque comprobaba que la huella
+# **estuviera** y no que terminara ahí: los 64 primeros caracteres encajaban y el resto no se
+# miraba—. Es la lección del capítulo 37 otra vez: que algo aparezca no es que esté bien.
+HUELLA_CON_ALGO_PEGADO = re.compile(HUELLA + r"(?P<pegado>[A-Za-z0-9._-]+)")
+
 
 def _sin_comentarios(texto: str) -> str:
     return "\n".join(linea for linea in texto.splitlines() if not linea.lstrip().startswith("#"))
@@ -213,6 +222,18 @@ def problemas_de_fijacion() -> List[str]:
         problemas += [f"{ruta}: {p}" for p in problemas_de_compose(_leer(ruta))]
     for ruta in WORKFLOWS:
         problemas += [f"{ruta}: {p}" for p in problemas_de_workflow(_leer(ruta))]
+
+    # Y ninguna huella, en ningún archivo, lleva nada pegado detrás (ver
+    # `HUELLA_CON_ALGO_PEGADO`). Se mira en todos y no solo en los workflows: la forma del
+    # descuido —un espacio que falta antes de la palabra siguiente— no es de ningún formato.
+    for ruta in DOCKERFILES + COMPOSE + WORKFLOWS:
+        texto = _leer(ruta)
+        for pegada in HUELLA_CON_ALGO_PEGADO.finditer(texto):
+            numero = texto[: pegada.start()].count("\n") + 1
+            problemas.append(
+                f"{ruta}: línea {numero}: la huella no acaba donde acaba la referencia, "
+                f"lleva «{pegada.group('pegado')}» pegado detrás"
+            )
 
     # La misma etiqueta con dos huellas es una renovación a medias: el CI escanearía una
     # imagen y la pila desplegaría otra, las dos con el mismo nombre.
