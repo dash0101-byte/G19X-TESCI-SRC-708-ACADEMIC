@@ -1,0 +1,21 @@
+# Hallazgos que gitleaks marca y NO son secretos, uno por linea y cada uno con su motivo.
+#
+# Se usa este archivo -y huellas- en lugar de una marca `# gitleaks:allow` en el codigo o de
+# una exclusion por ruta en la configuracion, y la diferencia importa:
+#
+#   * una marca suelta en el codigo no dice por que, y es justo la clase de marca sin motivo
+#     que el control 60 del CI persigue en las de cobertura;
+#   * una exclusion por ruta apagaria el escaner para TODO el archivo -o para todas las
+#     pruebas-, asi que un secreto de verdad escrito manana ahi al lado pasaria sin que nada
+#     se ponga rojo. Esa es la forma de arreglo que convierte un control en decoracion.
+#
+# Una huella fija cuatro cosas a la vez -confirmacion, archivo, regla y numero de linea-, asi
+# que no cubre nada mas que el hallazgo que nombra. Si el historial se reescribe, la huella
+# deja de encajar y el hallazgo vuelve a aparecer: eso es lo que se quiere.
+
+# Una contrasena inventada para crear una cuenta en una prueba: la prueba comprueba que el
+# alta de un asesor guarda el telefono en E.164, y necesita una contrasena que pase la
+# politica de longitud. La frase no abre nada -la base de pruebas es SQLite en memoria y se
+# crea y se tira en cada ejecucion- y no se parece a ninguna en uso. La regla
+# `generic-api-key` la marca por entropia, que es lo que hace bien: no sabe leer el contexto.
+8a352fb37634b4d5480d8fa1e33ee2308a436335:backend/tests/test_nada_supuesto_en_la_ficha.py:generic-api-key:216

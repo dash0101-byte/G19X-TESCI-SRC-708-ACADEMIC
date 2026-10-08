@@ -39,7 +39,7 @@ Todas medidas el 6 y 7 de octubre de 2026 sobre el árbol congelado, no estimada
 | Pruebas del cliente | **748** en 45 archivos |
 | Cobertura del cliente | 96,65 % sentencias · 91,75 % ramas · 98,52 % funciones · 98,68 % líneas, sobre suelos de 96,6 / 91,7 / 98,5 / 98,6 |
 | Trabajos de integración continua | **10** |
-| Controles de configuración peligrosa | **60** |
+| Controles de configuración peligrosa | **61** |
 | Guardas de propiedades | **7**, cada una con su arnés de reintroducción |
 | Análisis estático | `ruff`, `eslint` (con las 34 reglas de accesibilidad) y `npm run build`, sin avisos |
 

@@ -97,7 +97,7 @@ comprobación y conviene no confundirlas:
 | Clase | Cuántas | Qué es |
 | :--- | :---: | :--- |
 | Pruebas | 2064 servidor · 748 cliente | Comprueban **casos** |
-| Controles de configuración peligrosa | 60 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
+| Controles de configuración peligrosa | 61 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
 | Guardas de propiedades | 7 | Programas que levantan la aplicación y comprueban **propiedades**, no casos |
 
 Las guardas de propiedades, con su orden propio y nombre propio en el CI:

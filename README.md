@@ -21,7 +21,7 @@
 | :--- | :--- |
 | **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 2064 pruebas de servidor y 748 de cliente, seis contenedores. |
 | **Cómo se levanta** | Entrenar el modelo, `python devops/pila.py iniciar`, `python devops/pila.py up --build -d`, y el panel queda en [localhost:3000](http://localhost:3000). Las órdenes exactas, en la [guía de inicio rápido](#-guía-de-inicio-rápido-despliegue-de-la-versión-entregable). Nunca `docker compose` a secas: el lanzador es el único arranque, y los secretos viven **fuera** del árbol. |
-| **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **60 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
+| **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **61 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
 | **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
 | **Qué está congelado** | Desde el **06-10-2026**, todo: entra un cambio solo si sin él la pila no se levanta o la demostración no se puede enseñar. Lo que queda abierto está escrito y clasificado en [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md), que es la autoridad sobre esto. |
 | **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **39 restos menores** de §6.4 y las **trece decisiones** de §7 «lo que no se va a hacer, y por qué». |
@@ -60,7 +60,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 > **Calidad en las dos mitades.** 2064 pruebas en el backend (99 % de cobertura contando
 > ramas) y 748 en
 > el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
-> encendidas—, y 10 trabajos de integración continua con 60 controles de regresión de
+> encendidas—, y 10 trabajos de integración continua con 61 controles de regresión de
 > configuración peligrosa y **siete guardas de propiedades**, cada una con su arnés de
 > reintroducción de defectos.
 >

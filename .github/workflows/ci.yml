@@ -73,6 +73,14 @@ env:
   # comentario de encima, asi que contar los comentarios haria que el trinquete midiera
   # comentarios. Son diez sentencias repartidas en siete sitios.
   PRAGMAS_MAXIMOS: "10"
+  # Cuantos hallazgos de gitleaks estan perdonados en `.gitleaksignore`. Uno: una frase
+  # inventada para crear una cuenta en una prueba, que la regla `generic-api-key` marca por
+  # entropia. El control «Ninguna excepcion de gitleaks sin motivo» exige que cada linea sea
+  # una HUELLA completa -confirmacion, archivo, regla y numero de linea-, que lleve su motivo
+  # escrito encima y que el total no pase de aqui. Mismo trinquete al reves que el de las
+  # marcas de cobertura: una excepcion de mas es un sitio donde el escaner ya no mira, y la
+  # unica defensa es que aparecer una obligue a cambiar este numero a mano.
+  EXCEPCIONES_GITLEAKS: "1"
   # El suelo del cliente lo aplica Vitest desde `vite.config.js`: desde el 7 de octubre
   # de 2026 es 96.6/91.7/98.5/98.6 sobre los seis modulos con logica, pegado con dos
   # decimales a lo medido —96.65/91.75/98.52/98.68— de modo que perder UNA sentencia, UNA
@@ -127,8 +135,14 @@ jobs:
       # licencia para cuentas de organización y aquí no aporta nada a cambio.
       - name: Escanear el historial en busca de secretos
         run: |
+          # La ruta del archivo de excepciones va escrita a mano porque dentro del
+          # contenedor el directorio de trabajo no es el repositorio: gitleaks busca
+          # `.gitleaksignore` junto a donde se le lanza, y ahi no esta. Sin el flag el
+          # archivo existe en el arbol y el escaner no lo lee, que es la peor de las dos
+          # formas de equivocarse -parece puesto y no lo esta-.
           docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
-            detect --source=/repo --redact --no-banner --verbose
+            detect --source=/repo --redact --no-banner --verbose \
+            --gitleaks-ignore-path=/repo/.gitleaksignore
 
   # ============================================================================
   # Vulnerabilidades conocidas en las dependencias
@@ -5589,6 +5603,130 @@ jobs:
 
           print(f"Las {len(marcas)} marcas de cobertura de backend/app llevan su motivo, y no")
           print(f"son mas de las {MAXIMAS} inventariadas.")
+          PY
+      # Lo mismo que el control de arriba, en el otro escaner. §6.4 punto 67: gitleaks marca
+      # una contrasena inventada en una prueba y el trabajo `secretos` lleva rojo por eso.
+      # Un hallazgo que no es un secreto hay que perdonarlo de alguna forma, y las formas
+      # NO son equivalentes:
+      #
+      #   * `# gitleaks:allow` en el codigo no dice por que, y es justo la clase de marca sin
+      #     motivo que el control de arriba persigue en la cobertura;
+      #   * una exclusion por ruta apaga el escaner para todo un archivo -o para todas las
+      #     pruebas-, asi que un secreto de verdad escrito manana ahi al lado pasa sin que
+      #     nada se ponga rojo. Es la forma de arreglo que convierte un control en adorno;
+      #   * una HUELLA fija cuatro cosas a la vez -confirmacion, archivo, regla y numero de
+      #     linea-, asi que no cubre nada mas que el hallazgo que nombra.
+      #
+      # Y hay una cuarta forma de que esto no sirva, que es la que mas cuesta ver: que el
+      # archivo este puesto y el escaner no lo lea. Dentro del contenedor el directorio de
+      # trabajo no es el repositorio, asi que sin `--gitleaks-ignore-path` el archivo existe
+      # y no se usa. Eso se comprueba aqui tambien, leyendo la orden del propio flujo.
+      - name: Ninguna excepcion de gitleaks sin motivo
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          MAXIMAS = int(os.environ["EXCEPCIONES_GITLEAKS"])
+          ARCHIVO = pathlib.Path(".gitleaksignore")
+          HUELLA = re.compile(r"^(?P<commit>[0-9a-f]{40}):(?P<ruta>[^:]+):(?P<regla>[^:]+):(?P<linea>\d+)$")
+
+          fallos = []
+
+          # 1. La orden del flujo tiene que decirle al escaner donde esta el archivo.
+          #
+          # Se busca SOLO dentro del trabajo `secretos` y sin sus comentarios. Buscar el
+          # nombre del flag en todo el archivo lo encontraba en el comentario de este mismo
+          # control -que lo nombra para explicar por que hace falta-, asi que la guarda se
+          # satisfacia con su propia explicacion y pasaba con la orden ya cambiada. Lo
+          # encontro el arnes de reintroduccion, y es la cuarta vez que este repositorio
+          # tropieza con esa forma.
+          lineas_flujo = pathlib.Path(".github/workflows/ci.yml").read_text(encoding="utf-8").splitlines()
+          inicio = next((n for n, l in enumerate(lineas_flujo) if l.rstrip() == "  secretos:"), None)
+          if inicio is None:
+              sys.exit("FALLO: el flujo ya no tiene el trabajo `secretos`.")
+          fin = next(
+              (n for n in range(inicio + 1, len(lineas_flujo)) if re.match(r"^  [a-z]", lineas_flujo[n])),
+              len(lineas_flujo),
+          )
+          trabajo = "\n".join(
+              re.sub(r"\s*#.*$", "", l) for l in lineas_flujo[inicio:fin]
+          )
+          if "gitleaks/gitleaks:" not in trabajo or "detect --source" not in trabajo:
+              sys.exit("FALLO: no se encontro la orden de gitleaks en el trabajo `secretos`.")
+          if ARCHIVO.exists() and "--gitleaks-ignore-path" not in trabajo:
+              fallos.append(
+                  "hay un .gitleaksignore en el arbol y la orden no lo pasa con "
+                  "--gitleaks-ignore-path: el archivo esta puesto y el escaner no lo lee"
+              )
+
+          # 2. Ninguna marca suelta en el codigo, que es la forma sin motivo.
+          sueltas = []
+          for carpeta in ("backend", "frontend/src", "ml_pipeline", "scripts", "devops"):
+              raiz = pathlib.Path(carpeta)
+              if not raiz.exists():
+                  continue
+              for ruta in sorted(raiz.rglob("*")):
+                  if not ruta.is_file() or ruta.suffix not in {".py", ".js", ".jsx", ".sh", ".yml", ".yaml", ".toml"}:
+                      continue
+                  try:
+                      texto = ruta.read_text(encoding="utf-8")
+                  except (UnicodeDecodeError, OSError):
+                      continue
+                  if "gitleaks:allow" in texto:
+                      sueltas.append(ruta.as_posix())
+          if sueltas:
+              fallos.append("hay marcas `gitleaks:allow` sueltas, sin motivo y sin inventario: " + ", ".join(sueltas))
+
+          # 3. El archivo, si existe: cada linea una huella, con su motivo encima.
+          perdonados = []
+          if ARCHIVO.exists():
+              lineas = ARCHIVO.read_text(encoding="utf-8").splitlines()
+              for numero, linea in enumerate(lineas):
+                  desnuda = linea.strip()
+                  if not desnuda or desnuda.startswith("#"):
+                      continue
+                  donde = f".gitleaksignore:{numero + 1}"
+                  perdonados.append(donde)
+                  if not HUELLA.match(desnuda):
+                      fallos.append(
+                          f"{donde} no es una huella completa "
+                          "(confirmacion:archivo:regla:linea): una exclusion mas ancha "
+                          "apaga el escaner para mas de lo que se quiso perdonar"
+                      )
+                      continue
+                  # El motivo: el bloque de comentario inmediatamente encima.
+                  motivo = []
+                  for anterior in reversed(lineas[:numero]):
+                      if not anterior.strip():
+                          break
+                      if not anterior.strip().startswith("#"):
+                          break
+                      motivo.append(anterior.strip().lstrip("#").strip())
+                  if not any(motivo):
+                      fallos.append(
+                          f"{donde} no lleva motivo escrito encima: dentro de un ano nadie "
+                          "sabra si ese hallazgo seguia siendo inofensivo"
+                      )
+
+          if len(perdonados) > MAXIMAS:
+              fallos.append(
+                  f"hay {len(perdonados)} excepciones de gitleaks y el trinquete admite "
+                  f"{MAXIMAS}. Cada una es un sitio donde el escaner ya no mira: si la nueva "
+                  "esta justificada, suba EXCEPCIONES_GITLEAKS a mano y dejelo dicho"
+              )
+
+          if fallos:
+              print("FALLO: las excepciones de gitleaks no son estrechas o no dicen por que.")
+              for f in fallos:
+                  print(f"  - {f}")
+              sys.exit(1)
+
+          print(f"Excepciones de gitleaks: {len(perdonados)} de {MAXIMAS}. Todas son huellas")
+          print("completas, llevan su motivo y el escaner las lee; ninguna marca suelta.")
           PY
 
   # ============================================================================

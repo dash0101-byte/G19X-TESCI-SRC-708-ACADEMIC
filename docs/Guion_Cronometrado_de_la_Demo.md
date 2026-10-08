@@ -79,7 +79,7 @@ para explicar lo que se va a ver, y todo lo posterior para explicar lo que se ac
 | **1:00 – 2:00** | El problema | 36 horas de latencia, 12 % de conversión, atención FIFO. Y la restricción: local, a coste cero, con salida a Azure |
 | **2:00 – 3:00** | La arquitectura, en una diapositiva | Puertos y adaptadores; el score híbrido 60/40 con decaimiento exponencial de vida media 14 días |
 | **3:00 – 7:30** | **LA DEMOSTRACIÓN** — §4 | Del post a la red social hasta el dato de entrenamiento |
-| **7:30 – 8:45** | Calidad, seguridad y operación | 2064 + 748 pruebas, 99 % de cobertura con ramas, 10 trabajos de CI, 60 controles y siete guardas de propiedades |
+| **7:30 – 8:45** | Calidad, seguridad y operación | 2064 + 748 pruebas, 99 % de cobertura con ramas, 10 trabajos de CI, 61 controles y siete guardas de propiedades |
 | **8:45 – 10:00** | Lo que se negó a hacer, y cierre | Por qué no se reentrenó, por qué no hay pesos inventados, y qué queda |
 
 ---
