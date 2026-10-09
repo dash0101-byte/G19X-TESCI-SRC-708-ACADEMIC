@@ -20,7 +20,7 @@
 # Los compiladores y las cabeceras de desarrollo solo hacen falta para construir las
 # ruedas de psycopg2, numpy y scikit-learn. Se quedan en esta etapa y no viajan a la
 # imagen final, que es lo que reduce tanto el tamaño como la superficie de ataque.
-FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS builder
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -62,7 +62,7 @@ RUN pip install --require-hashes -r /tmp/requirements.lock
 # ------------------------------------------------------------------------------
 # Etapa 2 — Imagen de ejecución
 # ------------------------------------------------------------------------------
-FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS runtime
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS runtime
 
 # libpq5 es la biblioteca en tiempo de ejecución de PostgreSQL; libpq-dev (cabeceras y
 # compilador) se queda en la etapa de compilación. Desde el capítulo 32 va con su versión
@@ -70,14 +70,31 @@ FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb
 # cerca está del proceso que atiende peticiones.
 #
 # Los otros cuatro son parches de Debian 13 sobre la base fijada (capítulo 22): con la huella
-# de hoy, Trivy encontraba doce avisos ALTOS o CRÍTICOS con arreglo publicado en ellos. Van con
-# su versión exacta por la misma razón que los de `apk` del cliente: lo que entra lo decide
+# de entonces, Trivy encontraba doce avisos ALTOS o CRÍTICOS con arreglo publicado en ellos. Van
+# con su versión exacta por la misma razón que los de `apk` del cliente: lo que entra lo decide
 # este archivo, no el día de la construcción. Cuando Debian publique otra revisión, esta
 # línea dejará de construir; se resuelve renovando la base y mirando qué sigue haciendo falta.
+#
+# **Y eso pasó el 9 de octubre de 2026**, que es la primera vez que el aviso llegó como estaba
+# previsto. Debian publicó `deb13u3` de `libpcre2-8-0` —CVE-2026-103111, escritura fuera de
+# límites con una expresión regular preparada— y la base nueva ya lo traía instalado, así que
+# pedir `deb13u2` dejó de ser «subir» para ser BAJAR: `E: Packages were downgraded and -y was
+# used without --allow-downgrades`, salida 100. Ni silencio ni imagen distinta: un fallo de
+# construcción con el motivo escrito, que es para lo que esta línea lleva versiones.
+#
+# Resuelto como dice el párrafo de arriba: huella de la base renovada —`9d2e…0285` a
+# `bf44…d79c`, Debian 13.6 a 13.7— y esta versión subida a `deb13u3`. La renovación trae ADEMÁS
+# los otros seis avisos, que no estaban aquí porque `libssl3t64`, `openssl` y
+# `openssl-provider-legacy` no se instalan en este archivo: llegan con la base, y en 13.7 vienen
+# en `3.5.7-1~deb13u3` con CVE-2026-75804 y CVE-2026-84782 cerrados.
+#
+# Los otros cuatro siguen sin tocarse, y medido antes de dejarlos: en la base nueva el instalado
+# y el candidato coinciden con lo que piden estas líneas, así que hoy no suben nada. Se quedan
+# igual por lo mismo que se escribieron: son el aviso de la próxima revisión de Debian.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     'libpq5=17.11-0+deb13u1' \
     'gzip=1.13-1+deb13u1' \
-    'libpcre2-8-0=10.46-1~deb13u2' \
+    'libpcre2-8-0=10.46-1~deb13u3' \
     'libsqlite3-0=3.46.1-7+deb13u2' \
     'perl-base=5.40.1-6+deb13u1' \
     && rm -rf /var/lib/apt/lists/*

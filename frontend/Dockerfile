@@ -84,7 +84,21 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # llega como un fallo de construcción y no como una imagen distinta en silencio. Se resuelve
 # renovando la base y mirando qué sigue haciendo falta:
 #   docker run --rm <imagen base> sh -c "apk update -q && apk version -l '<'"
-RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0'
+#
+# Los tres últimos entraron el 9 de octubre de 2026, la primera vez que un escáner mira esta
+# imagen. No es una forma de hablar: el paso de Trivy del CI llevaba desde que se escribió sin
+# ejecutar un escaneo (punto 72 de §6.4), y cuando por fin corrió, su puerta sale con 1 en la
+# PRIMERA imagen, así que esta quedaba detrás y nunca se llegaba a ella. Al escanearla aparte
+# salieron tres ALTOS con arreglo publicado: `libexpat` CVE-2026-93990 (inyección de XML con
+# UTF-16 mal formado), `pcre2` CVE-2026-103111 —el mismo que el `libpcre2` del backend— y `tiff`
+# CVE-2026-4775 (ejecución de código o denegación de servicio por un entero con signo).
+#
+# Van como pines y NO renovando la huella de la base, porque renovarla no los arregla: se
+# comprobó que `nginx:alpine` al día —`72ba…f1d3` a `df22…eac2`, Alpine 3.24.1 a 3.24.2— trae
+# exactamente las mismas versiones de los tres. La imagen va por detrás del REPOSITORIO, no del
+# arreglo: v3.24/main ya publica 2.8.5-r0, 10.49-r0 y 4.7.2-r0, que es lo que se fija aquí.
+RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0' \
+    'libexpat=2.8.5-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0'
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fragmento con las cabeceras de seguridad, incluido desde cada `location`.
