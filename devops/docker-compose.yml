@@ -65,7 +65,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: plurione_leadscoring_db
     restart: unless-stopped
     environment:
@@ -691,7 +691,7 @@ services:
   # Usan la MISMA imagen que el servidor. `pg_dump` se niega a volcar un servidor más nuevo
   # que él, y esa negativa aparece el día que alguien actualiza PostgreSQL y no el cliente.
   respaldo:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: plurione_leadscoring_respaldo
     profiles: ["respaldo"]
     restart: "no"
@@ -727,7 +727,7 @@ services:
   # Restaura el volcado más reciente en una base desechable y compara los recuentos con la
   # base real. Es lo que separa «tenemos copias» de «tenemos copias que sirven».
   prueba-de-restauracion:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: plurione_leadscoring_prueba_restauracion
     profiles: ["respaldo"]
     restart: "no"
@@ -762,7 +762,7 @@ services:
   # La operación destructiva. Exige el archivo exacto y una confirmación explícita; el
   # script no continúa sin las dos.
   restaurar:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: plurione_leadscoring_restaurar
     profiles: ["respaldo"]
     restart: "no"
