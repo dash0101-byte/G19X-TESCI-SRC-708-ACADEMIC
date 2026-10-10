@@ -24,7 +24,7 @@ email-validator>=2.1.0
 # historicamente la superficie de esta biblioteca.
 pillow>=11.0.0,<13.0.0
 # Teléfonos en E.164: validar al guardar y normalizar lo existente (Fase 15).
-phonenumbers>=8.13.0
+phonenumbers>=9.0.40
 # El código QR del alta del segundo factor (capítulo 35). Es la ÚNICA dependencia que
 # añade ese capítulo, y entra porque es la única pieza que sale peor escrita a mano: un
 # codificador de QR son los polinomios de Reed-Solomon, ocho patrones de enmascaramiento y
