@@ -200,7 +200,7 @@ en [`Congelacion_y_Trabajo_Futuro.md`](Congelacion_y_Trabajo_Futuro.md).
 | **Cuentas externas** (§3) | LinkedIn, Calendly y WhatsApp no se leen; no se publica solo en ninguna red; la tarjeta de vista previa no se ha mirado en una red de verdad; las copias no salen de la máquina |
 | **Datos reales** (§4) | El modelo no se reentrena; no hay deriva medible; los cierres anteriores al capítulo 30 no tienen motivo; **la sesión con personas sigue sin celebrarse** |
 | **Decisiones que no son técnicas** (§5) | Los plazos de conservación no tienen valoración jurídica; suprimir aquí no suprime en el CRM; los motivos de pérdida no tienen peso; no hay previsión de ingresos |
-| **Deuda de ingeniería** (§6) | Cinco de nueve huecos de la historia cerrados; **57 restos menores** anotados, numerados hasta el 77, de los que **16 se cerraron** en los capítulos siguientes y el resto queda con su medición y su motivo |
+| **Deuda de ingeniería** (§6) | Cinco de nueve huecos de la historia cerrados; **58 restos menores** anotados, numerados hasta el 78, de los que **16 se cerraron** en los capítulos siguientes y el resto queda con su medición y su motivo |
 
 Y una sección de **lo que no se va a hacer, con el motivo**, para que las mismas discusiones
 no se reabran cada año.

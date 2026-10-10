@@ -199,11 +199,11 @@ convence, la discusión es con ese sitio.
 | El `pip install` de la construcción de la imagen falla con **«No matching distribution found for aiosqlite==0.22.1»** | **No es el lock.** Dos líneas más arriba está la causa: `CERTIFICATE_VERIFY_FAILED`. En una red que intercepta TLS —un proxy corporativo— el certificado de PyPI lo firma una autoridad que no está en el almacén del contenedor, pip no puede leer el índice y lo cuenta como «ninguna versión disponible». Es la misma red que pinta de rojo la dirección pública, dos filas más abajo | medido el 07-10-2026 |
 | Las órdenes con rutas de dentro del contenedor —`/app/scripts/seed_data.py`— fallan en **Git Bash** con `can't open file '/app/C:/Program Files/Git/app/…'` | Es del shell, no del sistema: Git Bash traduce lo que empieza por `/` a una ruta de Windows. En PowerShell y en `cmd` funcionan tal cual; en Git Bash, con `MSYS_NO_PATHCONV=1` delante | medido el 07-10-2026 |
 | La contraseña `PluriOne2026!` está **en el README** | Es la de desarrollo de `seed_data.py`, documentada desde el principio; en un entorno endurecido el sembrado genera una aleatoria. Es la única excepción a «nunca secretos en el árbol» | `AGENTS.md` §5 |
-| Hay **57 puntos anotados** de deuda menor, 41 abiertos | Están anotados **a propósito**: desde la congelación, lo que no impide levantar la pila ni enseñar la demostración se escribe en lugar de arreglarse. Esa lista es parte del entregable | §6.4 |
+| Hay **58 puntos anotados** de deuda menor, 42 abiertos | Están anotados **a propósito**: desde la congelación, lo que no impide levantar la pila ni enseñar la demostración se escribe en lugar de arreglarse. Esa lista es parte del entregable | §6.4 |
 
 Dos listas más largas que esta tabla, y que son la autoridad:
 
-* **[`Congelacion_y_Trabajo_Futuro.md`](Congelacion_y_Trabajo_Futuro.md) §6.4** — los 57 restos
+* **[`Congelacion_y_Trabajo_Futuro.md`](Congelacion_y_Trabajo_Futuro.md) §6.4** — los 58 restos
   menores, con su origen y las 16 tachaduras de los que se cerraron después.
 * **El mismo documento, §7 — «Lo que no se va a hacer, y por qué».** Trece decisiones que no
   están pendientes: están decididas. Si una incidencia propone algo de esa tabla, ya tiene
