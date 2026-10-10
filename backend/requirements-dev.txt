@@ -10,7 +10,7 @@ pytest-asyncio>=0.23.5
 pytest-cov>=5.0.0
 
 # Calidad y auditoría de seguridad en el pipeline
-ruff>=0.6.0
+ruff>=0.16.10
 pip-audit>=2.7.0
 
 # Las pruebas de la pila de despliegue leen devops/docker-compose.yml y comprueban que
