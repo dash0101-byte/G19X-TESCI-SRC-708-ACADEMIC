@@ -11,13 +11,21 @@
 
 ---
 
-## Ruta de diez minutos
+## Cómo ejecutarlo desde cero
 
 Para quien llega a evaluarlo y quiere verlo funcionando antes de leer nada más. Si algo de
 aquí no sale, está en [**Si algo falla**](docs/Si_Algo_Falla.md).
 
 **Hace falta instalado:** Python 3.13, Node.js 20 y Docker Desktop. Nada más —PostgreSQL y
 Redis vienen dentro de la pila—.
+
+**Cuánto tarda, cronometrado el 9 de octubre de 2026 sobre un clon limpio.** Todo menos
+construir las imágenes son **306 s**: clonar 20, instalar el lock 147, entrenar el modelo 38,
+compilar el cliente 40, migrar 38 y sembrar 8. Lo que manda en el total es la construcción de
+las imágenes, y no depende del repositorio sino de lo que la máquina ya tenga: **37 s con la
+caché de Docker caliente y 464 s con ella fría** —y más aún si hay que descargar las imágenes
+base—. Así que entre **seis y trece minutos**, y la diferencia es casi toda descarga. Los
+pasos 1 a 3 se hacen una sola vez; a partir de ahí, levantar la pila son segundos.
 
 > **Docker Desktop se apaga solo, y no lo dice.** Trae el *Resource Saver* encendido con un
 > plazo de cinco minutos: si no hay ningún contenedor corriendo apaga su máquina Linux, el
