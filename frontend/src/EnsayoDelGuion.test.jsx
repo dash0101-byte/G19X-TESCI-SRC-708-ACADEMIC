@@ -361,8 +361,13 @@ describe('A. Marketing', () => {
     // vivas vacías —una de alerta y otra de estado— para lo que diga una operación que no
     // vive en ninguna pantalla, así que en el panel hay más de un `role="status"`. Lo que
     // esta tarea comprueba es que el aviso de la publicación creada salga en una de ellas.
-    const avisos = await screen.findAllByRole('status');
-    expect(avisos.map((nodo) => nodo.textContent).join(' ')).toContain('creada');
+    // Y en un `waitFor`, no en un `findAllByRole`: precisamente porque esas dos regiones
+    // están SIEMPRE montadas, buscarlas se cumple en el acto y con el texto sin llegar.
+    // Lo que hay que esperar es el aviso, no la región que lo llevará.
+    await waitFor(() => {
+      const avisos = screen.getAllByRole('status');
+      expect(avisos.map((nodo) => nodo.textContent).join(' ')).toContain('creada');
+    });
 
     // Tarea 3: llevarse el texto listo, sin escribir el enlace a mano.
     const lista = await screen.findByRole('list', { name: 'Publicaciones' });
@@ -516,8 +521,11 @@ describe('C. Líder', () => {
     expect(screen.getByText(/Cubrir vacantes de TI/)).toBeInTheDocument();
     expect(screen.getByText(/Aceptó el aviso de privacidad el/)).toBeInTheDocument();
 
-    // Tarea 5: asignársela al asesor.
-    await usuario.selectOptions(await screen.findByLabelText('Asignar a'), String(CUENTAS.asesor.id));
+    // Tarea 5: asignársela al asesor. Se espera la OPCIÓN y no la etiqueta: el selector se
+    // dibuja antes de que llegue el equipo, así que `findByLabelText('Asignar a')` se
+    // cumple con la lista vacía y elegir falla con «Value "3" not found in options».
+    await screen.findByRole('option', { name: new RegExp(CUENTAS.asesor.full_name) });
+    await usuario.selectOptions(screen.getByLabelText('Asignar a'), String(CUENTAS.asesor.id));
     await usuario.click(screen.getByRole('button', { name: 'Asignar' }));
 
     await waitFor(() => {

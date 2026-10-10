@@ -411,9 +411,19 @@ describe('la supresión', () => {
 
     await abrirSupresion(usuario);
     await usuario.type(screen.getByLabelText(/Escriba el correo completo/), CORREO);
+    // Cuántos blobs había ANTES de suprimir: «el último» no sirve para esperar, porque el
+    // último de antes ya existe y la espera se cumpliría sola.
+    const blobsAntes = globalThis.URL.createObjectURL.mock.calls.length;
     await usuario.click(screen.getByRole('button', { name: 'Suprimir definitivamente' }));
 
     await waitFor(() => expect(api.suprimirTitular).toHaveBeenCalledWith(FICHA.id));
+    // Y la constancia con su propia espera: se escribe DESPUÉS de que el servidor confirme
+    // la supresión, mientras el `waitFor` de arriba se cumple en cuanto la llamada sale.
+    // Sin esto se leía el blob anterior —o ninguno— y la prueba moría con
+    // «Cannot read properties of undefined».
+    await waitFor(() =>
+      expect(globalThis.URL.createObjectURL.mock.calls.length).toBeGreaterThan(blobsAntes),
+    );
 
     // La constancia es el último blob que se descargó.
     const blobs = globalThis.URL.createObjectURL.mock.calls;

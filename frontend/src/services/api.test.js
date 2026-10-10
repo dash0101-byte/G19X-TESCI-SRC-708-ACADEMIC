@@ -310,8 +310,12 @@ describe('restaurar la sesión y cerrarla', () => {
 
     // Un 401 abre la renovación...
     const enVuelo = api.fetchLeads().catch(() => {});
-    await Promise.resolve();
-    await Promise.resolve();
+    // ...y se espera a que esté DE VERDAD en vuelo, no «dos ticks». Dos
+    // `await Promise.resolve()` daban por hecho que el 401 ya había llegado al cliente y
+    // que este ya había pedido la renovación; con la respuesta llegando un instante más
+    // tarde, `resolverPrimera` todavía no existía y la prueba moría con
+    // «resolverPrimera is not a function», que no se parece en nada al motivo.
+    await vi.waitFor(() => expect(resolverPrimera).toBeTypeOf('function'));
 
     // ...y en mitad de ella, la persona cierra sesión y vuelve a entrar.
     await api.logout();

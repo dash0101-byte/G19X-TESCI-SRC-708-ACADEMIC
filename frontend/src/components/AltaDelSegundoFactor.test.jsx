@@ -78,7 +78,9 @@ describe('el alta del segundo factor', () => {
     await usuario.click(screen.getByRole('button', { name: /Activar el segundo factor/ }));
 
     await waitFor(() => expect(activarSegundoFactor).toHaveBeenCalledWith('123456'));
-    expect(onActivado).toHaveBeenCalled();
+    // Con su propia espera: a quien la montó se le avisa DESPUÉS de que el servidor
+    // confirme, y el `waitFor` de arriba se cumple en cuanto la llamada sale.
+    await waitFor(() => expect(onActivado).toHaveBeenCalled());
   });
 
   it('un código equivocado deja el motivo en pantalla y no activa', async () => {

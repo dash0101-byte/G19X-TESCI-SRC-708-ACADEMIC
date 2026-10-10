@@ -525,9 +525,17 @@ describe('el resultado del recálculo masivo', () => {
 
     await recalcular();
 
-    const avisos = await screen.findAllByRole('status');
-    const aviso = avisos.find((nodo) => nodo.textContent.includes('recalculados'));
-    expect(aviso).toBeDefined();
+    // `findAllByRole` NO espera a este aviso: desde el capítulo 43 `App` mantiene dos
+    // regiones vivas y VACÍAS para lo que diga una operación sin pantalla, así que se
+    // cumple en el acto y con el texto todavía sin llegar. Se espera a que una de ellas
+    // HABLE, que es lo que esta prueba mira.
+    const aviso = await waitFor(() => {
+      const hablando = screen
+        .getAllByRole('status')
+        .find((nodo) => nodo.textContent.includes('recalculados'));
+      expect(hablando).toBeDefined();
+      return hablando;
+    });
     expect(aviso.textContent).toContain('312 prospectos recalculados');
     // Un éxito no se anuncia como alerta: `role="status"` espera a que el lector de
     // pantalla termine lo que esté diciendo.
@@ -546,9 +554,13 @@ describe('el resultado del recálculo masivo', () => {
 
     // Varias regiones de alerta conviven en el panel —la de `App` y la de la pantalla de
     // derechos, que también vive en administración—, así que se busca la que habla.
-    const avisos = await screen.findAllByRole('alert');
-    const aviso = avisos.find((nodo) => nodo.textContent.includes('extractor'));
-    expect(aviso, 'el fallo del recálculo no salió en ninguna región de alerta').toBeDefined();
+    const aviso = await waitFor(() => {
+      const hablando = screen
+        .getAllByRole('alert')
+        .find((nodo) => nodo.textContent.includes('extractor'));
+      expect(hablando, 'el fallo del recálculo no salió en ninguna región de alerta').toBeDefined();
+      return hablando;
+    });
     expect(aviso.textContent).toContain('el extractor se quedó sin memoria');
     expect(aviso.querySelector('.alert-error')).not.toBeNull();
   });

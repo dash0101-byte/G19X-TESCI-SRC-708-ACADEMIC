@@ -105,7 +105,9 @@ describe('La bandeja de hoy', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ya está' }));
 
     await waitFor(() => expect(marcarTareaHecha).toHaveBeenCalledWith(1));
-    expect(fetchBandejaDeHoy).toHaveBeenCalledTimes(2);
+    // Con su propia espera: volver a preguntar qué queda ocurre DESPUÉS de que el cierre
+    // conteste, y el `waitFor` de arriba se cumple en cuanto la llamada sale.
+    await waitFor(() => expect(fetchBandejaDeHoy).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText('Llamar por primera vez')).not.toBeInTheDocument());
   });
 

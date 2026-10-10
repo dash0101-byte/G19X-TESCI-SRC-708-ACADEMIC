@@ -98,7 +98,9 @@ describe('la casilla del aviso de privacidad', () => {
 
     await altaMinima(usuario);
 
-    expect(creado).toHaveBeenCalled();
+    // Con su propia espera: `altaMinima` espera a que el alta SALGA, y a quien la pidió se
+    // le avisa después de que el servidor conteste.
+    await waitFor(() => expect(creado).toHaveBeenCalled());
   });
 
   it('la casilla no viaja dentro de los campos personalizados', async () => {

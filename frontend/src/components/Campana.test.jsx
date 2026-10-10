@@ -29,6 +29,13 @@ beforeEach(() => {
   marcarAvisosLeidos.mockResolvedValue({ leidos: 1 });
 });
 
+// La campana se abre con la lista VACÍA, y la causa es fina: `/Avisos:/` casa también con
+// «Avisos: ninguno sin leer», que es lo que dice el PRIMER render, cuando el recuento
+// todavía no ha llegado. Así que el clic abre el diálogo antes de que haya un solo aviso
+// dentro, y un `getBy…` detrás encuentra el diálogo pero no su contenido. Quien va a tocar
+// un aviso espera el AVISO, no el diálogo.
+const esperarElAviso = () => screen.findByRole('button', { name: /Rosa Lima/ });
+
 describe('La campana', () => {
   it('enseña cuántos hay sin leer', async () => {
     render(<Campana onSelectLead={vi.fn()} />);
@@ -66,7 +73,7 @@ describe('La campana', () => {
     render(<Campana onSelectLead={vi.fn()} />);
     await userEvent.click(await screen.findByRole('button', { name: /Avisos:/ }));
 
-    expect(screen.getByText(/Rosa Lima · Lima SA/)).toBeInTheDocument();
+    expect(await screen.findByText(/Rosa Lima · Lima SA/)).toBeInTheDocument();
     expect(screen.getByText(/sin contactar desde hace 24 h/)).toBeInTheDocument();
   });
 
@@ -77,10 +84,12 @@ describe('La campana', () => {
     render(<Campana onSelectLead={onSelectLead} />);
     await userEvent.click(await screen.findByRole('button', { name: /Avisos:/ }));
 
-    await userEvent.click(screen.getByRole('button', { name: /Rosa Lima/ }));
+    await userEvent.click(await esperarElAviso());
 
     await waitFor(() => expect(marcarAvisosLeidos).toHaveBeenCalledWith([1]));
-    expect(onSelectLead).toHaveBeenCalledWith(10);
+    // Con su propia espera: abrir la ficha ocurre DESPUÉS de anotar la lectura, y el
+    // `waitFor` de arriba se cumple en cuanto la llamada sale.
+    await waitFor(() => expect(onSelectLead).toHaveBeenCalledWith(10));
   });
 
   it('si el marcado falla, la ficha se abre igual', async () => {
@@ -91,7 +100,7 @@ describe('La campana', () => {
     render(<Campana onSelectLead={onSelectLead} />);
     await userEvent.click(await screen.findByRole('button', { name: /Avisos:/ }));
 
-    await userEvent.click(screen.getByRole('button', { name: /Rosa Lima/ }));
+    await userEvent.click(await esperarElAviso());
 
     await waitFor(() => expect(onSelectLead).toHaveBeenCalledWith(10));
   });
@@ -101,7 +110,7 @@ describe('La campana', () => {
     render(<Campana onSelectLead={vi.fn()} />);
     await userEvent.click(await screen.findByRole('button', { name: /Avisos:/ }));
 
-    await userEvent.click(screen.getByRole('button', { name: /Rosa Lima/ }));
+    await userEvent.click(await esperarElAviso());
 
     expect(marcarAvisosLeidos).not.toHaveBeenCalled();
   });
@@ -111,7 +120,7 @@ describe('La campana', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Avisos:/ }));
     fetchAvisos.mockResolvedValue({ sin_leer: 0, avisos: [aviso({ leido_en: new Date().toISOString() })] });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar todos como leídos' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Marcar todos como leídos' }));
 
     await waitFor(() => expect(marcarAvisosLeidos).toHaveBeenCalledWith());
     await waitFor(() =>

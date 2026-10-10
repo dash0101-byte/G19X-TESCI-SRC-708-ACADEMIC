@@ -116,7 +116,9 @@ describe('Cerrar un prospecto', () => {
     expect(cuerpo.cerrado_el).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // Un perdido no manda tramo: el servidor lo rechazaría con un 422.
     expect(cuerpo).not.toHaveProperty('tramo');
-    expect(onCerrado).toHaveBeenCalled();
+    // Con su propia espera: la ficha se recarga DESPUÉS de que el cierre conteste, y el
+    // `waitFor` de arriba se cumple en cuanto la llamada sale.
+    await waitFor(() => expect(onCerrado).toHaveBeenCalled());
   });
 
   it('no deja cerrar sin elegir motivo', async () => {

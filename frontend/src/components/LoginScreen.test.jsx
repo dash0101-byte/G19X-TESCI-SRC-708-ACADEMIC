@@ -84,7 +84,9 @@ describe('la entrada', () => {
     await waitFor(() =>
       expect(completarLoginConSegundoFactor).toHaveBeenCalledWith('un.token.de.desafio', '123456'),
     );
-    expect(onAuthenticated).toHaveBeenCalledWith(USUARIO);
+    // Con su propia espera: la sesión se abre DESPUÉS de que el servidor valide el código,
+    // y el `waitFor` de arriba se cumple en cuanto la llamada sale.
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith(USUARIO));
   });
 
   it('un código equivocado devuelve al primer paso con el motivo', async () => {

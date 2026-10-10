@@ -247,7 +247,10 @@ describe('crear una publicación y copiar su texto', () => {
 
     expect(escribir).toHaveBeenCalledWith(PUBLICACION.texto_para_linkedin);
     expect(escribir.mock.calls[0][0]).toContain(ENLACE);
-    expect(await screen.findByRole('status')).toHaveTextContent('copiado');
+    // `findByRole('status')` ya NO espera nada aquí: la región existe desde el aviso de
+    // «creada» de más arriba, así que se devuelve con el texto anterior dentro. Lo que hay
+    // que esperar es que CAMBIE lo que dice.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('copiado'));
   });
 
   it('un borrador con cierre, responsable, post y opciones propias viaja completo', async () => {
@@ -410,6 +413,12 @@ describe('editar y el ciclo de estados', () => {
 
     await usuario.click(within(elemento(PUBLICACION.name)).getByRole('button', { name: 'Pausar' }));
     await waitFor(() => expect(cambiarEstadoDePublicacion).toHaveBeenCalledWith(5, 'pausada'));
+    // Antes del segundo clic hay que dejar que la recarga de la lista TERMINE. Pausar hace
+    // que la sección vuelva a pedir las publicaciones, y si eso aterriza entre buscar la
+    // fila y pulsarla, se pulsa un nodo ya desprendido del documento: el clic no hace nada
+    // y lo que falla es la espera de abajo, tres líneas más lejos del motivo.
+    await waitFor(() => expect(fetchCampaignList).toHaveBeenCalledTimes(2));
+    await esperarPublicacion('Post pausado');
     await usuario.click(within(elemento('Post pausado')).getByRole('button', { name: 'Reanudar' }));
     await waitFor(() => expect(cambiarEstadoDePublicacion).toHaveBeenCalledWith(9, 'activa'));
     expect(within(elemento('Post pausado')).getByText('Pausada')).toBeInTheDocument();
