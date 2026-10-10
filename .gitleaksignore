@@ -18,4 +18,10 @@
 # politica de longitud. La frase no abre nada -la base de pruebas es SQLite en memoria y se
 # crea y se tira en cada ejecucion- y no se parece a ninguna en uso. La regla
 # `generic-api-key` la marca por entropia, que es lo que hace bien: no sabe leer el contexto.
-8a352fb37634b4d5480d8fa1e33ee2308a436335:backend/tests/test_nada_supuesto_en_la_ficha.py:generic-api-key:216
+# La huella cambio de confirmacion el 10-10-2026: el historial se reescribio para
+# purgar tres documentos antes de publicar el repositorio, y `8a352fb37634` paso a ser
+# `221aad56f6bb`. El hallazgo es el mismo -mismo archivo, misma regla, misma linea 216-
+# y el motivo de arriba sigue valiendo entero; se comprobo volviendo a escanear y
+# cotejando con el mapa de `git filter-repo`. Que reaparezca al reescribir es lo que
+# este archivo dice que quiere: obliga a volver a justificarlo a mano.
+221aad56f6bb9f5954b85a38b2cf24f76f496ee6:backend/tests/test_nada_supuesto_en_la_ficha.py:generic-api-key:216
