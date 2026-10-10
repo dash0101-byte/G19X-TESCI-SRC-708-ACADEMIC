@@ -33,7 +33,7 @@ phonenumbers>=8.13.0
 #
 # Python puro y SIN dependencias propias: no arrastra nada al lock ni añade extensiones
 # compiladas, que era la objeción de fondo a traer `cryptography` solo para esto.
-segno>=1.6.0,<2.0.0
+segno>=1.6.6,<2.0.0
 # Limitación de tasa por IP en login, webhook CRM e inferencia de scoring.
 slowapi>=0.1.9
 # Almacén compartido del contador de tasa. Sin él, `limits` no sabe hablar con Redis
