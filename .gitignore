@@ -83,6 +83,11 @@ ml_pipeline/models/*.pkl
 # del tramite academico con datos de personas y de la empresa. No son parte del sistema
 # y no se publican.
 docs/docs_residencias/
+# Y las dos rubricas de evaluacion de la institucion: son los formularios que
+# rellena quien evalua, llegaron al primer commit por descuido y no forman parte
+# del sistema. Se quitan del repositorio sin borrarlos del disco.
+docs/evaluacion_informe.xlsx
+docs/evaluacion_seguimiento.xlsx
 
 # Informe de cobertura del cliente: se regenera con `npm run test:coverage`.
 frontend/coverage/
