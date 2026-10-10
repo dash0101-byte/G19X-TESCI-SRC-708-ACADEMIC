@@ -1,0 +1,9 @@
+# El volcado de la base lo importa quien revisa el proyecto con `psql`, así que es el único
+# archivo del árbol cuyos finales de línea no pueden depender del sistema donde se clone.
+# PostgreSQL acepta `\n`, `\r\n` y `\r` como fin de línea dentro de un `COPY`, pero con
+# `core.autocrlf=true` el archivo saldría en CRLF en Windows y en LF en Linux, y entregar
+# dos archivos distintos según quién clone es justo lo que no se quiere de una entrega.
+#
+# A propósito NO hay una regla `* text=auto`: el árbol tiene finales mixtos por archivo y
+# normalizarlo entero reescribiría casi todo, con la congelación definitiva en pie.
+db/base-de-datos.sql text eol=lf

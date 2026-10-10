@@ -4,8 +4,100 @@
 **Representante Legal:** Lic. Xochicuahuitl Gleason Juárez  
 **Asesor Empresarial:** Juan Méndez Herrera  
 **Líder de Proyecto:** Edgar Loheffelmman  
-**Alumno Residente:** Alumno de Ingeniería en Sistemas Computacionales  
+**Alumno Residente:** Rosales Castillo Sebastian · **Matrícula:** G19X-TESCI-SRC-708  
+**Institución:** Tecnológico de Estudios Superiores de Cuautitlán Izcalli (TESCI)  
+**Carrera:** Ingeniería en Sistemas Computacionales  
 **Periodo de Ejecución:** Estadía Profesional (2026)  
+
+---
+
+## Ruta de diez minutos
+
+Para quien llega a evaluarlo y quiere verlo funcionando antes de leer nada más. Si algo de
+aquí no sale, está en [**Si algo falla**](docs/Si_Algo_Falla.md).
+
+**Hace falta instalado:** Python 3.13, Node.js 20 y Docker Desktop. Nada más —PostgreSQL y
+Redis vienen dentro de la pila—.
+
+> **Docker Desktop se apaga solo, y no lo dice.** Trae el *Resource Saver* encendido con un
+> plazo de cinco minutos: si no hay ningún contenedor corriendo apaga su máquina Linux, el
+> icono **no cambia** y la ventana sigue diciendo que está encendido. La siguiente orden
+> falla. Si pasa, espere medio minuto a que vuelva, o apague ese ajuste en
+> *Settings → Resources*.
+
+```bash
+# 1. EL MODELO PRIMERO. No viaja en el repositorio y sin él la pila arranca igual, puntuando
+#    con el heurístico: no da ningún síntoma. Dos minutos, con los datos ya dentro.
+pip install --require-hashes -r backend/requirements.lock
+python ml_pipeline/src/train_model.py
+
+# 2. El cliente compilado. `dist/` tampoco viaja, y la imagen del backend lo copia para
+#    servir la SPA ella sola en el 8000. Sin él la construcción muere.
+cd frontend && npm ci && npm run build && cd ..
+
+# 3. El entorno, una sola vez. Genera los secretos FUERA del repositorio, en
+#    ~/.plurione/pila.env. Nunca `docker compose` a secas: el lanzador es el único arranque.
+python devops/pila.py iniciar
+
+# 4. El esquema y la pila.
+python devops/pila.py run --rm migrate
+python devops/pila.py up -d --build
+
+# 5. Las cuentas y los datos. UNA BASE RECIÉN MIGRADA NO TIENE NINGUNA CUENTA: sin este paso
+#    el panel pide credenciales que no existen.
+python devops/pila.py exec -e ENVIRONMENT=development backend python /app/scripts/seed_data.py
+```
+
+> En **Git Bash sobre Windows** el paso 5 falla: MSYS convierte `/app/scripts/…` en una ruta
+> de Windows y Python no la encuentra. Use PowerShell, o ponga `MSYS_NO_PATHCONV=1` delante.
+
+El panel queda en **<http://localhost:3000>**. Que está vivo lo dice
+`curl -s http://127.0.0.1:8000/health`, y en `ml_model_loaded` si está puntuando el modelo o
+el heurístico.
+
+### Usuario de prueba
+
+| Usuario | Contraseña | Qué ve |
+| :--- | :--- | :--- |
+| `admin.ti@plurione.com` | `PluriOne2026!` | Todo: cuentas, bitácora, derechos del titular |
+| `lider.ventas@plurione.com` | `PluriOne2026!` | La cartera completa, las publicaciones, los informes |
+| `asesor.comercial@plurione.com` | `PluriOne2026!` | **Solo sus propios prospectos** |
+
+`PluriOne2026!` es la contraseña de desarrollo de `backend/scripts/seed_data.py` y la única
+excepción documentada a «ningún secreto en el árbol»: contra un entorno endurecido el
+sembrado genera una aleatoria y la enseña una sola vez. Las otras cuatro cuentas de la
+demostración están en [Si algo falla](docs/Si_Algo_Falla.md#4-las-cuentas-para-entrar).
+
+**Si prefiere no construir nada**, [`db/base-de-datos.sql`](db/base-de-datos.sql) trae el
+esquema y los datos de prueba ya volcados, para importar en una base vacía.
+
+### Dónde está cada cosa
+
+| Qué | Dónde |
+| :--- | :--- |
+| **Script de la base de datos** | [`db/base-de-datos.sql`](db/base-de-datos.sql) —esquema, datos sintéticos y las siete cuentas— |
+| **Dependencias congeladas** | [`backend/requirements.lock`](backend/requirements.lock) —55 paquetes con 1373 huellas— y [`frontend/package-lock.json`](frontend/package-lock.json) |
+| **Variables de entorno** | [`.env.example`](.env.example) y [`devops/.env.example`](devops/.env.example). Los valores reales **no** viven en el repositorio |
+| **PRD y definición del MVP** | [`docs/PRD_MVP_Lead_Scoring.md`](docs/PRD_MVP_Lead_Scoring.md) |
+| **Arquitectura** | La sección de aquí abajo, y [la memoria técnica](docs/Memoria_Tecnica_Final_Lead_Scoring.md) |
+| **Manual de operación** | [`docs/Si_Algo_Falla.md`](docs/Si_Algo_Falla.md), escrito para quien no programa |
+
+---
+
+## Lo que todavía no funciona
+
+Sin adornos, porque lo que no se dice se encuentra igual. La lista entera, con el origen de
+cada punto y dónde se decidió, está en
+[**Congelación y trabajo futuro**](docs/Congelacion_y_Trabajo_Futuro.md), que es la autoridad
+sobre esto.
+
+| | |
+| :--- | :--- |
+| **Deuda menor anotada** | **56 puntos** en §6.4, de los que **16 están cerrados** y **40 siguen abiertos**: cifras escritas a mano que nada compara con lo que hay, controles que miden una ruta en vez de una propiedad, y un lanzador que no comprueba si el motor de Docker está vivo |
+| **Lo que no se va a hacer** | **12 decisiones** en §7, cada una con su motivo. No están pendientes: están decididas |
+| **Lo que el modelo no puede decir** | El ROC-AUC de 0.9469 se mide sobre datos **sintéticos**. Lo que se defiende es el aporte de **+0.052** sobre el heurístico en ese mismo conjunto. El rendimiento comercial solo podrá medirse con conversiones reales, que todavía no existen |
+| **Lo que la suite no puede ejercitar** | Corre sobre SQLite en memoria, así que lo que solo existe en PostgreSQL —`FOR UPDATE`, algunas restricciones— se comprueba sobre la **sentencia compilada** contra el dialecto real, nunca dándolo por bueno sin ejecutarlo |
+| **El modelo y el cliente compilado** | No viajan en el repositorio, a propósito: un *pickle* versionado es código de procedencia desconocida. Hay que generarlos, y el paso 1 de arriba lo hace |
 
 ---
 
@@ -24,7 +116,7 @@
 | **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **61 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
 | **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
 | **Qué está congelado** | Desde el **06-10-2026**, todo: entra un cambio solo si sin él la pila no se levanta o la demostración no se puede enseñar. Lo que queda abierto está escrito y clasificado en [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md), que es la autoridad sobre esto. |
-| **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **39 restos menores** de §6.4 y las **trece decisiones** de §7 «lo que no se va a hacer, y por qué». |
+| **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **56 restos menores** de §6.4 —40 abiertos— y las **doce decisiones** de §7 «lo que no se va a hacer, y por qué». |
 
 ---
 

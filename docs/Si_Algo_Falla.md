@@ -49,6 +49,15 @@ cd C:\Users\<usted>\Desktop\Resi\Sistema_Inteligente_Lead_Scoring
 y espere a que el icono de la ballena deje de moverse. Esto tarda uno o dos minutos la primera
 vez del día.
 
+**Y abierto no basta: Docker Desktop se apaga solo.** Trae encendido un ahorro de recursos
+—*Resource Saver*— con un plazo de cinco minutos: si no hay ningún contenedor corriendo
+apaga su máquina Linux, y **el icono no cambia y la ventana sigue diciendo que está
+encendido**. La orden siguiente falla igual. Se midió el 9 de octubre de 2026: abierto a las
+20:35, listo a las 20:36, apagado solo a las 20:42 y de vuelta a las 20:49 —seis minutos y
+medio en los que nada arranca—. Si ocurre, espere medio minuto y repita la orden, o quite
+ese ajuste en *Settings → Resources*. Con la pila levantada no se dispara: solo salta cuando
+no hay ningún contenedor corriendo.
+
 ```bash
 python devops/pila.py up -d
 ```
@@ -316,7 +325,7 @@ python devops/pila.py start backend frontend
 
 | Síntoma | Qué mirar | Qué hacer |
 | :--- | :--- | :--- |
-| **Nada carga.** <http://localhost:3000> no responde | ¿Está abierto Docker Desktop? El icono de la ballena | Abrir Docker Desktop, esperar a que pare de moverse y `python devops/pila.py up -d` |
+| **Nada carga.** <http://localhost:3000> no responde | ¿Está abierto Docker Desktop? Y **abierto no basta**: sin contenedores corriendo se apaga solo a los cinco minutos y el icono no cambia (§2) | Abrir Docker Desktop, esperar a que pare de moverse y `python devops/pila.py up -d`. Si llevaba un rato abierto y falla, repetir la orden: tarda medio minuto en volver |
 | **El panel carga pero dice que no hay conexión** al entrar | `python devops/pila.py ps` — ¿dice `backend` `(healthy)`? | Si dice `(health: starting)`, esperar 20 s. Si no aparece o dice `Exited`, ver `python devops/pila.py logs --tail 50 backend` |
 | **Un contenedor dice `Exited`** | `python devops/pila.py logs --tail 50 <nombre>` | Casi siempre es la base aún arrancando: `python devops/pila.py up -d` otra vez. Si insiste, guardar esas líneas y avisar |
 | **Dice que falta `SECRET_KEY` o `POSTGRES_PASSWORD`** | ¿Existe `C:\Users\<usted>\.plurione\pila.env`? | `python devops/pila.py iniciar`. Si el archivo ya existía, abrirlo y comprobar que esas dos líneas están y tienen valor |
