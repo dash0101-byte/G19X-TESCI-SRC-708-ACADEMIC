@@ -96,7 +96,7 @@ comprobación y conviene no confundirlas:
 
 | Clase | Cuántas | Qué es |
 | :--- | :---: | :--- |
-| Pruebas | 2064 servidor · 748 cliente | Comprueban **casos** |
+| Pruebas | 2093 servidor · 748 cliente | Comprueban **casos** |
 | Controles de configuración peligrosa | 61 | Pasos del trabajo `configuracion-peligrosa`: leen archivos y fallan si reaparece una configuración que ya causó un fallo |
 | Guardas de propiedades | 7 | Programas que levantan la aplicación y comprueban **propiedades**, no casos |
 
@@ -112,10 +112,25 @@ python scripts/renovar_imagenes.py --solo-fijacion  # que ninguna imagen quede s
 # y la del segundo factor, escrita en línea dentro del trabajo `configuracion-peligrosa`
 ```
 
+Y una que **no** corre en el CI, porque es al CI a quien vigila (§6.4 punto 68):
+
+```bash
+python scripts/guarda_del_ci.py            # el veredicto de la última ejecución de HEAD
+python scripts/guarda_del_ci.py --sin-red  # la mitad que no necesita red; la corre la suite
+```
+
+El veredicto de una ejecución no se puede pedir desde dentro de ella, así que ésta se
+teclea —y conviene teclearla antes de dar por bueno un árbol que sale verde en local: de
+los nueve defectos que llevaban el CI en rojo en octubre, **ninguno lo trajo un cambio
+del árbol**—. Saca los diez trabajos de `ci.yml`, nombra los que quedaron **sin
+veredicto** —un trabajo en rojo deja saltados a los que dependen de él, y entonces no se
+sabe cuántos defectos hay detrás— y sale con **2**, y no con 0, cuando no ha podido
+mirar: sin `gh`, sin sesión, sin red, con HEAD sin empujar o con la ejecución en vuelo.
+
 Las suites:
 
 ```bash
-python -m pytest backend/tests -q                   # 2064 pruebas
+python -m pytest backend/tests -q                   # 2093 pruebas
 python -m pytest backend/tests -q --cov=backend/app --cov-fail-under=99.1  # 13 min 5 s
 cd frontend && npx vitest run && npx eslint src && npm run build
 ruff check backend/ scripts/

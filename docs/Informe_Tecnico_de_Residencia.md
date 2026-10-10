@@ -34,7 +34,7 @@ Todas medidas el 6 y 7 de octubre de 2026 sobre el árbol congelado, no estimada
 
 | | |
 | :--- | :--- |
-| Pruebas del servidor | **2064 pasan**, 2 omitidas |
+| Pruebas del servidor | **2093 pasan**, 2 omitidas |
 | Cobertura del servidor | **99,11 %** contando ramas —99,37 % de sentencias · 97,88 % de ramas—, sobre suelos de 99,1 y 97,8 que el CI hace fallar |
 | Pruebas del cliente | **748** en 45 archivos |
 | Cobertura del cliente | 96,65 % sentencias · 91,75 % ramas · 98,52 % funciones · 98,68 % líneas, sobre suelos de 96,6 / 91,7 / 98,5 / 98,6 |

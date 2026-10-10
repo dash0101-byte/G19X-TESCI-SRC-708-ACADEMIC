@@ -136,7 +136,7 @@ sirve para auditar.
 Casi todo. Con el entorno del lock instalado y **sin Docker**:
 
 ```bash
-python -m pytest backend/tests -q                   # 2064 pruebas; 13 min 5 s con cobertura
+python -m pytest backend/tests -q                   # 2093 pruebas; 13 min 5 s con cobertura
 ruff check backend/ scripts/
 python scripts/guarda_de_la_pagina_publica.py       # la única ruta sin sesión que escribe
 python scripts/guarda_del_motor_de_reglas.py        # lo que decide de madrugada

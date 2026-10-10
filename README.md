@@ -19,7 +19,7 @@
 
 | | |
 | :--- | :--- |
-| **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 2064 pruebas de servidor y 748 de cliente, seis contenedores. |
+| **Qué es** | Un sistema de *lead scoring* para un equipo comercial pequeño: puntúa cada prospecto combinando un modelo supervisado calibrado con un heurístico de perfil ideal y decaimiento temporal, explica la puntuación, reparte las fichas nuevas, y recoge prospectos de una página pública enlazada desde una publicación de LinkedIn. Nueve pantallas, 2093 pruebas de servidor y 748 de cliente, seis contenedores. |
 | **Cómo se levanta** | Entrenar el modelo, `python devops/pila.py iniciar`, `python devops/pila.py up --build -d`, y el panel queda en [localhost:3000](http://localhost:3000). Las órdenes exactas, en la [guía de inicio rápido](#-guía-de-inicio-rápido-despliegue-de-la-versión-entregable). Nunca `docker compose` a secas: el lanzador es el único arranque, y los secretos viven **fuera** del árbol. |
 | **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **61 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
 | **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
@@ -57,7 +57,7 @@ El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosu
 
 ---
 
-> **Calidad en las dos mitades.** 2064 pruebas en el backend (99 % de cobertura contando
+> **Calidad en las dos mitades.** 2093 pruebas en el backend (99 % de cobertura contando
 > ramas) y 748 en
 > el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
 > encendidas—, y 10 trabajos de integración continua con 61 controles de regresión de
@@ -1268,7 +1268,7 @@ en otra máquina; ese ensayo es distinto y no lo cubre este script.
 
 ## 🧪 Ejecución de Pruebas Automatizadas (QA)
 
-### Backend — 2064 pruebas
+### Backend — 2093 pruebas
 
 Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
 entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
