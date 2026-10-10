@@ -77,7 +77,23 @@ sembrado genera una aleatoria y la enseña una sola vez. Las otras cuatro cuenta
 demostración están en [Si algo falla](docs/Si_Algo_Falla.md#4-las-cuentas-para-entrar).
 
 **Si prefiere no construir nada**, [`db/base-de-datos.sql`](db/base-de-datos.sql) trae el
-esquema y los datos de prueba ya volcados, para importar en una base vacía.
+esquema y los datos de prueba ya volcados —las siete cuentas incluidas—, para
+importarlo en una base vacía:
+
+```bash
+psql -U postgres -d lead_scoring_db -f db/base-de-datos.sql
+```
+
+Y si la pila ya está levantada, lo mismo sin publicar ningún puerto:
+
+```bash
+python devops/pila.py exec -T postgres psql -U plurione -d lead_scoring_db \
+  < db/base-de-datos.sql
+```
+
+El volcado lleva `--clean --if-exists`, así que **borra y recrea** lo que encuentre: se
+importa sobre una base vacía o sobre una que se pueda perder, nunca sobre datos que
+haga falta conservar.
 
 ### Dónde está cada cosa
 
