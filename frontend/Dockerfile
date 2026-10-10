@@ -65,7 +65,7 @@ COPY . .
 RUN rm -rf dist && npm run build
 
 # ------------------------------------------------- base común del servidor web
-FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3 AS servidor
+FROM nginx:alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2 AS servidor
 
 # Parches del sistema base, con versión (N-10, capítulo 22).
 #
