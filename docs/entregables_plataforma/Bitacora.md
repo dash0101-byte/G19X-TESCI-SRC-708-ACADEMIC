@@ -2,25 +2,25 @@
 
 **Residente:** Rosales Castillo Sebastián · 223107211 · Ingeniería en Sistemas Computacionales
 **Empresa:** PluriOne S.A. de C.V. · **Asesor externo:** Ing. Edgar Loeffelmann Ibarra · **Asesora interna:** M. en DBC. Elizabeth Bravo Gómez
-**Periodo de la residencia:** 01/08/2026 – 31/12/2026 · **Corte de esta bitácora:** 13/10/2026
+**Periodo de la residencia:** 31/08/2026 – 29/01/2027 · **Corte de esta bitácora:** 13/10/2026
 
 > **Cómo se construyó.** Los registros del 22-09-2026 en adelante salen del historial de confirmaciones (`git log`) del repositorio: cada fila es un trabajo que existe y se puede comprobar con su identificador. Las fechas anteriores salen de los documentos del proyecto. **No se anotan horas**: el repositorio no las registra y inventarlas sería falsear la bitácora; si la plataforma las pide, anótelas usted.
 
 ---
 
-## 1. Antes del historial del repositorio (agosto – 21 de septiembre)
+## 1. Antes del historial del repositorio (31 de agosto – 21 de septiembre)
 
 El historial público del repositorio comienza el 22-09-2026 (se reescribió para publicar una versión académica limpia). Lo anterior consta en los documentos:
 
 | Periodo | Actividad | Fuente |
 | :--- | :--- | :--- |
-| Agosto | Detección de necesidades, diagnóstico del proceso comercial y especificación de requerimientos (IEEE 830) | Reporte 01 |
-| Agosto – septiembre | Diseño de la arquitectura (Clean Architecture) y del modelo de datos | Reporte 03 |
+| Septiembre | Detección de necesidades, diagnóstico del proceso comercial y especificación de requerimientos (IEEE 830) — Fase 1 del cronograma | Reporte 01 |
+| Septiembre | Diseño de la arquitectura (Clean Architecture) y del modelo de datos | Reporte 03 |
 | Septiembre | Planeación Scrum, historias de usuario y riesgos | Reporte 04 |
 | 16-09-2026 | Entrenamiento original del modelo de ML (artefacto `98ed8bd1…`, reproducido idéntico el 07-10) | Para_Quien_Revisa_Este_Repositorio §1 |
 | Septiembre | Backend FastAPI, ingesta CRM, reglas dinámicas, interfaz React, pruebas, contenerización y seguridad RBAC | Reportes 05 – 11 |
 
-> **Pendiente de confirmar por el residente:** fechas exactas y horas de agosto y de la primera quincena de septiembre.
+> **Pendiente de confirmar por el residente:** fechas exactas y horas de la primera quincena de septiembre. El periodo oficial (31/08/2026 – 29/01/2027), el horario (9:00 a 14:00) y las asesorías, visitas y evaluaciones están en el cronograma autorizado (`docs/docs_residencias/cronograma.pdf`).
 
 ---
 

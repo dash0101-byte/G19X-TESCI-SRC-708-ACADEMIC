@@ -3,7 +3,7 @@
 **Producto:** Sistema Inteligente de Lead Scoring
 **Empresa:** PluriOne S.A. de C.V. (Develop Talent & Technology)
 **Residente:** Rosales Castillo Sebastián · No. de control 223107211 · Ingeniería en Sistemas Computacionales · 9° semestre
-**Periodo:** 2026-2 (01/08/2026 – 31/12/2026)
+**Periodo:** 2026-2 (31/08/2026 – 29/01/2027)
 **Versión del documento:** 1.0 — octubre de 2026 (producto en congelación definitiva desde el 06-10-2026)
 
 ---

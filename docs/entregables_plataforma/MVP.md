@@ -1,6 +1,6 @@
 # MVP — Sistema Inteligente de Lead Scoring
 
-**Empresa:** PluriOne S.A. de C.V. · **Residente:** Rosales Castillo Sebastián (223107211) · **Periodo:** 2026-2
+**Empresa:** PluriOne S.A. de C.V. · **Residente:** Rosales Castillo Sebastián (223107211) · **Periodo:** 2026-2 (31/08/2026 – 29/01/2027)
 
 Complementa al [PRD](PRD.md): aquí se define **el mínimo que valida la hipótesis** y cómo ese mínimo creció hasta el producto entregado.
 
@@ -43,7 +43,7 @@ flowchart LR
 
 | Etapa | Qué añadió | Cuándo (según el historial del repositorio) |
 | :--- | :--- | :--- |
-| MVP | Score, decaimiento, categorías, lista, pipeline | Bloques 1–2 de la estadía (agosto–septiembre) |
+| MVP | Score, decaimiento, categorías, lista, pipeline | Bloques 1–2 de la estadía (septiembre) |
 | Núcleo comercial | RBAC, dashboard, ficha 360°, XAI, simulador | Bloque 3 |
 | Captación | Publicaciones, QR, página pública | Capítulos 25–27 (22–23-09-2026) |
 | Operación comercial | Motor de reglas, «Hoy», campana, reparto automático | Capítulos 28 y 46 |
