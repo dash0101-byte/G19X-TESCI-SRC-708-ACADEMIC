@@ -16,4 +16,4 @@ pip-audit>=2.7.0
 # Las pruebas de la pila de despliegue leen devops/docker-compose.yml y comprueban que
 # el arranque sobre una base vacía siga estando resuelto. Solo se usa en la suite: la
 # aplicación no lee YAML en ningún punto.
-PyYAML>=6.0
+PyYAML>=6.0.3
