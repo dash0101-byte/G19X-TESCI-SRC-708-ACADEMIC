@@ -102,7 +102,7 @@ haga falta conservar.
 | **Script de la base de datos** | [`db/base-de-datos.sql`](db/base-de-datos.sql) —esquema, datos sintéticos y las siete cuentas— |
 | **Dependencias congeladas** | [`backend/requirements.lock`](backend/requirements.lock) —55 paquetes con 1373 huellas— y [`frontend/package-lock.json`](frontend/package-lock.json) |
 | **Variables de entorno** | [`.env.example`](.env.example) y [`devops/.env.example`](devops/.env.example). Los valores reales **no** viven en el repositorio |
-| **PRD y definición del MVP** | [`docs/PRD_MVP_Lead_Scoring.md`](docs/PRD_MVP_Lead_Scoring.md) |
+| **PRD y definición del MVP** | [`PRD`](docs/entregables_plataforma/PRD.md) · [`MVP`](docs/entregables_plataforma/MVP.md) |
 | **Arquitectura** | La sección de aquí abajo, y [la memoria técnica](docs/Memoria_Tecnica_Final_Lead_Scoring.md) |
 | **Manual de operación** | [`docs/Si_Algo_Falla.md`](docs/Si_Algo_Falla.md), escrito para quien no programa |
 
