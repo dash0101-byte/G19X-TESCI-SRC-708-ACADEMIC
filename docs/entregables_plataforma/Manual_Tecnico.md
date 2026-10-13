@@ -36,7 +36,7 @@ backend/app/models/        esquema (entities.py); importa de core, nunca al rev�
 backend/app/services/      la lógica; un servicio puede importar a otro
 backend/app/api/v1/        endpoints; no deciden alcance de cartera
 backend/app/repositories/  el alcance de cartera vive aquí, no en cada endpoint
-backend/alembic/           18 migraciones; nada crea tablas al vuelo
+backend/alembic/           17 migraciones; nada crea tablas al vuelo
 backend/tests/             la suite (2093 pruebas)
 frontend/src/              cliente; services/ reglas compartidas; pruebas/ las derivadas
 ml_pipeline/               entrenamiento, deriva, registro, realimentación

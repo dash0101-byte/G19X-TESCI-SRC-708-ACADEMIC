@@ -116,7 +116,7 @@ Restricción de ingeniería: **coste recurrente de 0 USD**, sin cuentas externas
 
 ## 8. Arquitectura (resumen)
 
-- **Backend:** FastAPI, Clean Architecture (puertos y adaptadores), Pydantic v2, SQLAlchemy 2.0, Alembic (18 migraciones). PostgreSQL en la pila; SQLite en pruebas.
+- **Backend:** FastAPI, Clean Architecture (puertos y adaptadores), Pydantic v2, SQLAlchemy 2.0, Alembic (17 migraciones). PostgreSQL en la pila; SQLite en pruebas.
 - **Modelo:** `GradientBoostingClassifier` con calibración isotónica; motor heurístico ICP compartido entre el servicio y el pipeline de entrenamiento.
 - **Frontend:** React + Vite, accesible AA, sin dependencias de fuentes externas.
 - **Operación:** Docker Compose (seis servicios), Redis para el contador de tasa, nginx como puerta pública, respaldos con prueba de restauración, CI con 10 trabajos.
