@@ -20,7 +20,7 @@
 # Los compiladores y las cabeceras de desarrollo solo hacen falta para construir las
 # ruedas de psycopg2, numpy y scikit-learn. Se quedan en esta etapa y no viajan a la
 # imagen final, que es lo que reduce tanto el tamaño como la superficie de ataque.
-FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS builder
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -62,7 +62,7 @@ RUN pip install --require-hashes -r /tmp/requirements.lock
 # ------------------------------------------------------------------------------
 # Etapa 2 — Imagen de ejecución
 # ------------------------------------------------------------------------------
-FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS runtime
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS runtime
 
 # libpq5 es la biblioteca en tiempo de ejecución de PostgreSQL; libpq-dev (cabeceras y
 # compilador) se queda en la etapa de compilación. Desde el capítulo 32 va con su versión
