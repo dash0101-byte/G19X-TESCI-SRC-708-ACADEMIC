@@ -631,7 +631,7 @@ jobs:
       # Las pruebas se ejecutan contra el mismo artefacto que irá a la imagen, de modo
       # que ejercitan la ruta real de inferencia y no el heurístico de respaldo.
       - name: Descargar el modelo validado
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: modelo-entrenado
           path: ml_pipeline/models/
@@ -858,13 +858,13 @@ jobs:
       # El Dockerfile del backend copia rutas concretas en lugar de `COPY . .`, y dos de
       # ellas no están en el repositorio: se reponen aquí desde los trabajos anteriores.
       - name: Restaurar el modelo validado
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: modelo-entrenado
           path: ml_pipeline/models/
 
       - name: Restaurar el bundle del frontend
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: frontend-dist
           path: frontend/dist/
