@@ -23,7 +23,7 @@ services:
   # aparte en vez de añadir `ports:` al servicio `postgres` para que la definición de la
   # base de datos sea idéntica en desarrollo y en producción.
   postgres-expose:
-    image: alpine/socat:latest@sha256:c5a091e1e735a90aa941a5828529dbe6c6157407a8047a9aa473faa133361b82
+    image: alpine/socat:latest@sha256:fb3862c949af7c79996d0e514ee96128644d840835ed5368eeecb14a869de361
     container_name: plurione_pg_tunel_dev
     restart: unless-stopped
     command: tcp-listen:5432,fork,reuseaddr tcp-connect:postgres:5432
