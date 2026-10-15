@@ -1,0 +1,1471 @@
+# Referencia completa — Sistema Inteligente de Lead Scoring
+
+Esto es lo que estaba en el [`README.md`](../README.md) hasta el **15 de octubre de 2026**, movido aquí **sin cambiar una palabra**.
+
+El motivo: el README había llegado a 1 645 líneas, y la puerta de entrada de un repositorio tiene que poder leerse de una vez. Arriba quedaron qué es el sistema, cómo ejecutarlo desde cero, los usuarios de prueba, lo que todavía no funciona y dónde está cada cosa. Todo el detalle técnico —que no sobra, solo estorbaba ahí— está en este archivo.
+
+**Qué hay aquí:**
+
+1. 🚀 Arquitectura y Tecnologías Clave (Stack Optimizado de Producción)
+2. ⚡ Guía de Inicio Rápido (Despliegue de la Versión Entregable)
+3. 🔐 Autenticación y Control de Acceso
+4. 📥 Cómo llegan los prospectos
+5. 🌐 Rutas y Puertos de Validación Funcional
+6. 🛠️ Fiabilidad Operativa
+7. 🧪 Ejecución de Pruebas Automatizadas (QA)
+8. 🎯 Demostración Técnica Interactiva (CLI)
+9. 📚 Compilación de la Memoria Técnica Institucional
+10. 📑 Suite de 44 Reportes Técnicos de Estadía Profesional
+
+---
+
+## 🚀 Arquitectura y Tecnologías Clave (Stack Optimizado de Producción)
+
+El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosuficiencia operativa**. Se depuraron tecnologías redundantes, costosas o poco útiles (como Azure AI Search, llamadas remotas a endpoints de Azure ML, dependencias externas a Azure OpenAI y licencias privativas de Power BI), consolidando una arquitectura autocontenida, de latencia ultrabaja y costo recurrente $0 USD:
+
+- **Motor de Machine Learning Supervisado Nativo:** Algoritmo `GradientBoostingClassifier` con calibración isotónica de probabilidades (`CalibratedClassifierCV`) e inferencia en memoria en menos de 1 ms. Su **ROC-AUC de 0.9469 (IC 95 % [0.928, 0.964]) se mide sobre datos sintéticos**: verifica que el pipeline está íntegro, no el rendimiento comercial. Sobre ese mismo conjunto el heurístico sin modelo alcanza 0.8950 y ordenar por una sola columna alcanza 0.9053, así que **el aporte real del modelo es de +0.052, con IC 95 % [+0.030, +0.076]** — y esa es la cifra que hay que defender (Capítulos 12 y 24). El modelo no recibe datos inventados: los ingresos que no se declararon llegan como ausentes y se imputan con marca, WhatsApp y LinkedIn son variables distintas y el resultado de cada llamada cuenta.
+- **Algoritmo Híbrido con Decaimiento Temporal Continuo:**
+  $$S_{\text{final}} = 0.60 \times S_{\text{ML}} + 0.40 \times S_{\text{Heurístico}} \times \gamma(\Delta t)$$
+  donde $\gamma(\Delta t) = (0.5)^{\frac{\Delta t}{14}}$ modela la pérdida exponencial del interés del prospecto en una vida media de 14 días.
+- **Inteligencia Artificial Explicable (XAI) Nativa:** Motor de interpretabilidad analítica que sintetiza fortalezas clave y genera tácticas comerciales recomendadas en tiempo real sin costos por tokens ni latencias externas.
+- **Backend RESTful:** FastAPI con Clean Architecture, Pydantic v2 y SQLAlchemy 2.0. Sirve tanto la API y documentación OpenAPI/Swagger como la aplicación web compilada (SPA).
+- **Frontend Analítico Empresarial:** React.js con Vite, diseño Glassmorphism, dashboards analíticos de segmentación y embudo, Ficha 360° y simulador de scoring interactivo.
+- **Seguridad RBAC:** Control de acceso empresarial basado en roles (`Líder Comercial`, `Administrador TI`, `Asesor Comercial`).
+- **DevOps y Empaquetado:** Dockerfiles multi-etapa y Docker Compose listos para despliegue productivo inmediato.
+
+---
+
+> **Calidad en las dos mitades.** 2093 pruebas en el backend (99 % de cobertura contando
+> ramas) y 748 en
+> el cliente (96,6 %), `ruff` y `eslint` sin avisos —con las 34 reglas de accesibilidad
+> encendidas—, y 10 trabajos de integración continua con 61 controles de regresión de
+> configuración peligrosa y **siete guardas de propiedades**, cada una con su arnés de
+> reintroducción de defectos.
+>
+> **Las nueve pantallas pasan el nivel AA de WCAG 2.1**, medido por `axe-core` desde la
+> propia suite del cliente; se recorren enteras con el teclado; el contraste de la paleta se
+> calcula contra el mínimo de la norma leyendo `index.css` —incluido el contorno de los
+> controles y el hecho de que el foco se distinga de él—; todo lo que el marcado nombra,
+> clases y variables de la paleta, se comprueba que exista; y los errores de formulario
+> llegan a un lector de pantalla. El detalle, en el [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md).
+
+> ## 🧊 Congelado el 24-09-2026 · **congelación definitiva el 06-10-2026**
+>
+> Desde el **24 de septiembre de 2026** solo se corrigen fallos, y entraron quince capítulos
+> de correcciones —del 32 al 46—, cada uno abriendo la congelación para puntos **nombrados**
+> del documento de trabajo futuro y para ninguno más.
+>
+> Desde el **6 de octubre de 2026** el criterio es el último y es más estrecho: **solo entra
+> un cambio si, sin él, la pila no se levanta o la demostración no se puede enseñar.** No se
+> abre ningún capítulo ni ninguna auditoría nuevos. Lo que queda por hacer está escrito y
+> clasificado; eso es parte del entregable, no una lista de deseos.
+>
+> | Para | Documento |
+> | :--- | :--- |
+> | Operar el sistema sin programar: encender, apagar, túnel, respaldos, cuentas y una tabla de «síntoma → qué mirar → qué hacer» | **[Si algo falla](docs/Si_Algo_Falla.md)** |
+> | Trabajar en el código: qué está congelado, cómo se levanta, qué guardas hay y cómo se prueban, dónde vive cada cosa | **[AGENTS.md](AGENTS.md)** |
+> | Saber qué **no** se hizo y por qué, agrupado por de qué depende | **[Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md)** |
+> | Las cifras finales y las preguntas difíciles con su respuesta honesta | **[Informe técnico de la residencia](docs/Informe_Tecnico_de_Residencia.md)** |
+>
+> Sustituye a las once secciones «Lo que esta fase no hizo» de los reportes 19 a 29, e
+> incluye lo que **no** se va a hacer, con el motivo.
+>
+> **Revisión del capítulo 32.** La sección «lo que puede morder» —la deuda que no dependía
+> de nadie— pasó de ocho puntos a **dos**, y los dos esperan a un sistema externo. Ya no
+> queda ninguna fila de la política de conservación sin plazo.
+>
+> **Revisión del capítulo 33.** El único punto que el 32 dejó abierto, y que él mismo había
+> encontrado: **ningún campo de la ficha se podía vaciar** una vez escrito. Un dato puesto
+> por error se podía cambiar por otro, no retirar, y la pantalla respondía que sí lo había
+> hecho. Cerrado. §6.1 vuelve a no tener nada que este equipo pueda cerrar por su cuenta.
+
+## ⚡ Guía de Inicio Rápido (Despliegue de la Versión Entregable)
+
+### Opción A: Despliegue Unificado con Docker Compose (Recomendado)
+
+El backend arranca con `ENVIRONMENT=production` y **exige** dos secretos propios. La pila se
+arranca siempre de un solo modo: con `devops/pila.py`, que envuelve `docker compose` y le pasa
+un archivo de entorno que vive **fuera del repositorio** —`~/.plurione/pila.env`, o el que
+indique `PLURIONE_ENTORNO`—. Se niega a arrancar si ese archivo está dentro del árbol, si hay
+un `.env` suelto en el repositorio que Compose o la aplicación leerían por su cuenta, o si
+faltan `SECRET_KEY` o `POSTGRES_PASSWORD` (capítulo 22).
+
+```bash
+# PRIMERO el modelo. No viaja en el repositorio, y sin él la pila arranca igual de verde
+# puntuando con el heurístico. Dos minutos, y los datos ya están dentro.
+pip install --require-hashes -r backend/requirements.lock
+python ml_pipeline/src/train_model.py
+
+# Y el cliente compilado, por la misma razón: `dist/` tampoco está en el repositorio, y la
+# imagen del backend lo copia para servir la SPA ella sola en el 8000. El lanzador se niega
+# a construir sin él y dice esta misma orden.
+cd frontend && npm ci && npm run build && cd ..
+
+# Una sola vez: crea el archivo de entorno, con los dos secretos ya generados
+python devops/pila.py iniciar
+
+# Aplica el esquema. Es un servicio de un solo disparo: espera a que PostgreSQL esté sano,
+# ejecuta `alembic upgrade head` y termina.
+python devops/pila.py run --rm migrate
+
+python devops/pila.py up --build -d
+```
+
+**Ese primer paso no es opcional, y saltárselo no da ningún síntoma.**
+`ml_pipeline/models/lead_scorer_model.joblib` no está versionado a propósito —`joblib` carga con
+*pickle*, que ejecuta código, de modo que un binario comprometido en el árbol es un fichero de
+procedencia desconocida que el backend ejecuta con sus credenciales—. El `Dockerfile` copia ese
+directorio, que existe con sus tres `.json`, así que **la imagen se construye sin fallar**: los
+seis contenedores se ponen verdes, el panel funciona y las fichas se puntúan **con el
+heurístico**, que es justo la línea base contra la que el modelo se compara. Quien se lo salte
+mide la línea base y cree medir el modelo.
+
+Para saber cuál está puntuando no hay que leer registros: `curl -s
+http://127.0.0.1:8000/health` responde `"ml_model_loaded": true` o `false`. El detalle, en
+[**Para quien revisa este repositorio**](docs/Para_Quien_Revisa_Este_Repositorio.md).
+
+Todo lo que sigue a `devops/pila.py` es una orden de `docker compose` y se le pasa tal cual.
+`python devops/pila.py --comprobar` hace solo las comprobaciones, sin tocar Docker.
+
+Ese `run --rm migrate` es **opcional**: la pila lo ejecuta sola, porque el
+backend depende de él con `service_completed_successfully` y no arranca hasta que sale con
+código 0. Se muestra aparte porque un despliegue conviene hacerlo en dos tiempos —migrar
+y, si eso fue bien, servir— y porque así queda dicho de dónde sale el esquema.
+
+Nada crea tablas al vuelo: en producción el backend **verifica** que la base esté sellada
+en la última revisión de Alembic y aborta el arranque si no lo está. Es lo que evita que
+una aplicación nueva se ponga a escribir sobre un esquema viejo.
+
+```bash
+# Qué revisión tiene la base ahora mismo
+python devops/pila.py run --rm migrate alembic current
+
+# Historial y hacia dónde va
+python devops/pila.py run --rm migrate alembic history --indicate-current
+```
+
+El sistema queda disponible en [http://localhost:3000](http://localhost:3000). Esa es la
+puerta de entrada: nginx sirve la SPA, añade las cabeceras de seguridad y hace de pasarela
+hacia la API.
+
+**Recién levantada, la base no tiene ni una cuenta.** `migrate` crea el esquema y nada más, así
+que el panel pide credenciales que todavía no existen. Con esto hay sistema que mirar —las siete
+cuentas, cuatro publicaciones y doce prospectos clasificados—, y la contraseña viaja en variables
+de entorno para no quedar escrita en ningún archivo:
+
+```bash
+python devops/pila.py exec -e ENVIRONMENT=development -e SEED_ADMIN_PASSWORD=PluriOne2026! -e SEED_SALES_LEAD_PASSWORD=PluriOne2026! -e SEED_EXECUTIVE_PASSWORD=PluriOne2026! -e SEED_ASESOR_PASSWORD=PluriOne2026! backend python /app/scripts/seed_data.py
+```
+
+El `-e ENVIRONMENT=development` no es un atajo sospechoso: el sembrado de demostración **vacía
+las tablas de negocio** antes de regenerarlas y por eso se niega a correr contra un entorno
+endurecido, que es lo que la pila es. La variable se pasa a **ese** proceso y no a la pila. En un
+despliegue de verdad lo que se usa es `--solo-usuarios`, que crea o restablece las cuentas de
+acceso y **no toca ningún otro dato** (está en [Si algo falla](docs/Si_Algo_Falla.md)). Y sin
+`--force`, el sembrado completo se niega en cuanto la base ya tiene datos de negocio y enumera lo
+que borraría.
+
+Lo que la pila **no** publica, y antes sí:
+
+| | Antes | Ahora |
+| :--- | :--- | :--- |
+| PostgreSQL | `0.0.0.0:5432` | Solo dentro de la red de la pila |
+| pgAdmin | `0.0.0.0:5050`, con `admin`/`admin` en el YAML | Fuera del stack; overlay aparte con credenciales propias |
+| API del backend | `0.0.0.0:8000` | `127.0.0.1:8000` (el acceso público entra por nginx) |
+| Redis (contador de tasa) | No existía; la cuenta vivía en la memoria de cada worker | Servicio propio de la pila, sin puerto publicado |
+| `/docs`, `/redoc`, OpenAPI | Abiertos | Deshabilitados con `ENVIRONMENT=production` |
+
+Para inspeccionar la base de datos durante el desarrollo:
+
+```bash
+# Consola psql dentro del contenedor, sin publicar ningún puerto
+python devops/pila.py exec postgres psql -U plurione -d lead_scoring_db
+
+# O levantar pgAdmin y el puerto 5432, ambos limitados a 127.0.0.1.
+# Exige PGADMIN_EMAIL y PGADMIN_PASSWORD en el archivo de entorno de la pila.
+python devops/pila.py --dev up -d
+```
+
+---
+
+### Opción B: Ejecución Inmediata en Producción (Local)
+
+#### 1. Instalar Dependencias
+```bash
+# Ejecución: exactamente lo que lleva la imagen, con la huella de cada fichero
+pip install --require-hashes -r backend/requirements.lock
+
+# Desarrollo y pruebas: lo anterior en las mismas versiones, más pytest, ruff y pip-audit
+pip install --require-hashes -r backend/requirements-dev.lock
+
+# ¿Lo instalado es lo fijado? Sale con 1 y dice qué paquete difiere
+python scripts/comprobar_instalado.py backend/requirements-dev.lock
+```
+
+`requirements.txt` dice qué versiones son **aceptables**; los `.lock` dicen cuáles se
+**instalan**, con la huella SHA-256 de cada fichero. La imagen, el CI y el entrenamiento
+del modelo instalan desde los locks: dos construcciones separadas por meses llevan lo mismo,
+y un paquete sustituido en el índice no entra. Para cambiar una dependencia se edita el
+`.txt` y se regeneran los dos, desde `backend/`:
+
+```bash
+cd backend
+python -m uv pip compile requirements.txt --universal --python-version 3.13 --generate-hashes -o requirements.lock
+python -m uv pip compile requirements-dev.txt --universal --python-version 3.13 --generate-hashes -c requirements.lock -o requirements-dev.lock
+```
+
+`--universal` resuelve para todas las plataformas a la vez y deja los marcadores escritos:
+un lock generado en Windows sin él no llevaría `uvloop`, que la imagen Linux sí instala. El
+de desarrollo se compila **con el de producción como restricción**, para que la suite corra
+sobre las mismas versiones que la imagen.
+
+#### 2. Crear el Esquema con Alembic
+
+Sin Compose no hay servicio `migrate`, así que las migraciones se aplican a mano **antes**
+de sembrar nada. El sembrado escribe en tablas que todavía no existen si se salta este paso.
+
+```bash
+# `DATABASE_URL` fuera del árbol: ni el .env ni la base viven en el repositorio.
+export DATABASE_URL="sqlite:///C:/Users/<usuario>/Desktop/Resi/_lead_scoring_local/lead_scoring.db"
+python -m alembic upgrade head
+```
+
+#### 3. Entrenar Modelo y Sembrar Base de Datos
+```bash
+# Entrenar pipeline supervisado calibrado. Genera lead_scorer_model.joblib, el perfil
+# de referencia para el monitoreo de deriva y una entrada en el registro de modelos.
+# Falla —y NO sobrescribe el artefacto anterior— si el ROC-AUC cae bajo 0.82 o si el
+# modelo deja de aportar sobre el heurístico.
+python ml_pipeline/src/train_model.py
+
+# Poblar base de datos con prospectos sintéticos.
+# El script VACÍA las tablas de negocio antes de regenerarlas: si la base ya tiene
+# datos, aborta y enumera lo que borraría. Añada --force para confirmarlo.
+python backend/scripts/seed_data.py
+
+# En producción o staging el sembrado de demostración está prohibido. Para crear o
+# restablecer solo las cuentas de acceso, sin tocar ningún dato:
+python backend/scripts/seed_data.py --solo-usuarios
+
+# Dejar la pila lista para sentar a alguien delante: siembra lo anterior y añade una
+# publicación de ejemplo con perfiles ya recibidos por su enlace público, para que haya
+# algo que comparar. Copia la base antes de vaciarla e imprime enlaces y cuentas.
+python scripts/preparar_prueba_con_personas.py --force
+
+# Las hojas para anotar, una por papel, con las tareas ya escritas (las saca del guion).
+python scripts/hojas_de_observacion.py crear
+
+# Al terminar la sesión: arma la tabla de vaciado y dicta el veredicto.
+# Con las hojas en blanco responde «SIN DATOS», que es la respuesta correcta.
+python scripts/hojas_de_observacion.py leer
+```
+
+El guion por rol y la hoja para anotar dónde se atasca cada persona están en
+[docs/Prueba_Con_Personas.md](docs/Prueba_Con_Personas.md). El criterio «nadie se atasca»
+no lo afirma nadie a mano: lo calcula `hojas_de_observacion.py leer` a partir de las hojas
+de la sesión, y mientras no haya sesión responde que no hay datos.
+
+#### 4. Observabilidad del Modelo
+```bash
+# ¿Se siguen pareciendo los prospectos de hoy a los del entrenamiento?
+# Compara las instantáneas de variables registradas en producción contra el perfil de
+# referencia mediante el índice PSI, e informa además de qué motor puntuó cada caso.
+python ml_pipeline/src/drift_monitor.py
+
+# Dataset etiquetado con desenlaces comerciales reales (WON/LOST), para reentrenar.
+# Exige un mínimo de ejemplos: por debajo de él, se niega a generarlo y explica por qué.
+python ml_pipeline/src/feedback_dataset.py
+```
+
+En la pila de Compose, PostgreSQL no publica puerto hacia el host, así que el monitor se
+ejecuta desde el propio contenedor, donde viaja incluido:
+
+```bash
+python devops/pila.py exec backend python /app/observabilidad/drift_monitor.py
+```
+
+Sus umbrales y sus límites —incluido el hecho de que el perfil de referencia se construye
+sobre datos sintéticos— están en el Capítulo 13 de la memoria.
+
+### El monitor de deriva corre solo, y avisa
+
+Lo anterior es la consulta manual. Un monitor que hay que acordarse de lanzar detecta la
+deriva el día que a alguien se le ocurre mirar, que suele ser el día después de que
+importara. El servicio `monitor-deriva` de la pila lo ejecuta en bucle:
+
+| Variable | Por defecto | Qué hace |
+| :--- | :--- | :--- |
+| `ML_DRIFT_INTERVALO_S` | `21600` (6 h) | Cada cuánto reevaluar |
+| `ML_DRIFT_SILENCIO_S` | `21600` (6 h) | Cuánto callar antes de repetir un aviso vigente |
+| `ML_DRIFT_WEBHOOK` | *(vacío)* | A dónde entregar la alerta, además de al registro |
+
+La alerta sale como un objeto JSON en una línea, con el mismo formato que el resto del
+registro del sistema:
+
+```
+[ALERTA-DERIVA] {"evento":"deriva_de_variables","tipo":"deriva","veredicto":"deriva significativa",
+                 "columnas_con_deriva":["source_channel"],"psi":{"source_channel":0.41}, ...}
+```
+
+Y **se repite lo justo**. La deriva de población dura semanas; avisar en cada ciclo produce
+decenas de mensajes idénticos sobre una condición que no ha cambiado, quien los recibe crea
+un filtro, y a partir de ahí el sistema tiene monitorización y no tiene aviso —que es peor
+que el punto de partida, porque además parece resuelto—. Se reavisa cuando **cambia el
+conjunto de columnas afectadas** o cuando pasa el periodo de silencio, y se avisa también
+de la vuelta a la normalidad, que si no nadie sabe cuándo terminó. El estado vive en un
+volumen y no en `tmpfs`: en `tmpfs`, cada reinicio del contenedor olvidaría que ya avisó.
+
+Corre en la pila y no en integración continua porque lo que hay que comparar contra el
+perfil son las instantáneas que produjo **esa** base al puntuar prospectos reales. CI no
+las tiene ni debe tenerlas; un trabajo programado en el pipeline daría la sensación de
+vigilancia sin ninguna.
+
+### El modelo, atado a los datos que lo produjeron
+
+El registro de modelos guarda una entrada por entrenamiento, y desde N-15 esa entrada
+**no puede escribirse sin la huella SHA-256 del conjunto que lo entrenó**:
+
+```bash
+python - <<'PY'
+import json, sys; sys.path.insert(0, "ml_pipeline/src")
+from model_registry import entrada_de_artefacto
+sha = json.load(open("ml_pipeline/models/metrics.json", encoding="utf-8"))["model_sha256"]
+print(entrada_de_artefacto(sha))
+PY
+```
+
+El campo existía desde la fase 8 y valía `null` en todas las entradas: el parámetro era
+opcional y `train_model.py` llamaba sin él. El registro declaraba una trazabilidad que no
+tenía, y la pregunta «¿con qué datos se entrenó el modelo que puntuó a este prospecto?»
+seguía sin respuesta, con el agravante de parecer contestada. Ahora la llamada falla sin
+huella, el origen se **declara** en vez de deducirse —la deducción anterior, `sinteticos si
+no hay huella`, se vuelve falsa justo al hacerla obligatoria— y el pipeline **recalcula** la
+huella desde el CSV y exige que coincida: un valor constante también dejaría el campo
+distinto de `null`.
+
+### El perfil de referencia sabe de qué modelo es
+
+El monitor mide cuánto se aleja producción de la población con la que se entrenó **el modelo
+que está puntuando**. Contra el perfil de otro entrenamiento el PSI sigue saliendo, con el
+mismo aspecto, y deja de significar lo que dice. Perfil y `.joblib` viajan juntos en la
+imagen y salen del mismo `train_model.py`, pero hasta la Fase 13 nada lo dejaba escrito ni
+lo comprobaba.
+
+Ahora el perfil lleva la huella del artefacto (`model_sha256`) y la de los datos, y el
+monitor la comprueba **antes de leer una sola instantánea**:
+
+```
+[DERIVA] No se evalua. El perfil de referencia salio del artefacto 0a2632a2f496 y el que
+         esta desplegado es 7c1e90b3d2aa. Se compararia produccion contra la poblacion de
+         otro modelo, y los PSI no significarian lo que dicen.
+```
+
+Sale con código **1** —«no se pudo evaluar»—, no con el 2 de la deriva: no es una señal del
+negocio, es un despliegue roto. Un perfil sin huella se rechaza también en lugar de darse
+por bueno: es exactamente el caso que hay que obligar a regenerar.
+
+### Reentrenar con desenlaces reales
+
+```bash
+# 1. Exportar los prospectos que llegaron a WON / LOST / UNQUALIFIED, etiquetados sobre la
+#    instantánea de variables del momento en que ENTRARON al embudo.
+python devops/pila.py exec backend python /app/observabilidad/feedback_dataset.py \
+    --salida /tmp/leads_reales.csv
+
+# 2. Medir contra ellos. NO publica: mide.
+python ml_pipeline/src/train_model.py --datos realimentacion --dataset leads_reales.csv
+
+# 3. Pedir la publicación. Solo se publica si el LÍMITE INFERIOR del IC 95 % del ROC-AUC
+#    alcanza el umbral y el del APORTE sobre el heurístico alcanza el mínimo; si no, no
+#    escribe el artefacto y sale con código 1.
+python ml_pipeline/src/train_model.py --datos realimentacion --dataset leads_reales.csv --publicar
+```
+
+Medir y publicar están separados a propósito. El primer dataset de realimentación tiene
+decenas de filas, no miles, y con un conjunto de prueba pequeño el ROC-AUC sale alto por
+azar con facilidad: en el ensayo, 45 desenlaces dieron **0.8889 con un intervalo de
+confianza del 95 % de [0.571, 1.000]** —superando los dos umbrales del pipeline—, mientras
+260 dieron **0.8917 con [0.800, 0.968]**. Casi la misma estimación puntual y un valor
+probatorio completamente distinto. Por eso el intervalo se calcula siempre y por eso
+publicar es un acto deliberado.
+
+Y desde la Fase 13 no depende de que quien lo pide haya mirado la tabla: `--publicar` exige
+que el **límite inferior** del intervalo alcance el umbral de 0.82. Con ese criterio no se
+habría publicado ninguna de las dos cohortes del ensayo, tampoco la de 260, cuyo límite
+inferior se queda en 0.800. Con los datos sintéticos queda en 0.928 y la condición no cuesta
+nada: solo muerde donde tiene que morder.
+
+Desde el capítulo 24 lo mismo vale para el **aporte sobre el heurístico**, que antes se exigía
+con la estimación puntual. Se mide con un bootstrap pareado —las mismas filas para el modelo
+y para la regla en cada réplica— y su límite inferior tiene que alcanzar +0.01. Muerde antes
+que el del ROC-AUC: una cohorte sintética de 1000 prospectos da un aporte de +0.028 con
+intervalo [-0.002, +0.059] y no se publica, aunque su ROC-AUC tenga el límite inferior en
+0.91. Y el ensayo del bucle, con 12 ejemplos de prueba, se queda fuera por el aporte
+([-0.100, +0.222]) antes de llegar a nada más.
+
+Las instantáneas llevan `version_del_vector`. Las anteriores al capítulo 24 no dicen qué
+mensajes eran de LinkedIn ni cuántas llamadas quedaron sin respuesta, así que el dataset
+real y el monitor de deriva las **descartan y las cuentan** en lugar de traducirlas.
+
+Desde el capítulo 30 la etiqueta no se deduce del estado: se **lee**. Cerrar un prospecto
+exige decir cómo acabó, por qué motivo —de una lista cerrada— y qué día, y eso queda en la
+tabla `desenlaces` junto con el score que tenía al cerrarse. El dataset usa esa fila tal
+cual, y el motivo viaja como columna de contexto y **no** como variable del modelo: se
+conoce al cerrar, no el día que hay que decidir a quién llamar. Los cierres anteriores a ese
+capítulo siguen entrando con la etiqueta deducida del estado, y el manifiesto los cuenta
+aparte.
+
+**Hoy el bucle no tiene datos**: en la base no hay ningún prospecto en estado terminal. El
+panel de desenlaces dice cuántos faltan —200 ejemplos utilizables, 50 de cada clase— y avisa
+al líder cuando se alcanza el mínimo, **sin reentrenar nada**: quien decide es una persona.
+
+Para que el camino no se pudra hasta que los haya, el pipeline lo recorre entero en cada
+ejecución sobre una base desechable:
+
+```bash
+python ml_pipeline/src/ensayo_del_bucle.py --tamano 60 --entrenar
+```
+
+No mide el negocio —las etiquetas son sintéticas— y no toca nada del despliegue: artefacto,
+perfil y registro de producción quedan intactos.
+
+---
+
+## 🔐 Autenticación y Control de Acceso
+
+El sistema exige inicio de sesión: **todos** los endpoints de datos requieren un JWT
+firmado por el backend (HS256 con `SECRET_KEY`). Las cabeceras `X-User-Role` /
+`X-Entra-User-Role` ya no se leen — cualquiera podía declararse administrador con ellas.
+
+| Pieza | Dónde vive | Vigencia |
+| :--- | :--- | :--- |
+| **Access token** | Solo en memoria del navegador (nunca en `localStorage`) | 15 minutos |
+| **Refresh token** | Cookie `HttpOnly`, `SameSite=Strict`, limitada a `/api/v1/auth` | 7 días |
+
+El frontend renueva el access token de forma transparente. La renovación **rota** el token
+de refresco: cada emisión queda registrada con un identificador propio (`jti`) y una
+*familia* común a toda la sesión, y refrescar consume el token presentado.
+
+Presentar un token ya consumido solo puede significar que dos partes tienen la misma
+cookie. Como no hay forma de saber cuál es la legítima, se revoca **la familia entera** y
+ambas vuelven a iniciar sesión; el incidente queda en la bitácora de auditoría. Antes esto
+no ocurría: se entregaba una cookie nueva y la anterior seguía valiendo hasta expirar, de
+modo que una cookie robada daba siete días de acceso renovable sin dejar rastro.
+
+Dos matices, porque conviene decirlos:
+
+- Hay una **ventana de gracia de 10 segundos** (`REFRESH_ROTATION_GRACE_SECONDS`) para el
+  caso honesto de dos pestañas refrescando a la vez. Sin ella, un usuario con varias
+  pestañas perdería la sesión sin haber hecho nada.
+- Los **access tokens ya emitidos también se revocan al instante** (capítulo 23). Llevan
+  `ver`, la `token_version` de la cuenta al emitirse, y la resolución de identidad —que ya
+  leía la cuenta en cada petición— la compara sin ninguna consulta más. Antes seguían
+  valiendo sus 15 minutos: un token robado sobrevivía al logout de su víctima.
+
+Al cerrar sesión se revocan todas las familias vivas **y** se incrementa `token_version`,
+que cierra la sesión en todos los dispositivos a la vez. Lo mismo ocurre al cambiar o
+restablecer la contraseña, al cambiar el rol y al desactivar la cuenta.
+
+Los JWT se firman y verifican con **PyJWT**, solo HMAC, exigiendo `exp`, `iat`, `nbf`,
+`iss`, `aud`, `sub` y `jti`. python-jose salió del proyecto porque arrastraba `ecdsa`, con un
+aviso sin arreglo que `pip-audit` tenía que ignorar; ahora la auditoría no ignora ninguno.
+
+**Contraseñas filtradas.** La política rechaza, además, las que aparecen en filtraciones
+públicas. Se comprueba en el alta, en el cambio propio y en el restablecimiento, y hay dos
+comprobaciones, en este orden:
+
+1. Una lista **local** de 46 825 entradas dentro de la imagen (`backend/app/core/datos/`).
+   La huella del archivo está en su manifiesto, y una lista vaciada o sustituida no se usa
+   en silencio: falla.
+2. Si la local la deja pasar, **se pregunta por rango** al servicio público (capítulo 37).
+   **Salen los cinco primeros caracteres del resumen SHA-1 y nada más** —nunca la contraseña
+   ni el resumen completo—; el servicio devuelve los cientos de sufijos que empiezan por ese
+   prefijo y la comparación se hace aquí, así que no puede saber cuál era el nuestro ni si
+   alguno lo era. La petición pide relleno (`Add-Padding`) para que el tamaño de la
+   respuesta tampoco delate el prefijo.
+
+**Si el servicio no contesta, no se bloquea a nadie.** Dos segundos de espera, sin
+reintentos, y el resultado es idéntico al que daba el sistema antes del capítulo 37: decide
+la lista local. El fallo queda en la bitácora con el prefijo —lo único que ya había
+salido—, nunca con la contraseña ni con su resumen. La salida verifica el certificado
+contra el **almacén del sistema**, no contra el paquete de la biblioteca, porque en una
+máquina con el TLS interceptado lo segundo produce un «el servicio no contesta» silencioso
+sobre un servicio que funciona.
+
+### Cuentas sembradas
+
+`seed_data.py` crea tres cuentas, una por rol. Sus contraseñas salen de
+`SEED_ADMIN_PASSWORD`, `SEED_SALES_LEAD_PASSWORD` y `SEED_EXECUTIVE_PASSWORD`. Si no
+define esas variables **fuera de producción**, se usa la contraseña de desarrollo
+`PluriOne2026!`; en `production`/`staging` se genera una aleatoria y se imprime una sola
+vez en la salida del script.
+
+`seed_data.py` crea además cuatro cuentas de asesor comercial (`carlos.morales@`,
+`ana.ruiz@`, `valeria.mendoza@` y `diego.herrera@`), que antes vivían en una tabla
+`sales_reps` aparte y no podían iniciar sesión. Su contraseña sale de
+`SEED_ASESOR_PASSWORD`.
+
+| Correo | Rol | Puede |
+| :--- | :--- | :--- |
+| `admin.ti@plurione.com` | System_Admin | Todo, incluida la gestión de cuentas y la bitácora |
+| `lider.ventas@plurione.com` | Sales_Lead | Cartera completa, campañas, borrado y recálculo masivo |
+| `asesor.comercial@plurione.com` | Commercial_Executive | **Solo su propia cartera**: consulta, alta, edición y actividades |
+
+### Alcance sobre el dato
+
+El rol decide qué operaciones puede invocar cada persona. **De qué prospectos** lo decide la
+asignación:
+
+| | `Commercial_Executive` | `Sales_Lead` y `System_Admin` |
+| :--- | :--- | :--- |
+| Ver y buscar prospectos | Solo los asignados a él | Toda la cartera |
+| `total` del listado y KPIs de `/analytics/summary` | Contados sobre su cartera | Sobre toda |
+| Editar un prospecto | Solo los suyos | Cualquiera |
+| Reasignar (`assigned_rep_id`) | No (403) | Sí |
+| Borrar un prospecto | No (403) | Sí |
+| `/analytics/campaigns` | No (403) | Sí |
+
+Un prospecto que existe pero pertenece a otra persona responde **404**, indistinguible de uno
+inexistente: un 403 confirmaría que ese identificador está ocupado, y recorrer identificadores
+dibujaría el tamaño de la cartera ajena sin ver un solo dato. La diferencia sí queda
+registrada en la bitácora, como `acceso.fuera_de_alcance`.
+
+El filtro se aplica **en el repositorio**, no en cada endpoint: `LeadRepository` exige el
+alcance como argumento obligatorio, así que un endpoint nuevo que se olvide de pasarlo falla
+con un `TypeError` en lugar de devolver datos de más en silencio.
+
+### Gestión de cuentas
+
+| Endpoint | Quién | Qué hace |
+| :--- | :--- | :--- |
+| `GET/POST /api/v1/users` | `System_Admin` | Listado y alta |
+| `PUT /api/v1/users/{id}` | `System_Admin` | Nombre, rol, actividad, marca de asesor, capacidad |
+| `POST /api/v1/users/{id}/role` | `System_Admin` | Cambio de rol con asiento propio; cierra sus sesiones |
+| `DELETE /api/v1/users/{id}` | `System_Admin` | **Baja lógica**: no borra la fila |
+| `POST /api/v1/users/{id}/activate` | `System_Admin` | Reactiva; exige cambiar la contraseña |
+| `POST /api/v1/users/{id}/reset-password` | `System_Admin` | Fija contraseña y revoca sesiones |
+| `GET /api/v1/sales-reps` | `Sales_Lead`, `System_Admin` | Equipo comercial con su carga, en una consulta; cuenta siempre los prospectos que siguen en cuentas de baja |
+| `POST /api/v1/sales-reps/{id}/cartera` | `Sales_Lead`, `System_Admin` | Traspasa todos los prospectos de una cuenta a un asesor activo; avisa si supera su capacidad |
+| `GET /api/v1/eventos-sin-asociar` | `Sales_Lead`, `System_Admin` | Bandeja de avisos de integraciones que no pertenecen a ninguna ficha |
+| `POST /api/v1/eventos-sin-asociar/{id}/vincular` | `Sales_Lead`, `System_Admin` | Convierte el aviso en actividad del prospecto elegido; conserva su fuente y su verificación |
+| `DELETE /api/v1/eventos-sin-asociar/{id}` | `Sales_Lead`, `System_Admin` | Descarta el aviso; en la bitácora quedan su fuente y su tipo |
+| `GET /api/v1/campaigns` | Cualquier rol | Campañas de captación; `?canal=LinkedIn` da las publicaciones |
+| `POST/PUT/DELETE /api/v1/campaigns` | `Sales_Lead`, `System_Admin` | Alta, edición, estado (`borrador`, `activa`, `pausada`, `cerrada`) y cierre (`DELETE`) |
+| `POST /api/v1/campaigns/{id}/duplicar` | `Sales_Lead`, `System_Admin` | Copia en borrador con enlace propio |
+| `GET /api/v1/publicaciones/{id}/informe` | Cualquier rol | Perfiles que trajo una publicación; el asesor ve los suyos y **un número** con el resto; visitas, tasa de envío y perfiles por día |
+| `GET /api/v1/publicaciones/{id}/vista-previa` | Cualquier rol | La página de interés tal como la verá el interesado, en cualquier estado y sin contar visita |
+| `GET /interes/{slug}` | Público, sin sesión | El HTML de la página, con las etiquetas Open Graph y de X de esa publicación dentro |
+| `GET /interes/{slug}/tarjeta.png` | Público, sin sesión | La imagen 1200×630 de vista previa, dibujada en el servidor |
+| `GET /api/v1/agenda/hoy` | Cualquier rol | Lo que hay que hacer hoy, por score; el líder puede pedir la bandeja de su cartera |
+| `POST /api/v1/agenda/tareas/{id}/hecha` | Su dueño | «Ya la hice»; una tarea ajena responde 404 |
+| `GET /api/v1/agenda/avisos` | Cualquier rol | La campana, siempre la propia |
+| `GET /api/v1/agenda/enfriandose` | Líder y administrador | Los HOT desatendidos y con qué asesor están |
+| `GET /api/v1/publicaciones/comparativa` | `Sales_Lead`, `System_Admin` | Perfiles, score medio y avances de cada publicación |
+| `GET /api/v1/publicaciones/nuevos-sin-asesor` | `Sales_Lead`, `System_Admin` | Cuántos prospectos de una publicación siguen sin asignar, por cualquier red |
+| `GET /api/v1/interes/{slug}` | **Sin sesión** | La publicación y las listas del formulario |
+| `POST /api/v1/interes/{slug}` | **Sin sesión** | Solicitud de contacto de la página de interés |
+
+**Publicaciones.** Una publicación de LinkedIn es una campaña con canal `LinkedIn`, no una
+entidad aparte. Tiene descripción, a quién va dirigida y un enlace público
+`<PUBLICACIONES_URL_BASE>/<public_slug>`. El slug lo genera el servidor con 128 bits de azar,
+ninguna edición lo cambia y el índice único impide que otra campaña lo lleve. La respuesta
+trae `enlace_publico` y `texto_para_linkedin` (descripción + enlace), que es lo que copia el
+botón «Copiar texto para LinkedIn» de la pestaña «Publicaciones». El asesor la consulta; el
+líder y el administrador la gestionan.
+
+Desde el capítulo 26 una publicación tiene además:
+
+* **estado**: borrador, activa, pausada o cerrada; solo la activa sirve su página;
+* **fecha de cierre**, que la cierra sola sin tarea programada, la primera vez que alguien
+  mira;
+* **asesor responsable**, que recibe solo las fichas nuevas y, si deja de ser asesor activo,
+  deja de recibirlas;
+* sus propias **opciones de «¿Qué necesitas?»**, de 2 a 5, que siguen sin puntuar;
+* la **dirección del post** publicado, comprobada como de linkedin.com por el nombre de la
+  máquina.
+
+Se puede **duplicar** (sale en borrador, con enlace propio) y ver en dos **vistas previas**:
+
+* el post como en LinkedIn, con su corte de «ver más» y el aviso a 3 000 caracteres;
+* la página tal como la verá el interesado, en cualquier estado y sin contar visita.
+
+La página cuenta **visitas**: un número por día, sin cookies ni datos de quien mira. El
+informe da con ellas la tasa de envío y un gráfico de perfiles recibidos por día.
+
+Desde el capítulo 27 la misma publicación se difunde por **varias redes**: LinkedIn,
+WhatsApp, Facebook y correo vienen activadas; Instagram y X se activan si se quieren. Cada
+red tiene **su propio enlace a la misma página** (`?r=whatsapp`) y su propio texto, recortado
+a lo que cabe —X a 280 contando el enlace, WhatsApp y correo más cortos—, sin recortar nunca
+el enlace.
+
+Los botones «Compartir en…» abren la **dirección pública de compartir** de cada red: sin
+API, sin cuentas y sin claves; publica quien pulsa, con su sesión. Donde la red solo se lleva
+el enlace (LinkedIn, Facebook) o no tiene forma de compartir desde la web (Instagram), al
+lado va «Copiar texto». Hay además un **código QR** descargable del enlace, generado en el
+navegador, para Instagram y para material impreso.
+
+Al pegar el enlace, la red enseña una **tarjeta** con el título, el texto y una imagen de
+1200×630 de esa publicación. Quien la dibuja es el servidor: LinkedIn, WhatsApp, Facebook y X
+piden la dirección y leen el HTML **sin ejecutar JavaScript**, así que `/interes/{slug}` se
+sirve desde el backend con las etiquetas ya dentro. Una publicación que no está activa —o un
+enlace inventado— da etiquetas genéricas y la misma respuesta, sin filtrar su título. La
+imagen se genera en local con Pillow y la tipografía del propio cliente; no interviene ningún
+servicio de tarjetas.
+
+Por dónde llegó cada persona queda registrado: en la actividad, en la ficha 360 («Llegó por
+la publicación X, vía WhatsApp») y como **canal** de la ficha. Una red desconocida o
+manipulada en el enlace se registra como «sin red» y **nunca** rechaza el envío. Ninguno de
+esos canales lo conoce el modelo, así que todos son neutros, igual que «LinkedIn». El informe
+añade una **fila por red** con visitas, envíos, tasa, perfiles y score medio.
+
+**Página de interés.** El enlace lleva a `/interes/<slug>`, la única pantalla sin sesión.
+Muestra el título y el texto de la publicación y un formulario de listas cerradas: cargo,
+sector y tamaño son **las listas del modelo** (`CATEGORIAS_DEL_MODELO`), porque el
+preprocesador descarta en silencio las categorías que no vio al entrenar. No hay texto libre,
+el aviso de privacidad es obligatorio, teléfono y perfil de LinkedIn son opcionales y la
+facturación no se pregunta: `annual_revenue` queda vacío. Es una ruta propia y no un conector firmado: un navegador no puede guardar un
+secreto HMAC. Se defiende con límite por IP y por publicación, campo trampa, validación
+estricta, «no disponible» cuando la publicación no existe o está desactivada, y **la misma
+respuesta exista o no el correo**, para que no sirva para averiguar quién está en la base.
+Por dentro usa `registrar_evento`: si el correo ya existe, la solicitud se suma al historial
+y **no pisa** los datos de la ficha. El prospecto llega atribuido a su publicación, con canal
+`LinkedIn` —que el listado marca como «Nuevo desde LinkedIn»— y ya repartido: al responsable
+de la publicación si lo tiene y, si no, a quien decida el reparto automático.
+
+**Informe por publicación.** `GET /api/v1/publicaciones/{id}/informe` responde con tres
+números —perfiles recibidos, cuántos avanzaron de etapa (salieron de `NEW`) y score medio— y
+la tabla ordenada por score: nombre, empresa, cargo, qué necesita (de su última solicitud; no
+puntúa), score, etapa, asesor y fecha, filtrable
+por etapa y por días. Entra en el informe tanto quien está **atribuido** a la campaña
+(`leads.campaign_id`) como quien **envió su perfil** por su enlace: `campaign_id` se fija al
+crear la ficha y no se vuelve a tocar, así que sin lo segundo una persona que responde a tres
+publicaciones contaría solo en la primera. Los números son los de quien pregunta: un asesor
+ve sus prospectos y `de_otros_asesores` dice cuántos más hay **sin un solo nombre**; el líder
+y el administrador ven la publicación entera. Una campaña de otro canal responde 404, igual
+que una inexistente; una publicación desactivada **sí** conserva su informe, porque se
+desactiva para dejar de recibir perfiles, no para borrar los que trajo. Cada consulta queda en
+la bitácora como `publicacion.informe` con sus filtros y el número de filas, nunca con las
+filas. La comparativa (`publicacion.comparativa`) no se acota por cartera —comparar
+publicaciones con la cartera de una sola persona ordenaría asesores, no publicaciones— y por
+eso es de dirección.
+
+**Ficha 360.** `GET /api/v1/leads/{id}` trae `llego_por` cuando la persona llegó por una
+publicación: su perfil de LinkedIn y una fila por solicitud, con la publicación, su enlace, la
+fecha, qué necesita y cuándo aceptó el aviso de privacidad. Si no hubo solicitudes el campo es
+`null` y la ficha no pinta la tarjeta; el perfil va en la tarjeta y no en cada fila porque es
+de la persona y la ficha guarda el primero que llegó.
+
+Ni las cuentas ni las campañas se borran: se desactivan. Borrar una cuenta dejaría sin sujeto
+sus asientos de auditoría; borrar una campaña pondría a `NULL` la atribución de cada prospecto
+que atrajo. Toda mutación queda en la bitácora.
+
+Un administrador **no puede degradarse ni desactivarse a sí mismo**, ni dejar el sistema sin
+ninguna cuenta de administración activa: la comprobación cuenta cuántas quedarían.
+
+### Contraseñas
+
+- Mínimo **12 caracteres**; a partir de 16 no se exige variedad, por debajo hacen falta 3 de
+  los 4 tipos (minúscula, mayúscula, dígito, símbolo). Se prefiere una frase larga a una
+  palabra corta con símbolos: `Verano2026!` cumple las cuatro reglas clásicas y es de las
+  primeras que prueba un diccionario.
+- Máximo **72 bytes** (no caracteres): bcrypt trunca ahí en silencio.
+- Se rechazan las contraseñas conocidas, el nombre del producto y el propio nombre o correo.
+- El rechazo devuelve **todos** los motivos, no el primero.
+- `POST /api/v1/auth/change-password` cambia la propia. Exige la contraseña actual aunque la
+  sesión esté autenticada —si bastara el token, robar una sesión de 15 minutos bastaría para
+  quedarse con la cuenta— y **cierra todas las sesiones, incluida la que hizo el cambio**.
+- Una cuenta con **contraseña prestada** —creada, restablecida o reactivada por un
+  administrador— no opera hasta cambiarla. El servidor responde `403` con
+  `{"codigo": "cambio_de_contrasena_obligatorio"}` a todo salvo `GET /auth/me`,
+  `POST /auth/change-password` y `POST /auth/logout`, y el cliente la lleva directamente a
+  cambiarla. El bloqueo vive en la dependencia de identidad por defecto: un endpoint nuevo
+  nace cerrado para estas cuentas sin que nadie tenga que acordarse.
+- No hay caducidad por tiempo: forzar cambios periódicos empuja a rotar un sufijo.
+
+### Webhook CRM
+
+`POST /api/v1/crm/webhook` exige firma HMAC-SHA256 sobre `<timestamp>.<cuerpo crudo>`:
+
+- `X-PluriOne-Signature`: el HMAC en hexadecimal, con `CRM_WEBHOOK_SECRET` como clave.
+- `X-PluriOne-Timestamp`: epoch en segundos; se rechaza fuera de ±300 s (anti-replay).
+- El cuerpo se limita a 256 KiB.
+
+Si `CRM_WEBHOOK_SECRET` está vacío, el endpoint responde **503** en lugar de aceptar
+tráfico anónimo.
+
+La firma autentica el cuerpo, pero **no acredita que la petición sea nueva**: reenviar una
+entrega capturada dentro de la ventana de tolerancia volvía a pasar todas las
+comprobaciones, porque es la misma petición. Cada entrega atendida queda ahora registrada,
+y se distingue un reenvío de un reintento:
+
+| Qué llega | Respuesta |
+| :--- | :--- |
+| Los mismos bytes con la misma firma | **409** — ningún emisor honesto reenvía con la misma marca de tiempo |
+| El mismo evento con firma nueva (reintento del CRM) | **200 con la respuesta original** y la cabecera `X-PluriOne-Idempotent-Replay: true` |
+
+La ventana se controla con `CRM_IDEMPOTENCY_WINDOW_SECONDS` (900 s por defecto). Pasada
+esa ventana la marca de tiempo original ya no supera la comprobación anti-replay, así que
+las entradas caducadas se purgan solas.
+
+### Registro de actividad e integraciones
+
+Toda actividad —la que declara un asesor desde la ficha, la que registra el cambio de etapa,
+la del webhook CRM y la de los conectores— pasa por `registrar_evento()`
+(`backend/app/services/registro_de_actividad.py`) y por nada más. Cada fila dice de dónde
+viene:
+
+| Campo | Qué dice |
+| :--- | :--- |
+| `source` | `manual`, `pipeline`, `crm`, `formulario_web`, `linkedin_lead_gen`, `calendly` o `whatsapp` |
+| `verificada` | Si lo vio un sistema o lo declaró una persona |
+| `external_event_id` | El identificador de origen; `(source, external_event_id)` es único para siempre |
+| `occurred_at` / `created_at` | Cuándo ocurrió / cuándo se registró |
+
+Reglas iguales para todas las fuentes:
+
+- Un tipo desconocido o ausente responde **422** con el motivo, nunca un `FORM_SUBMIT` por defecto.
+- Una llamada lleva su resultado (`CONECTO`, `NO_CONTESTO`, `BUZON`) y solo la que conectó
+  cuenta como conversación. Un mensaje lleva su dirección y no admite notas.
+- La propuesta enviada y la reunión agendada no se declaran: las registra el cambio de etapa.
+- Los teléfonos se guardan en E.164; lo que no es un número responde 422.
+- Un correo desconocido crea ficha solo si la fuente genera prospectos (formularios, LinkedIn
+  Lead Gen, CRM). El resto espera en la bandeja **«Sin asociar»**.
+- Lo que no llega queda vacío y puntúa neutro: ni industria ni tamaño inventados.
+- Del mensaje no se guarda el texto: solo tipo, dirección, fecha e identificador.
+
+Las integraciones entran por `POST /api/v1/integraciones/{nombre}/eventos` (`calendly`,
+`whatsapp`, `linkedin-lead-gen`, `formulario-web`), firmadas con el mismo esquema HMAC que el
+CRM. Cada una tiene su interruptor, su secreto y su límite, y ninguno se comparte:
+
+```bash
+INTEGRACION_CALENDLY_ACTIVA=true
+INTEGRACION_CALENDLY_SECRETO=<secreto compartido solo con Calendly>
+INTEGRACION_CALENDLY_LIMITE=60/minute
+```
+
+Están apagadas por defecto, y una apagada responde 404 igual que una que no existe. Revocar
+una —vaciar su secreto o apagarla— no toca a las demás. El CRM conserva `CRM_WEBHOOK_SECRET` y
+gana `INTEGRACION_CRM_ACTIVA`. Las formas de carga que aceptan los conectores, y lo que falta
+para conectar un proveedor real, están en el capítulo 21.
+
+
+#### 4. Iniciar Servidor de Producción Entregable (1 solo comando)
+Al contar con el frontend previamente compilado en `frontend/dist`, FastAPI sirve tanto la aplicación web como los endpoints:
+```bash
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+> Ingresa a tu navegador en: **[http://localhost:8000](http://localhost:8000)**. La aplicación pedirá
+> credenciales: usa una de las cuentas sembradas (ver *Autenticación y Control de Acceso*).
+
+*(Si deseas ejecutar el frontend en modo hot-reload de desarrollo: `cd frontend && npm run dev` en el puerto 3000).*
+
+---
+
+## 📥 Cómo llegan los prospectos
+
+Un prospecto entra por uno de cinco caminos. Todos terminan en el mismo sitio —
+`registrar_evento`, la única pieza que escribe actividades— y se puntúan al llegar; lo que
+cambia es quién lo manda, si puede crear la ficha, si puede reescribirla y si queda atribuido
+a una campaña.
+
+| Camino | Quién lo manda | ¿Crea la ficha? | Si el correo ya existe | Campaña | Asesor |
+| :--- | :--- | :-: | :--- | :-: | :--- |
+| **Página de interés** `/interes/<enlace>` | La persona, desde el enlace de una publicación | Sí | Suma la solicitud al historial y **no pisa** la ficha | La publicación | El responsable de la publicación; si no tiene, el reparto automático |
+| **Alta en el panel** | Un asesor o el líder | Sí | Rechaza el alta (el correo es único) | La que se indique | El asesor que la crea; el líder elige, y si no elige, el reparto automático |
+| **CRM** `POST /api/v1/crm/webhook` | El CRM, con firma HMAC | Sí | Actualiza cargo, empresa, sector, tamaño e ingresos | Ninguna | El reparto automático |
+| **Formulario web y LinkedIn Lead Gen** `POST /api/v1/integraciones/<nombre>/eventos` | Cada sistema, con su propio secreto y su interruptor | Sí | Igual que el CRM | Ninguna | El reparto automático |
+| **Calendly y WhatsApp** (mismas rutas) | Cada sistema, firmado | **No** | Suman reunión o mensaje a la ficha | — | — |
+
+Lo que no se puede atribuir a ninguna ficha —una reunión de Calendly con un correo que no
+existe— no se descarta ni crea una ficha a medias: va a la bandeja «Sin asociar», donde el líder
+lo vincula o lo descarta.
+
+**Reparto automático de prospectos** (capítulo 46). Una ficha nueva sin asesor y que no venga
+de una publicación con responsable se asigna sola a la cuenta activa que atiende cartera con
+**menos prospectos abiertos**; con empate, a la que lleva más tiempo sin recibir uno. Un trato
+ganado, uno perdido y un prospecto descartado no cuentan como cartera abierta: contarlos
+premiaría a quien menos cierra. Corre dentro del scoring, que es el paso por el que pasan los
+cinco caminos de arriba, y **una sola vez**: la prueba de que es un alta es que la ficha no
+tenga todavía ninguna instantánea de score, así que una reasignación hecha a mano no la
+deshace ningún recálculo. Cada reparto deja en la bitácora con qué regla se eligió y entre
+cuántos candidatos, sin actor —el alta la pudo pedir una persona, pero a quién le tocaba no lo
+decidió ella—. Si no hay ninguna cuenta donde repartir, la ficha queda sin asesor y el líder
+la ve en su contador, sin ningún error. Se apaga con `REPARTO_AUTOMATICO_ACTIVO=false`, y
+apagarlo no mueve nada de lo ya repartido. No mira el score, ni el sector, ni la zona, ni la
+capacidad declarada.
+
+### La historia que se enseña: del post de LinkedIn al prospecto puntuado
+
+1. **Marketing crea la publicación** en la pestaña «Publicaciones»: una campaña con canal
+   `LinkedIn`, su texto y a quién va dirigida. El servidor le da un enlace propio de 128 bits
+   que nadie puede elegir, cambiar ni reutilizar.
+2. **Copia el texto para LinkedIn**: la descripción y el enlace, ya juntos.
+3. **La persona abre el enlace** —en el teléfono, normalmente— y deja sus datos en un
+   formulario de unos treinta segundos, sin texto libre. Solo son obligatorios nombre,
+   correo, empresa, cargo, tamaño y sector (las listas que conoce el modelo), «¿Qué
+   necesitas?» con botones de un toque y el aviso de privacidad. El teléfono y el perfil de
+   LinkedIn van plegados bajo «Añadir más datos», y la facturación no se pregunta.
+4. **El sistema crea la ficha puntuada**, atribuida a la publicación, marcada «Nuevo desde
+   LinkedIn» y **ya repartida** a la asesora con menos cartera abierta (capítulo 46): esta
+   publicación no tiene responsable, así que decide el reparto, y con qué regla lo hizo queda
+   en la bitácora.
+5. **El líder la abre** y decide si la deja donde cayó o se la pasa a otra persona; lo que
+   reasigne a mano se queda. El contador «Nuevos de publicaciones, sin asesor» cuenta ahora lo
+   que el reparto **no pudo** colocar, así que con el equipo sembrado dice cero. El asesor la
+   encuentra con la tarjeta «Llegó por»: de qué publicación, qué necesita, cuándo aceptó el
+   aviso y su perfil de LinkedIn.
+6. **El líder compara publicaciones**: perfiles recibidos, cuántos avanzaron de etapa y score
+   medio de cada una, y el informe de cada publicación con sus perfiles por score.
+7. **El trato se cierra diciendo por qué** (capítulo 30). Pasar a «Ganado» o «Perdido» no es
+   una opción del selector de etapa: pide un motivo de una lista cerrada, el día en que se
+   cerró y, si se ganó, el tramo del acuerdo. Nada de texto libre. El prospecto sale de la
+   bandeja «Hoy» y deja de recibir tareas y avisos, y su puntuación **no se recalcula**: la
+   que tenga es la que había cuando se decidió.
+8. **El líder mira los desenlaces**, en la pestaña «Desenlaces»: ganados y perdidos por
+   motivo, por publicación, por red y por la categoría que tenían al cerrarse —que es la
+   respuesta a «¿el score acertaba?»—, más un contador de cuánto falta para poder reentrenar.
+   Todo son totales: ni una fila lleva a una persona.
+
+El guion completo, con las reglas que lo gobiernan, está en
+[docs/Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md](docs/Guion_Demo_Del_Post_de_LinkedIn_al_Prospecto_Puntuado.md),
+y cómo ensayarlo con personas en [docs/Prueba_Con_Personas.md](docs/Prueba_Con_Personas.md).
+
+Para enseñarlo delante de un sínodo hay un tercer documento, el
+[guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md): reparte los 4 min 30 s de la
+demostración entre los nueve pasos, dice qué frase va con cada pantalla y trae los tiempos
+de servidor medidos. El recorrido entero se ensaya solo, contra la API de verdad y sobre
+una **copia** de la base de demostración:
+
+```bash
+python scripts/ensayo_de_la_demo.py --base <ruta al .db de demostración>
+```
+
+Comprueba los nueve pasos y para en el primero que falle diciendo cuál y por qué. El
+recorrido completo cuesta **menos de dos segundos de servidor**; lo que sí se nota es la
+primera puntuación de cada proceso, que carga el artefacto y tarda **entre 3 y 4 s**, así
+que el guion empieza por un envío de calentamiento.
+
+### Lo que protege la página pública
+
+Es la única ruta sin sesión que escribe en la base. Tiene límite de envíos por IP (10 por
+hora) y por publicación (120), un campo trampa para robots, un esquema que rechaza cualquier
+campo de más, «no disponible» igual para una publicación inexistente, desactivada o que no es
+de LinkedIn, y **la misma respuesta exista o no el correo**, para que no sirva para averiguar
+quién está en la base. El CI lo comprueba en un paso propio, **«La pagina publica conserva
+sus defensas»** (`scripts/guarda_de_la_pagina_publica.py`), que falla si la página pierde el
+límite, acepta texto libre, sirve listas distintas de las del modelo que puntúa, obliga a más
+de lo imprescindible, vuelve a preguntar o escribir la facturación, deja que «¿Qué
+necesitas?» mueva la puntuación, o si el heurístico vuelve a suponer lo que falta.
+
+**Nada supuesto.** Lo que la persona no dice queda vacío: ni teléfono, ni perfil, ni
+facturación. «¿Qué necesitas?» no puntúa: se guarda en la solicitud y el asesor lo lee en la
+ficha 360 y en el informe (antes, «Ver una demostración» se registraba como una demo pedida y
+sumaba 25 puntos). Y la regla heurística trata un tamaño, un cargo o un sector que faltan
+como **desconocidos**, con el punto medio de su bloque (6, 15 y 10,5 puntos), y no como
+«1-10» o como la base de un estudiante.
+
+Dos límites conocidos: el modelo todavía no conoce el canal `LinkedIn` —conoce «LinkedIn
+Ads», que es publicidad pagada— y lo trata como desconocido hasta reentrenar con desenlaces
+reales; y solo esta página atribuye la ficha a su campaña, las integraciones no.
+
+---
+
+## 🌐 Rutas y Puertos de Validación Funcional
+
+| Servicio / Componente | URL de Acceso | Descripción |
+| :--- | :--- | :--- |
+| **Plataforma Web (React SPA)** | [http://localhost:3000](http://localhost:3000) | Entrada de la pila Docker: nginx sirve la SPA y hace de pasarela hacia la API. |
+| **Plataforma Web (ejecución local)** | [http://localhost:8000](http://localhost:8000) | Entrega unificada de uvicorn fuera de Docker. |
+| **Documentación Swagger API** | [http://localhost:8000/docs](http://localhost:8000/docs) | Solo fuera de producción. Con `ENVIRONMENT=production` devuelve 404, igual que `/redoc` y el esquema OpenAPI. |
+| **Health Check API** | [http://localhost:8000/health](http://localhost:8000/health) | Ejecuta un `SELECT` real contra la base y responde 503 si no contesta. |
+| **pgAdmin 4** | [http://127.0.0.1:5050](http://127.0.0.1:5050) | Solo con el overlay de desarrollo (`python devops/pila.py --dev up -d`) y credenciales propias en el archivo de entorno de la pila. |
+| **PostgreSQL 16** | — | Sin puerto publicado. Acceso vía `python devops/pila.py exec postgres psql` o el overlay de desarrollo. |
+
+### Límites de tasa
+
+Cuatro rutas se pueden abusar sin credenciales válidas o con un único token, y llevan tope por IP:
+
+| Endpoint | Límite por defecto | Variable | Motivo |
+| :--- | :--- | :--- | :--- |
+| `POST /api/v1/auth/login` | 10/minuto | `RATE_LIMIT_LOGIN` | Fuerza bruta de contraseñas |
+| `POST /api/v1/scoring/predict` | 60/minuto | `RATE_LIMIT_PREDICT` | Es la ruta más cara: inferencia + generación de texto |
+| `POST /api/v1/crm/webhook` | 120/minuto | `RATE_LIMIT_WEBHOOK` | Un secreto filtrado no debe permitir inundar la base |
+| `POST /api/v1/integraciones/{nombre}/eventos` | Uno por integración (30–120/minuto) | `INTEGRACION_<NOMBRE>_LIMITE` | La cuenta de una integración no consume la de otra |
+
+Al superarlos se devuelve `429` con las cabeceras `X-RateLimit-*`. `RATE_LIMIT_ENABLED=false`
+desactiva el mecanismo cuando el corte lo aplica un balanceador por delante.
+
+Dos ajustes deciden si el tope sirve de algo:
+
+- **`TRUST_PROXY_HEADERS`** (por defecto `false`). `X-Forwarded-For` la escribe el cliente:
+  si se le hace caso sin un proxy de confianza delante, basta con rotar un valor inventado
+  en cada intento para que el límite no llegue a aplicarse nunca. La pila de compose la
+  activa explícitamente, porque allí todo el tráfico entra por nginx.
+- **`RATE_LIMIT_STORAGE_URI`**. Con `memory://` cada worker de uvicorn cuenta por su lado y
+  el tope real es el declarado *multiplicado* por el número de workers (medido: con 2
+  workers y `10/minute` pasaban 11-20 intentos). La pila levanta un Redis propio y apunta
+  a él, con lo que la cuenta es exacta y común a todos los procesos.
+
+### Bitácora de auditoría
+
+`GET /api/v1/audit` devuelve quién hizo qué, sobre qué, desde qué dirección y con qué
+resultado — incluidos los intentos **denegados**, que son los que interesan cuando alguien
+tantea los límites de su rol. Filtra por `actor_email`, `action`, `entity`, `entity_id`,
+`outcome`, `desde` y `hasta`.
+
+Es **solo lectura** (no hay endpoint que borre ni edite asientos: lo primero que borraría
+quien abusa de sus permisos es el registro de que lo hizo) y **solo `System_Admin`**: la
+bitácora concentra ya correlacionado quién trabaja con qué cartera y desde dónde se conecta
+cada persona, y eso no es información que un responsable de equipo necesite para su trabajo.
+Consultarla queda a su vez registrado.
+
+### Datos de los prospectos: acceso, supresión y retención
+
+Un prospecto es una persona. El sistema guarda su ficha, lo que hizo, cada puntuación con
+el vector de variables y la explicación, y lo que llegó del CRM.
+
+| Qué | Cómo | Quién |
+| :--- | :--- | :--- |
+| Todo lo que el sistema sabe de una persona | `GET /api/v1/leads/{id}/exportar` — JSON adjunto, `Cache-Control: no-store` | `Sales_Lead`, `System_Admin` |
+| Suprimirla | `DELETE /api/v1/leads/{id}` | `Sales_Lead`, `System_Admin` |
+| Resumir el historial vencido | servicio `retencion-historial` de la pila, una pasada al día | la pila, sin actor |
+
+- **La exportación** trae cada columna de cada tabla que cuelga del prospecto —también las
+  que se añadan mañana—, las ingestas del CRM que no llegaron a vincularse, qué se hizo con
+  sus datos y cuándo (por rol, sin datos de los empleados), cuánto se conservan y qué copias
+  existen fuera de la base.
+- **La supresión** borra en una transacción todo lo que cuelga del prospecto, incluidas las
+  entregas de webhook y las ingestas revertidas que llevan su correo sin `lead_id`, y retira
+  sus datos de los asientos de la bitácora sin borrar los asientos. El asiento del borrado
+  guarda cuántas filas salieron de cada tabla y una **huella con clave** del correo: permite
+  comprobar si una persona concreta fue suprimida sin que la bitácora se lo diga a nadie más.
+- **El historial de puntuación** conserva el detalle de los últimos
+  `SCORE_HISTORY_RETENTION_MONTHS` meses completos (12 por defecto, mínimo 3) más el mes en
+  curso. Lo anterior se resume por prospecto y mes en `score_history_monthly` y se borra.
+  Se conservan **siempre** la instantánea de entrada de cada prospecto —el ejemplo de
+  entrenamiento del bucle de realimentación— y su puntuación vigente.
+- **Lo demás también tiene plazo** (capítulo 22), y lo aplica la misma pasada diaria, con un
+  asiento por plazo en la bitácora. Por debajo del mínimo, el servicio no arranca.
+
+  | Tabla | Plazo por defecto | Mínimo | Cuenta desde |
+  | :--- | :--- | :--- | :--- |
+  | `refresh_tokens` (sesiones) | `CONSERVACION_SESIONES_DIAS` = 30 | 7 | que la sesión caducó |
+  | `scoring_jobs` (recálculos) | `CONSERVACION_TRABAJOS_DIAS` = 90 | 7 | que terminó; los vivos no se tocan |
+  | `crm_integration_logs` | `CONSERVACION_REGISTROS_CRM_DIAS` = 90 | 30 | la sincronización |
+  | `unmatched_events` (bandeja «Sin asociar») | `CONSERVACION_SIN_ASOCIAR_DIAS` = 90 | 30 | que llegó el aviso |
+  | `tareas` (capítulo 28) | `CONSERVACION_TAREAS_DIAS` = 180 | 30 | que se **cerró**; una abierta no caduca |
+  | `avisos` (capítulo 28) | `CONSERVACION_AVISOS_DIAS` = 90 | 14 | que se **leyó**; uno sin leer no caduca |
+
+- **El desenlace no tiene plazo propio**, y es una decisión y no un olvido (capítulo 30). Es
+  un hecho sobre el prospecto —como su score—, no trabajo nuestro que se acumule, y purgarlo
+  por antiguo destruiría los ejemplos de entrenamiento que el sistema tardó un ciclo
+  comercial entero en reunir. Vive y muere con la ficha, y la exportación del titular lo
+  dice. De la conversación que llevó al cierre no se guarda nada: el motivo es una clave de
+  una lista cerrada, nunca un texto.
+
+```bash
+# Qué haría la purga hoy, sin escribir nada
+python devops/pila.py exec retencion-historial python /app/scripts/retencion_historial.py --simular
+```
+
+La política completa —qué se guarda, cuánto tiempo, con qué mecanismo y qué queda fuera del
+alcance de una supresión— está en el capítulo 20 de la memoria técnica.
+
+---
+
+## 🛠️ Fiabilidad Operativa
+
+### Recálculo masivo: un turno a la vez, y un estado que caduca
+
+`scoring_jobs.status` decía qué se pretendía hacer, no qué estaba pasando. Un proceso que
+moría a mitad del recorrido dejaba su fila en `RUNNING` para siempre.
+
+| | Antes | Ahora |
+| :--- | :--- | :--- |
+| Trabajo cuyo proceso murió | `RUNNING` indefinidamente | Arriendo vencido → `FAILED` |
+| Distinguir «lento» de «muerto» | Imposible | `heartbeat_at` y `lease_until` |
+| Dos recálculos simultáneos | Ambos se ejecutaban | El segundo recibe **409** |
+| Saber en qué contenedor mirar | — | `worker_id` (host y PID) |
+
+El ejecutor renueva `lease_until` **en cada lote**, junto con el progreso y en el mismo
+commit: la señal de vida la produce el avance real, no un temporizador aparte que seguiría
+diciendo «vivo» con el bucle bloqueado. Vencido el plazo, el trabajo se cierra como
+fallido —al arrancar la aplicación y también antes de aceptar uno nuevo, porque si nadie
+reinicia la pila el barrido del arranque no vuelve a ocurrir—.
+
+La exclusión la impone un **índice único** sobre `lease_key`, no una consulta previa.
+«Mirar si hay uno activo y, si no, insertar» es una carrera que con dos workers pierde
+alguien cada vez que un usuario pulsa dos veces el botón.
+
+```bash
+# Un recálculo mientras hay otro vivo
+curl -X POST .../api/v1/leads/batch/recalculate-all -H "Authorization: Bearer $TOKEN"
+# 409 {"detail": {"job_id": "...", "estado": "RUNNING", "procesados": 340, "total": 5000}}
+```
+
+### Registro estructurado y `request_id`
+
+Los registros son **un objeto JSON por línea**. El formato de texto anterior dejaba de
+servir con dos workers escribiendo sobre el mismo descriptor: las trazas multilínea se
+entremezclaban y no había forma de reunir lo que produjo una misma petición.
+
+Cada petición lleva un `request_id` que viaja por `contextvars`, sale en la cabecera
+`X-Request-ID` y aparece en **todos** los renglones que esa petición genere, incluidos los
+de las librerías. Antes, el identificador que se devolvía en los 500 se inventaba en el
+propio manejador y no constaba en ningún otro sitio: el dato que soporte pedía no llevaba
+a ninguna parte.
+
+Si el cliente manda su propio `X-Request-ID`, se respeta —así se encadena con el de un
+balanceador— pero solo si encaja en `[A-Za-z0-9._-]{1,64}`. Aceptarlo tal cual sería
+inyección en el registro: un salto de línea dentro de la cabecera escribe renglones enteros
+en el log, y en un formato de una línea por evento eso es fabricar eventos falsos.
+
+```bash
+# Todo lo que produjo una petición concreta
+python devops/pila.py logs backend --no-log-prefix | jq -c 'select(.request_id=="a1b2c3...")'
+
+# Las peticiones que tardaron más de medio segundo
+python devops/pila.py logs backend --no-log-prefix | jq -c 'select(.duracion_ms > 500)'
+```
+
+`LOG_FORMAT` acepta `json`, `text` o `auto`. Con `auto` manda el entorno: JSON en producción
+y staging, texto en desarrollo, donde los lee una persona.
+
+### Métricas de Prometheus
+
+`GET /metrics`, **fuera** de `/api/v1`. No es un capricho de rutas: el nginx de la pila solo
+hace de pasarela para `/api/`, de modo que la ruta queda inalcanzable desde el puerto
+público sin depender de una regla de denegación que alguien pueda borrar.
+
+| Métrica | Origen | Exactitud |
+| :--- | :--- | :--- |
+| `plurione_http_peticiones_total` | Memoria del proceso | Solo del worker que responde |
+| `plurione_http_duracion_segundos` | Memoria del proceso | Solo del worker que responde |
+| `plurione_scores_calculados_total` | Memoria del proceso | Solo del worker que responde |
+| `plurione_recalculos_en_curso` | Consulta a la base | Exacta |
+| `plurione_recalculos_total` | Consulta a la base | Exacta |
+| `plurione_prospectos_total` | Consulta a la base | Exacta |
+
+La imagen sirve con `--workers 2`, así que una recogida la atiende uno de los dos y
+devuelve **su** mitad de los contadores de proceso. Es el mismo defecto que tenía la
+limitación de tasa con `memory://`, y aquí no se resuelve igual: un contador en Redis por
+petición costaría más que la petición. Se hace explícito con `plurione_worker_info`, que
+dice qué worker respondió. Para números exactos: una réplica por contenedor con
+`--workers 1`, y que Prometheus recoja de todas.
+
+Todo lo que puede leerse de la base se lee de la base, y por eso sale exacto venga la
+respuesta de donde venga.
+
+**Protección.** Prometheus no sabe iniciar sesión, así que la ruta no puede depender del
+JWT del resto de la API: se compara `METRICS_TOKEN` con `compare_digest`. Sin testigo, la
+ruta queda **abierta en desarrollo y apagada (404) en producción y staging**. Responde 404
+y no 403 porque un 403 confirma que hay algo que pedir.
+
+```bash
+curl -H "Authorization: Bearer $METRICS_TOKEN" http://backend:8000/metrics
+```
+
+### Endurecimiento de los contenedores
+
+Todos los servicios llevan techo de CPU y memoria, `no-new-privileges`, `cap_drop: ALL`
+con solo las capacidades que cada imagen necesita, y rotación de registros.
+
+| Servicio | `read_only` | Capacidades añadidas | Techo por defecto |
+| :--- | :--- | :--- | :--- |
+| `backend` | Sí (`/tmp` en memoria) | ninguna | 2 CPU / 2 GB |
+| `migrate` | Sí | ninguna | 1 CPU / 512 MB |
+| `frontend` | Sí | `CHOWN`, `SETGID`, `SETUID`, `NET_BIND_SERVICE` | 0.5 CPU / 128 MB |
+| `redis` | Sí | `SETGID`, `SETUID` | 0.5 CPU / 256 MB |
+| `postgres` | **No** | `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, `SETUID` | 1 CPU / 1 GB |
+
+PostgreSQL es el único sin `read_only`: su entrypoint ajusta permisos y escribe fuera del
+volumen al inicializar, y una base de datos es por definición un proceso que escribe.
+
+Los techos se ajustan por variable (`LIMITE_MEM_BACKEND`, `LIMITE_CPU_POSTGRES`…). Vienen
+holgados a propósito: un techo demasiado justo no da un error legible, da un proceso que el
+núcleo mata con código 137 y sin un solo renglón en el registro.
+
+La rotación (`max-size`, `max-file`) importa más ahora que antes: un objeto JSON por
+petición llena un disco bastante más rápido que una línea por evento, y el disco que se
+llena es el mismo en el que vive la base de datos.
+
+### Fuentes autoalojadas y una CSP que se comprueba
+
+La página traía tres familias de `fonts.googleapis.com`. La `Content-Security-Policy` que
+sirve nginx dice `style-src 'self'` y `font-src 'self'`, así que el navegador bloqueaba
+esa hoja **en silencio**: en producción la aplicación caía a las fuentes del sistema y el
+único síntoma era que se veía distinta que con `npm run dev`. De las tres familias
+descargadas, además, dos no se usaban en ningún sitio y la que el CSS pedía de verdad
+(`Inter`) no se descargaba nunca.
+
+Ahora los `.woff2` viajan en el bundle con huella en el nombre (`src/fuentes.css`), la
+política dice `font-src 'self'` sin `data:`, y **hay quien lo comprueba**: el pipeline
+levanta la imagen del frontend, descarga la página, y verifica que todo lo que enlaza lo
+sirve ese mismo origen y que cada fuente responde con la firma `wOF2` de un archivo real
+—el `try_files` de la SPA devuelve `index.html` con código 200 para cualquier ruta que no
+exista, así que mirar solo el código no vale—.
+
+```bash
+cd frontend
+docker build -t plurione-frontend:local .
+# nginx resuelve el upstream al arrancar y se niega si el nombre no existe
+docker run --rm -p 8099:80 --add-host backend:127.0.0.1 plurione-frontend:local
+curl -sI http://127.0.0.1:8099/ | grep -i content-security-policy
+```
+
+### Auditoría de dependencias, escaneo de imágenes e inventario
+
+| Qué | Herramienta | Puerta |
+| :--- | :--- | :--- |
+| Dependencias de Python | `pip-audit` sobre lo **instalado** desde los locks, también dentro de la imagen | cualquier aviso |
+| Dependencias del cliente | `npm audit` | `--audit-level=high` |
+| Imágenes de contenedor | Trivy | `HIGH`/`CRITICAL` **con arreglo publicado** |
+| Lista de materiales | syft (CycloneDX) | se publica como artefacto |
+
+```bash
+npm --prefix frontend audit --audit-level=high
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.74.0 \
+    image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+    plurione/leadscoring-backend:local
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock anchore/syft:v1.51.1 \
+    -o cyclonedx-json plurione/leadscoring-backend:local > sbom-backend.cdx.json
+```
+
+Las dos herramientas, como todas las imágenes de terceros del proyecto, van **fijadas por
+huella** en el pipeline, los Dockerfiles y la pila (`nombre:etiqueta@sha256:…`). La etiqueta
+dice qué seguir; lo que se descarga lo decide la huella. Renovar es explícito:
+
+```bash
+python scripts/renovar_imagenes.py --solo-fijacion   # sin red: todo fijado, sin apk upgrade
+python scripts/renovar_imagenes.py                   # pregunta al registro qué quedó atrás
+python scripts/renovar_imagenes.py --aplicar         # reescribe las huellas; se revisa el diff
+```
+
+Desde el capítulo 37, **`.github/dependabot.yml` avisa** de lo que se queda atrás: las
+acciones del CI, las dependencias de Python y de npm, las dos imágenes base de los
+Dockerfile y las imágenes de la pila. Abre solicitudes de cambio y no mezcla nada.
+
+**El guion de arriba sigue siendo la fuente de verdad**, y la distinción importa: es el
+único que conoce las reglas de este proyecto —una etiqueta no puede llevar dos huellas,
+nada de `apt-get upgrade`, paquetes del sistema con versión, acciones por huella de
+commit—, así que una solicitud automática puede dejar el repositorio en un estado que
+`--solo-fijacion` rechaza. Y al revés: que no haya solicitudes abiertas no significa que
+todo esté al día, significa que Dependabot no ha visto nada. El propio `dependabot.yml`
+documenta qué se acepta con el CI verde y qué exige repetir la comprobación de la imagen
+entera —cualquier huella de imagen base la exige—.
+
+`pip-audit` ya no audita los rangos de `requirements.txt`, que resolvía en el momento de
+auditar y no tenían por qué coincidir con lo que llevaba la imagen construida una hora
+antes. El CI instala cada lock en un entorno limpio, comprueba con
+`scripts/comprobar_instalado.py` que lo instalado es exactamente lo fijado —y lo mismo
+**dentro de la imagen**, donde los marcadores se evalúan para Linux— y audita esa lista con
+`--no-deps --disable-pip`, sin volver a resolver nada.
+
+`--ignore-unfixed` no es una concesión, es lo que hace que la puerta signifique algo. Sin
+ella, la imagen del backend salía con 57 hallazgos altos o críticos, de los cuales 55 no
+tienen arreglo publicado por Debian: una puerta que está en rojo por causas que nadie de
+este proyecto puede resolver se acaba desactivando, y entonces tampoco avisa de los dos
+que sí eran accionables.
+
+Los dos accionables eran `msgpack` y `setuptools` **vendorizados dentro de pip**, que la
+aplicación no importa nunca. Se cerraron sacando pip entero de la imagen de ejecución
+—que además le quita a un atacante la herramienta de descargar y ejecutar código—. Los
+siete de la imagen del frontend eran `libuuid` del sistema base de Alpine, ya corregidos
+aguas arriba. Se recogían con `apk upgrade`, que subía lo que hubiera ese día; desde el
+capítulo 22 se instalan con su versión exacta sobre una base fijada por huella.
+
+### El bundle que se prueba es el que se despliega
+
+`frontend/dist/` no se versiona. El pipeline lo compila **una vez**, en el trabajo del
+cliente, después de pasar el `linter`, las pruebas y el suelo de cobertura; lo publica
+como artefacto; y la imagen lo consume tal cual con `--target desde-artefacto`, sin
+recompilarlo. Un paso posterior compara la huella SHA-256 del artefacto con la del
+archivo que sirve la imagen.
+
+El Dockerfile del cliente tiene dos destinos por eso:
+
+```bash
+# En un portátil: compila desde el código
+docker build -t plurione-frontend:local frontend/
+
+# Como en CI: consume un dist/ ya compilado y verificado
+npm --prefix frontend run build
+docker build --target desde-artefacto -t plurione-frontend:artefacto frontend/
+```
+
+Antes había uno solo, y el pipeline compilaba dos veces: la que se probaba y la que se
+publicaba. Dos compilaciones que terminan bien no son la misma compilación, y la
+diferencia no da ningún síntoma.
+
+### Copias de seguridad, y su prueba de restauración
+
+```bash
+# Volcado con marca UTC en un volumen aparte, verificado y con huella SHA-256
+python devops/pila.py --profile respaldo run --rm respaldo
+
+# Lo que convierte «tenemos copias» en «tenemos copias que sirven»
+python devops/pila.py --profile respaldo run --rm prueba-de-restauracion
+```
+
+La copia no se da por buena porque `pg_dump` terminara: se comprueba que el archivo **se
+puede leer** (`pg_restore --list`), que no es sospechosamente pequeño —una base vacía por
+error produce un volcado perfectamente válido de unos kilobytes— y se deja su huella al
+lado. Se escribe como `.parcial` y se renombra al final, para que un volcado interrumpido
+no quede nunca con el nombre de uno bueno.
+
+La prueba de restauración restaura el volcado más reciente en una base **desechable** del
+mismo servidor y compara el recuento de filas tabla por tabla contra la base real. Usa
+`pg_restore --exit-on-error`: sin esa opción, una restauración a medias informa de los
+errores y termina con código 0, de modo que el fallo se leería como un éxito.
+
+Para recuperar de verdad:
+
+```bash
+python devops/pila.py stop backend frontend
+python devops/pila.py --profile respaldo run --rm \
+    -e VOLCADO=/respaldos/lead_scoring_db_20260909T031500Z.dump \
+    -e CONFIRMO_SOBRESCRIBIR=si restaurar
+python devops/pila.py run --rm migrate alembic current   # ¿coincide con lo que espera el código?
+python devops/pila.py start backend frontend
+```
+
+Exige el archivo exacto —no coge el más reciente por su cuenta, que puede ser justo el que
+ya contiene el borrado del que se quiere volver— y una confirmación explícita. Restaura con
+`--single-transaction`: si falla a mitad, la base se queda como estaba en vez de convertirse
+en una mezcla de dos versiones.
+
+**Dos límites que conviene tener escritos.** Las copias viven en un volumen del mismo
+disco: protegen de un `DROP TABLE` o de una migración que salió mal, **no** de que se muera
+el disco; sacarlas de la máquina es un paso de operación que depende de dónde se despliegue.
+Y la prueba demuestra que el archivo sirve, no que se podría reconstruir el servicio entero
+en otra máquina; ese ensayo es distinto y no lo cubre este script.
+
+---
+
+## 🧪 Ejecución de Pruebas Automatizadas (QA)
+
+### Backend — 2093 pruebas
+
+Ejecuta la suite completa de pruebas automatizadas (matemáticas de decaimiento, paridad
+entre las dos rutas de cálculo del heurístico, validación de esquemas, atomicidad de la
+ingesta CRM, adaptadores nativos, API y seguridad RBAC):
+```bash
+python -m pytest backend/tests/ -v
+```
+
+### Gobierno del modelo
+
+```bash
+python -m pytest backend/tests/test_gobierno_del_modelo.py backend/tests/test_perfil_y_publicacion.py \
+    backend/tests/test_ml_honesto.py -v
+```
+
+Cubren lo que decide si el modelo se puede explicar dentro de seis meses: que la huella de
+los datos sea real y **recalculable por un tercero**, que medir con datos reales no
+publique ni ensucie el registro, y que una alerta de deriva se emita cuando toca y —sobre
+todo— **se calle cuando no toca**; que el perfil de referencia corresponda al artefacto que
+puntúa, y que publicar exija el intervalo de confianza y no solo la estimación puntual.
+
+### Reproducibilidad y ciclo de vida del dato
+
+```bash
+python -m pytest backend/tests/test_dependencias_fijadas.py backend/tests/test_retencion_del_historial.py \
+    backend/tests/test_derechos_del_titular.py -v
+```
+
+Cubren que los locks estén completos y sean coherentes con los rangos y entre sí, que la
+imagen y el CI instalen desde ellos y que el modelo versionado se haya entrenado con sus
+versiones; que la purga del historial resuma sin perder la instantánea de entrada que usa
+el bucle de realimentación, y sin contar dos veces una fila; y que, tras suprimir a una
+persona, su correo no aparezca en **ninguna fila de ninguna tabla**.
+
+### Cimientos del registro
+
+```bash
+python -m pytest backend/tests/test_registro_de_actividad.py -v
+```
+
+Cubren que solo `registrar_evento` escriba actividades; que un tipo desconocido responda 422
+en lugar de degradarse; que lo que no llega no se invente; que solo la llamada que conectó
+cuente; que WhatsApp y LinkedIn sigan alimentando la variable con la que se entrenó el
+modelo; que cada integración firme con su secreto y cuente con su límite; y que el texto de
+un mensaje enviado por el CRM, WhatsApp, Calendly o el formulario web no aparezca en
+**ninguna columna de ninguna tabla**.
+
+### Del post de LinkedIn al prospecto puntuado
+
+```bash
+python -m pytest backend/tests/test_publicaciones.py backend/tests/test_pagina_de_interes.py \
+  backend/tests/test_categorias_del_modelo.py backend/tests/test_informe_de_publicaciones.py -v
+python scripts/guarda_de_la_pagina_publica.py
+```
+
+Cubren el enlace de cada publicación —imposible de adivinar, de cambiar y de reutilizar—; la
+página pública con duplicados que suman sin pisar la ficha, publicaciones desactivadas o
+inexistentes, los dos límites de envío, el campo trampa, el aviso de privacidad falso u
+omitido y la misma respuesta exista o no el correo; que las listas del formulario sean las
+del artefacto que puntúa; y el alcance del informe, con el asesor viendo sus prospectos y
+un número del resto, sin nombres. La guarda comprueba propiedades en lugar de casos, y es un
+paso propio del CI.
+
+### El desenlace: cerrar diciendo por qué
+
+```bash
+python -m pytest backend/tests/test_desenlaces.py backend/tests/test_migracion_desenlaces.py -v
+python scripts/guarda_de_los_desenlaces.py
+```
+
+Cubren que la edición de la ficha ya no pueda cerrar un prospecto —y que un prospecto ya
+cerrado se siga pudiendo editar—; que el motivo salga de la lista de su propio desenlace, que
+un ganado necesite tramo y un perdido no lo admita, y que una fecha futura o anterior al alta
+se rechacen; que el score que se guarda sea el del momento y que cerrar no recalcule; que las
+tareas abiertas se descarten y las reglas dejen de proponer trabajo; que el contador cuente
+exactamente lo que el extractor del dataset sabría usar; y que el panel sea de dirección y no
+devuelva ni un dato de contacto. La guarda comprueba propiedades en lugar de casos —ocho— y
+es un paso propio del CI; el arnés de reintroducción de defectos detecta los 18 probados.
+
+### Cliente — 748 pruebas
+
+El navegador tenía la mitad del sistema y ninguna prueba. Ahora tiene las suyas, con
+Vitest y Testing Library, y un `linter` propio:
+
+```bash
+cd frontend
+
+npm run lint            # eslint + eslint-plugin-react-hooks
+npm test                # 748 pruebas
+npm run test:coverage   # con suelo de cobertura; falla si baja
+npm run test:watch      # mientras se trabaja
+```
+
+La prioridad fue el módulo de sesión (`src/services/api.js`), que es donde un fallo no
+se ve: un refresco de más solo multiplica peticiones, y una sesión que revive tras
+cerrarla tampoco avisa. Se cubren el refresco concurrente, el reintento tras un 401, la
+expiración y el cierre de sesión; después, los componentes con lógica —la matriz de
+prospectos, el simulador, el menú de la sesión, la pantalla de cambio obligatorio de
+contraseña, el reparto de la cartera de las bajas en el panel de administración, la ficha del
+prospecto y la bandeja «Sin asociar»—.
+
+Desde el capítulo 36 se comprueba además **la accesibilidad**, en siete archivos bajo
+`src/pruebas/`: las nueve pantallas montadas contra WCAG 2.1 AA (`axe-core`), el recorrido
+real del tabulador, el contraste de la paleta contra el mínimo de la norma, que los errores
+y los aciertos de los formularios lleguen a un lector de pantalla, que toda clase que el
+marcado usa exista en la hoja de estilos, que toda variable de la paleta que el marcado
+nombra exista en ella —desde el capítulo 39— y que **ningún color se escriba fuera de la
+paleta** —desde el capítulo 40—. Los tres últimos nacieron de defectos reales y son el mismo
+defecto con tres caras: tres pantallas pedían una clase de campo que no existe y se dibujaban
+con el estilo del navegador; el tablero pedía tres degradados que tampoco existen y dibujaba
+su gráfico vacío; y el rojo de cuatro avisos estaba escrito a mano en un `style` del JSX, que
+es el único sitio por donde un color se escapa de la única comprobación que lo mide — y no
+llegaba al mínimo de la norma. **Las tres listas se sacan del código**, no se escriben a mano.
+
+El suelo de cobertura vive en `frontend/vite.config.js` y va **justo por debajo de lo
+medido** (96 / 90 / 98 / 98 frente a 96,3 / 90,6 / 98,6 / 98,5), no en un número redondo: un
+suelo del 80 % con la cobertura real en el 95 % deja pasar una regresión de quince puntos
+sin decir nada. Y cuando baja, el pipeline se pone en rojo, que es para lo que está: el
+capítulo 36 se encontró ese suelo **ya roto**, porque las cinco funciones del segundo factor
+habían entrado sin prueba.
+
+`react-hooks/exhaustive-deps` está en `error`, no en aviso. Un aviso permanente que nadie
+atiende enseña a ignorar la salida del `linter`. Lo mismo vale para las **34 reglas de
+`jsx-a11y`**, encendidas enteras desde el capítulo 36 y todas en `error`: encontraron cuatro
+controles que solo se podían pulsar con el ratón, uno de ellos la única puerta a cerrar
+sesión. Hay dos reglas apagadas a propósito —`react-hooks/set-state-in-effect` y
+`jsx-a11y/no-autofocus`— con el motivo escrito en `eslint.config.js`, y una prueba
+(`src/pruebas/linter.test.js`) que obliga a que cualquier otra que se apague lleve el suyo.
+
+> La suite es autosuficiente: corre sobre SQLite en memoria y crea sus propios datos.
+> **No** hace falta sembrar antes, y no debe hacerse: las pruebas no tocan ninguna base
+> real. Esta nota decía lo contrario mientras las pruebas dependían del sembrado, que es
+> precisamente lo que las volvía dependientes del orden de ejecución.
+
+Las reglas heurísticas del ICP viven en un único módulo, `backend/app/core/scoring_rules.py`,
+que consumen tanto el servicio de scoring como el pipeline de entrenamiento. Es
+deliberado: cuando cada uno tenía su copia, el modelo se entrenaba con una definición de
+"buen prospecto" y luego se evaluaba a los prospectos reales con otra. `test_scoring_parity.py`
+compara ambas rutas para que la divergencia no pueda repetirse en silencio.
+
+---
+
+## 🎯 Demostración Técnica Interactiva (CLI)
+
+Ejecuta el script de demostración end-to-end en vivo que simula la ingesta de un webhook CRM, evalúa el algoritmo híbrido y genera el diagnóstico con IA:
+```bash
+python scripts/demo_e2e.py
+```
+
+---
+
+## 📚 Compilación de la Memoria Técnica Institucional
+
+Para compilar los 44 reportes técnicos en el documento formal consolidado con portada e índice:
+```bash
+python docs/compile_reports.py
+```
+El archivo consolidado se genera en: `docs/Memoria_Tecnica_Final_Lead_Scoring.md`.
+
+---
+
+## 📑 Suite de 44 Reportes Técnicos de Estadía Profesional
+
+| Reporte | Documento | Enfoque de Ingeniería |
+| :-: | :--- | :--- |
+| **01** | [Reporte 01](docs/reportes/Reporte_01_Deteccion_de_Necesidades_y_Requerimientos.md) | Detección de Necesidades y Especificación IEEE 830. |
+| **02** | [Reporte 02](docs/reportes/Reporte_02_Propuesta_Tecnica_y_Estrategia_de_Lead_Scoring.md) | Formulación Matemática del Scoring Híbrido y Decaimiento Continuo. |
+| **03** | [Reporte 03](docs/reportes/Reporte_03_Diseno_de_Arquitectura_Integral_y_Modelo_de_Datos.md) | Clean Architecture, Puertos y Adaptadores y Modelo ERD. |
+| **04** | [Reporte 04](docs/reportes/Reporte_04_Planificacion_Operativa_y_Gestion_Scrum_del_Proyecto.md) | Gestión Ágil Scrum, Historias de Usuario y Riesgos. |
+| **05** | [Reporte 05](docs/reportes/Reporte_05_Desarrollo_del_Pipeline_de_Machine_Learning_y_Adaptadores_Azure_Local.md) | Pipeline de Machine Learning sobre datos sintéticos y Motores Nativos. |
+| **06** | [Reporte 06](docs/reportes/Reporte_06_Core_Backend_FastAPI_Ingesta_CRM_y_Reglas_Dinamicas.md) | Core Backend FastAPI, Ingesta CRM y Deduplicación. |
+| **07** | [Reporte 07](docs/reportes/Reporte_07_Interfaz_de_Usuario_React_y_Visualizacion_Analitica.md) | UI en React.js, Analítica Avanzada, Ficha 360° y XAI. |
+| **08** | [Reporte 08](docs/reportes/Reporte_08_Suite_de_Pruebas_Automatizadas_y_QA_de_Precision.md) | QA, Pruebas Matemáticas y 100% de Aprobación en Pytest. |
+| **09** | [Reporte 09](docs/reportes/Reporte_09_Contenerizacion_CI_CD_y_Simulacion_de_Seguridad_RBAC.md) | Dockerfiles, Docker Compose, CI/CD y RBAC Empresarial. |
+| **10** | [Reporte 10](docs/reportes/Reporte_10_Manual_Tecnico_Plan_de_Mantenimiento_y_Cierre_de_Estadia.md) | Manual Técnico, Soporte Multinivel (N1/N2/N3) y Cierre de Estadía. |
+| **11** | [Reporte 11](docs/reportes/Reporte_11_Auditoria_Endurecimiento_de_Seguridad_y_Rendimiento.md) | Auditoría Técnica, Endurecimiento de Seguridad y Optimización de Rendimiento. |
+| **12** | [Reporte 12](docs/reportes/Reporte_12_Gobierno_de_Datos_Migraciones_y_Validez_del_Modelo.md) | Migraciones con Alembic, Líneas Base del Modelo y Bucle de Realimentación. |
+| **13** | [Reporte 13](docs/reportes/Reporte_13_Superficie_de_Ataque_Residual_y_Observabilidad_del_Modelo.md) | CORS, Inyección de Prompt, Monitoreo de Deriva y Registro de Modelos. |
+| **14** | [Reporte 14](docs/reportes/Reporte_14_Sesiones_Verificables_Ingesta_Idempotente_y_Bitacora_de_Auditoria.md) | Rotación de sesión con detección de reutilización, idempotencia de la ingesta y bitácora de auditoría. |
+| **15** | [Reporte 15](docs/reportes/Reporte_15_Identidad_Unificada_Autorizacion_por_Objeto_y_Gestion_de_Cuentas.md) | Identidad unificada, autorización por objeto en el repositorio, gestión de cuentas y política de contraseñas. |
+| **16** | [Reporte 16](docs/reportes/Reporte_16_Fiabilidad_Operativa_Arriendos_Observabilidad_y_Respaldos.md) | Arriendo y turno exclusivo del recálculo, registro estructurado con `request_id`, métricas de Prometheus, endurecimiento de contenedores y copias con prueba de restauración. |
+| **17** | [Reporte 17](docs/reportes/Reporte_17_Paridad_de_Calidad_en_el_Cliente_Fuentes_Autoalojadas_y_Cadena_de_Suministro.md) | Pruebas y análisis estático del cliente, fuentes autoalojadas con CSP verificada, auditoría de dependencias, escaneo de imágenes con SBOM y trazabilidad del artefacto desplegado. |
+| **18** | [Reporte 18](docs/reportes/Reporte_18_Gobierno_del_Modelo_Procedencia_de_los_Datos_Bucle_de_Realimentacion_y_Alertas_de_Deriva.md) | Procedencia obligatoria del conjunto de entrenamiento, bucle de realimentación ejercitado de punta a punta con intervalos de confianza, y monitoreo de deriva programado con alerta y silencio. |
+| **19** | [Reporte 19](docs/reportes/Reporte_19_Lo_Dicho_y_No_Hecho_Contrasena_Prestada_Cartera_de_las_Bajas_y_Condiciones_de_Publicacion.md) | Contraseña prestada impuesta en el servidor, reparto de la cartera de las cuentas de baja, perfil de referencia atado al artefacto y publicación condicionada al intervalo de confianza. |
+| **20** | [Reporte 20](docs/reportes/Reporte_20_Reproducibilidad_y_Ciclo_de_Vida_del_Dato_Dependencias_Fijadas_Retencion_del_Historial_y_Derechos_del_Titular.md) | Dependencias fijadas con huellas y auditoría de lo instalado, retención del historial de puntuación, exportación y supresión de los datos de una persona, y política de conservación. |
+| **21** | [Reporte 21](docs/reportes/Reporte_21_Cimientos_del_Registro_Procedencia_de_la_Actividad_Integraciones_y_Minimizacion.md) | Procedencia en cada actividad y un solo servicio de registro, bandeja «Sin asociar», teléfonos en E.164, integraciones con secreto y límite propios, minimización de mensajes y una ficha que enseña el cambio real del score. |
+| **22** | [Reporte 22](docs/reportes/Reporte_22_Nada_Sin_Plazo_Ni_Sin_Aviso_Caducidad_Alertas_del_Monitor_Imagenes_Fijadas_y_Arranque.md) | Plazo de conservación para todo lo que no lo tenía, alertas del monitor también cuando no evalúa, imágenes fijadas por huella y un solo modo de arrancar. |
+| **23** | [Reporte 23](docs/reportes/Reporte_23_Autenticacion_sin_Excepciones_PyJWT_Revocacion_Inmediata_y_Contrasenas_Filtradas.md) | PyJWT en lugar de python-jose, revocación inmediata del access token y contraseñas filtradas con una lista local. |
+| **24** | [Reporte 24](docs/reportes/Reporte_24_Modelo_sin_Datos_Inventados_Ingresos_Ausentes_Canales_Separados_y_Aporte_con_Intervalo.md) | Un solo vector del modelo con versión, ingresos ausentes como ausencia, canales y resultados de llamada separados y aporte sobre el heurístico con intervalo. |
+| **25** | [Reporte 25](docs/reportes/Reporte_25_Del_Post_de_LinkedIn_al_Prospecto_Puntuado_Publicaciones_Pagina_de_Interes_e_Informe_por_Publicacion.md) | Del post de LinkedIn al prospecto puntuado: publicaciones con enlace propio, página de interés pública y defendida, ficha «Llegó por», informe y comparativa por publicación, y guarda del CI. |
+| **26** | [Reporte 26](docs/reportes/Reporte_26_Publicaciones_Completas_Ciclo_de_Vida_Opciones_Responsable_y_Visitas.md) | Publicaciones completas: estados y cierre automático, vistas previas del post y de la página, opciones de «¿Qué necesitas?» por publicación, asesor responsable, post real, duplicar, y visitas sin datos personales con tasa de envío y gráfico por día. |
+| **27** | [Reporte 27](docs/reportes/Reporte_27_Una_Publicacion_Varias_Redes_Difusion_Textos_por_Red_y_Atribucion.md) | Una publicación, varias redes: enlace y texto por red, botones oficiales de compartir sin API ni cuentas, código QR generado en local, red de llegada en la ficha y en el informe, vista previa del enlace con etiquetas Open Graph servidas por el servidor, y las claves viejas de JWT guardadas por su huella. |
+| **28** | [Reporte 28](docs/reportes/Reporte_28_El_Sistema_Dice_Que_Hacer_Hoy_Motor_de_Reglas_Tareas_y_Avisos.md) | El sistema dice qué hacer hoy: seis reglas en la pasada diaria que dejan tareas y avisos sin salir del panel, bandeja «Hoy» ordenada por score, campana de avisos, los HOT que se enfrían para el líder, y guarda del CI con 31 defectos reintroducidos. |
+| **29** | [Reporte 29](docs/reportes/Reporte_29_Cerrar_el_Bucle_El_Desenlace_con_su_Motivo_Panel_y_Contador_del_Reentrenamiento.md) | Cerrar el bucle (capítulo 30): el desenlace con motivo de lista cerrada, fecha de cierre y tramo del acuerdo; una sola puerta para cerrar; lo cerrado sale de la bandeja y de las reglas; panel de desenlaces por motivo, publicación, red y score al cerrarse; contador del reentrenamiento con aviso, sin reentrenar nada; y guarda del CI con 18 defectos reintroducidos. |
+| **30** | [Reporte 30](docs/reportes/Reporte_30_La_Deuda_Que_Muerde_Plazos_Para_lo_Ultimo_sin_Plazo_El_Pais_Que_Ya_No_Se_Supone_y_Todo_Fijado.md) | La deuda que muerde (capítulo 32): plazo para las dos últimas filas sin plazo —la bitácora de auditoría y el conjunto de realimentación, que no es una tabla sino archivos—, el país que deja de suponerse en la columna, el esquema y el registro, el teléfono de los asesores en E.164 con el mismo módulo que el de los prospectos, los ceros de ingresos migrados a vacío, `App.jsx` probado con la aplicación montada, y los paquetes de `apt-get` y las acciones de GitHub fijados por versión y por huella de commit. 27 defectos reintroducidos, 27 detectados. |
+| **31** | [Reporte 31](docs/reportes/Reporte_31_Vaciar_un_Campo_es_un_Cambio_El_Nulo_que_se_Ignoraba_y_la_Lista_que_la_Tabla_Dicta.md) | Vaciar un campo es un cambio (capítulo 33): la actualización parcial deja de ignorar los nulos explícitos —distinguía «no lo mandó» de «lo mandó vacío» y volvía a mezclarlos—, los campos que la tabla declara `NOT NULL` responden 422 nombrándose con la lista **derivada de las columnas** y no escrita a mano, la bitácora distingue lo vaciado sin copiar valores, y el panel deja de exigir lo que la tabla admite vacío. 9 defectos reintroducidos, 9 detectados por guarda y por suite. |
+| **32** | [Reporte 32](docs/reportes/Reporte_32_Salir_a_Internet_por_una_Puerta_Estrecha_Tunel_a_Coste_Cero_y_la_Direccion_que_Caduca.md) | Salir a internet por una puerta estrecha (capítulo 34): un túnel gratuito publica **solo** la página de interés —lista blanca en un servidor aparte, 404 para todo lo demás— con HTTPS y sin abrir puertos del router; la dirección pública sigue siendo un solo ajuste, así que pasar a un dominio es cambiar un valor; y como la dirección de un túnel gratuito cambia en cada arranque, el sistema avisa cuando deja de responder y marca los enlaces ya repartidos que no llevan aquí. Comprobado desde fuera de la red: 5 rutas publicadas, 25 negadas. 10 defectos reintroducidos, 10 detectados. |
+| **DEF** | [Guía de Defensa](docs/GUIA_DEFENSA_ORAL.md) | Guion de 10 minutos que sigue la demostración, 16 preguntas técnicas de sínodo y **10 preguntas incómodas** con su respuesta honesta: por qué no se lee LinkedIn, por qué el modelo no conoce los canales nuevos, por qué no hay desenlaces sintéticos, por qué la dirección pública caduca y por qué suprimir aquí no suprime en el CRM. |
+| **33** | [Reporte 33](docs/reportes/Reporte_33_Segundo_Factor_para_Administracion_El_Secreto_que_no_se_Guarda_y_la_Cuenta_que_no_se_Bloquea_Sola.md) | Segundo factor para administración (capítulo 35): TOTP obligatorio para `System_Admin` y opcional para el resto, con QR y diez códigos de recuperación de un solo uso. El secreto **no se guarda**: se deriva de `SECRET_KEY` y una sal por alta, así que la base no contiene nada que cifrar. El alta no activa hasta comprobar un código, el desafío del login es de tipo propio y no sirve como sesión, un código no vale dos veces, y **la última administración no puede quitarse el suyo**. TOTP escrito sobre la biblioteca estándar y comprobado contra los 18 vectores oficiales del RFC 6238. 10 defectos reintroducidos, 10 detectados. |
+| **34** | [Reporte 34](docs/reportes/Reporte_34_Accesibilidad_Comprobada_La_Ventana_que_no_Era_Ventana_el_Color_que_no_Llegaba_y_la_Consulta_por_Fila.md) | Accesibilidad comprobada (capítulo 36): las **ocho pantallas** pasan el nivel AA de WCAG 2.1, medido por `axe-core` desde la propia suite —la biblioteca ya estaba instalada desde el capítulo 17 y nadie la llamaba: declararla costó **una línea** del lock—. La ficha 360 **no era una ventana** para el teclado ni para un lector de pantalla: sin rol, sin nombre, sin atrapado del foco, sin `Escape` y sin devolverlo al cerrar. Cuatro controles del panel solo se podían pulsar con el ratón, y uno era la única puerta a **cerrar sesión**. El contraste se calcula leyendo la paleta de `index.css`, porque `jsdom` no dibuja pero los colores están escritos: un token no llegaba al mínimo y pintaba las etiquetas de todos los formularios. Y midiendo con **300 prospectos y 5 000 actividades** apareció un N+1: la bandeja «Hoy» hacía una consulta por tarea. 20 defectos reintroducidos, 20 detectados. |
+| **35** | [Reporte 35](docs/reportes/Reporte_35_La_Cadena_de_Suministro_se_Mantiene_Sola_Cinco_Caracteres_que_Salen_el_Tercero_que_no_Puede_Bloquear_y_el_Aviso_que_no_Decide.md) | La cadena de suministro se mantiene sola (capítulo 37): cierra **§3.7 y §3.8** de la congelación demostrando que la premisa de las dos era falsa —ninguna necesitaba la cuenta externa que decían necesitar—. Las contraseñas se comprueban ahora contra el servicio público **por rango**: salen **cinco caracteres** del resumen SHA-1 y nada más, con relleno para que el tamaño tampoco hable. Si el servicio cae o tarda, **no se bloquea a nadie** y el resultado es el de antes, carácter a carácter. La salida verifica contra el **almacén del sistema**, porque con el paquete de la biblioteca el fallo sería silencioso. Y `dependabot.yml` vigila seis ecosistemas **avisando**, mientras `renovar_imagenes.py` sigue decidiendo. 17 defectos reintroducidos, 17 detectados — y tres disparos en falso destapados de paso, los tres por buscar una palabra en vez de una forma. |
+| **36** | [Reporte 36](docs/reportes/Reporte_36_Un_Derecho_sin_Pantalla_La_Respuesta_que_no_Distingue_el_Borrado_que_se_Escribe_y_el_Numero_que_Llego_al_Tablero.md) | Un derecho sin pantalla (capítulo 38): abre la congelación para **tres puntos de §6.2 y ninguno más** —los tres eran la misma cosa, una capacidad que existe, está probada y no se puede usar desde donde hay que usarla—. Los derechos del titular tenían API desde la Fase 14 y **ningún sitio desde donde ejercerlos**: ahora hay pantalla que busca por correo, enseña qué consta y de dónde llegó, exporta el documento del servidor y suprime **exigiendo que el correo se escriba**, con su constancia. La respuesta es **la misma** para quien nunca entró y para quien ya se fue, porque distinguirlas convertiría la pantalla en el oráculo que la huella con clave de la bitácora evita; y la igualdad del correo la decide el cliente, porque el buscador del listado trae también a quien solo se parece. Sin lógica de supresión nueva: el servidor es el del capítulo 37 más un archivo de pruebas. Y escaneando un QR con un teléfono apareció lo gordo: **no lo leía ningún lector desde el capítulo 27**, porque la información de formato iba transpuesta, y las diecinueve pruebas del QR estaban verdes por ser todas simétricas respecto de la diagonal. 29 defectos reintroducidos, 29 detectados. |
+| **37** | [Reporte 37](docs/reportes/Reporte_37_Lo_que_el_Marcado_Pedia_y_la_Hoja_no_Tenia_La_Barra_que_no_Pintaba_el_Contorno_que_no_se_Veia_y_el_Criterio_que_Casi_Rompe_el_Otro.md) | Lo que el marcado pedía y la hoja no tenía (capítulo 39): abre la congelación para **cuatro puntos de §6.4 y ninguno más**, y el primero estaba **mal medido**. Lo anotado como «cosmético: falta un color» eran **cinco variables en nueve sitios**, y un `var()` que no resuelve no deja la propiedad en su valor anterior sino en el **inicial**: la barra de distribución del tablero se dibujaba **vacía** y la opción elegida de la ficha 360 **sin contorno**. El hallazgo, sin embargo, no es el defecto sino lo que apareció al corregirlo: subir el borde de un control a los 3.0 que pide **§1.4.11** lo dejaba a **1.11:1** del aro de foco, es decir, cumplía un criterio **rompiendo §2.4.7**; los dos tokens se mueven juntos y el cambio de estado se mide en los **dos** controles donde ocurre, porque el que manda es el botón y medir solo el campo dejaba pasar un valor que allí falla. Además: la hoja del panel de difusión —catorce clases que no existían—, un color de acción destructiva que **no** es el de HOT porque ese rojo es una temperatura de prospecto, el estado apagado de los botones, que no existía en toda la hoja, y un suelo para el código QR medido en **píxeles por módulo**. Lo que impide que vuelva a pasar es que las dos listas —clases y variables— **se sacan del código**. 27 defectos reintroducidos, 27 detectados. |
+| **38** | [Reporte 38](docs/reportes/Reporte_38_El_Error_que_el_Servidor_ya_Explicaba_El_Color_que_Nadie_Media_el_Campo_que_no_se_Senalaba_y_el_Aro_que_Tuvo_que_ser_Geometrico.md) | El error que el servidor ya explicaba (capítulo 40): abre la congelación para **un punto de §6.4 y ninguno más** —un campo con un valor inválido se veía igual que uno correcto— y al medirlo aparecen tres cosas que no estaban anotadas. La primera es **un hueco entre dos comprobaciones que están bien escritas**: una dice que no mide contraste porque jsdom no dibuja y manda a la otra; la otra dice que lee los colores del `:root`. Las dos son verdad, y **un color escrito en un `style` del JSX no está en ninguna de las dos** — el rojo de cuatro avisos daba 4.43:1, por debajo de los 4.5 de §1.4.3, y el token que la paleta ya tenía para ese sitio daba 6.02. La segunda es que **el servidor ya decía qué campo**: el 422 trae `loc` desde el capítulo 33, y los cuatro formularios del panel lo volcaban entero en un aviso de arriba —con el nombre de la columna, en inglés y en un renglón— o, en la ficha 360, en un `alert()` del navegador. Y el hallazgo es el del capítulo 39 un piso más abajo: el borde rojo de un campo inválido **no puede cambiar con el foco** y **ningún color llega a 3.0 por encima de él** —1.96 el aro de la paleta, 2.60 el rojo más claro—, así que el foco pasa a ser un aro **añadido**. Cuando no hay salida cromática, la salida es geométrica. 28 defectos reintroducidos, 28 detectados — y **cuatro guardas del propio capítulo fallaron en la primera pasada**, las cuatro por buscar un nombre en vez de un uso. |
+| **39** | [Reporte 39](docs/reportes/Reporte_39_El_Minimo_que_no_Media_Nada_Un_Blanco_en_Cinco_Puertas_la_Regla_que_Solo_Tenia_una_Tabla_y_el_Espacio_que_Duplicaba_un_Evento.md) | El mínimo que no medía nada (capítulo 41): abre la congelación para **un punto de §6.4 y ninguno más** —el alta de una ficha guardaba el texto en blanco que la edición normalizaba— y el punto estaba **corto en tres sitios**. El alta y la edición no son dos puertas sino **dos de cinco**: de los 61 campos de texto de las entradas de la API, **34 guardaban el blanco tal cual**, y la única que lo rechazaba era el formulario público, con **una línea de configuración** que llevaba siete capítulos ahí y que no tenía ninguna otra entrada. El defecto es **de orden**: `UsuarioCreate` declaraba un mínimo de dos caracteres y recortaba en un validador, que corre **después** de las restricciones del campo, así que dos espacios cumplían el mínimo y se guardaban como `''` en una columna `NOT NULL`, y `' A '` como una sola letra. Las dos piezas eran correctas; lo que estaba mal era cuál iba primero. Y lo mejor del capítulo 33 —derivar de la tabla la lista de campos sin los que una fila no existe— **se había escrito para una tabla de tres**: en las otras dos ediciones parciales, un `null` sobre una columna obligatoria llegaba al `commit` y salía como **500**. Además, `crm_platform` es el prefijo del identificador con el que un evento del CRM queda marcado para siempre y nadie lo recortaba: «HubSpot» y «HubSpot » eran dos eventos, y **el mismo evento entraba dos veces**. 33 defectos reintroducidos, 33 detectados — y **dos de los que escaparon eran arreglos de este capítulo que no arreglaban nada**: el arnés dejó de medir guardas y empezó a medir arreglos. |
+| **40** | [Reporte 40](docs/reportes/Reporte_40_El_Motor_que_no_Comprobaba_Nada_Dieciocho_Claves_sin_Probar_el_Except_que_Adivinaba_y_el_Duplicado_que_Perdia_un_Prospecto.md) | El motor que no comprobaba nada (capítulo 42): abre la congelación para **dos puntos de §6.4 y ninguno más** —el `except IntegrityError` que traducía cualquier violación a «el correo ya existe», y el alta de una ficha sin la red que la edición tiene desde el capítulo 33—, y los dos daban por hecho que solo se llega ahí por una **carrera**. No: `leads` tiene dos claves ajenas, así que un asesor que no existe pasa el esquema —es un entero— y lo rechaza la base. Medido: `POST /leads` era un **500** y `PUT /leads/{id}` un **409 que nombraba el correo de la propia ficha**, que quien editaba no había tocado. **Lo importante no es el arreglo sino por qué no había forma de encontrarlo**: SQLite no comprueba las claves ajenas si no se le pide —`PRAGMA foreign_keys` nace apagado en cada conexión— y la línea estaba escrita seis veces en el repositorio, todas dentro de tres pruebas de migración y ninguna en el motor de la aplicación. Al encenderla, la suite dio **exactamente el mismo resultado**: las **18 claves ajenas y las 18 cláusulas `ondelete`** del esquema no las había ejercitado nunca nadie. El punto 26 proponía leer el error del motor, y eso también estaba a medias: SQLite nombra la columna en `UNIQUE constraint failed` y para una clave ajena dice `FOREIGN KEY constraint failed` **y nada más**, así que el `except` no lee el mensaje: **pregunta a la base**, con la lista de reglas sacada de la tabla. Además, el más caro de los cuatro que suponían era el del webhook: «duplicado» ante un rechazo que no lo era **descarta el evento entero** y el prospecto no existe en ninguna parte. 23 defectos reintroducidos, 23 detectados — y dos de los que escaparon decían que una comprobación de este capítulo no hacía nada: sí la hace, pero en **el momento** y no en la respuesta, y nadie lo había escrito. |
+| **41** | [Reporte 41](docs/reportes/Reporte_41_Los_Avisos_que_no_Estaban_en_la_Pagina_El_Cuadro_que_Pedia_una_Contrasena_en_Claro_el_Par_que_Nadie_Media_y_los_Motivos_que_el_Cliente_Tiraba.md) | Los avisos que no estaban en la página (capítulo 43): abre la congelación para **tres puntos de §6.4 y ninguno más** —los tres que quedaban del lado del cliente— y los tres estaban mal medidos. Los «siete `alert()`» eran **seis**, todos en un archivo, y **dos no eran errores**: uno anunciaba un éxito. Había además dos cuadros del navegador que ese punto no contaba, y uno era el peor de todos: un `window.prompt` pedía la contraseña de otra cuenta **en claro**, sin repetición y sin sitio donde enseñar los motivos de la política. **Lo importante no es el arreglo sino lo que apareció al hacerlo**: §6.4 decía de los avisos escritos a mano que «no incumplen ningún mínimo», y un par de colores escrito en un `style` es un par que la suite de contraste **no puede ver** —su lista se declara a mano—. Al derivarla del código aparecieron **siete combinaciones sin medir** y dos por debajo de los 4.5 de §1.4.3, una de ellas visible solo **con el ratón sobre la fila**. Una planta más abajo, lo mismo: once de las ochenta y ocho cajas de formulario no eran `.input-field`, y las ocho del alta de una cuenta son de las que el capítulo 40 marca con `aria-invalid`, así que el atributo **se anunciaba y no se veía**. Y el nombre de la columna no lo escribían siete pantallas sino una función en un sitio, que además **tiraba los motivos** que el servidor manda enteros a propósito —con dos pruebas verdes debajo que fabricaban el mensaje una capa por debajo del fallo—. 29 defectos reintroducidos, 29 detectados. |
+| **42** | [Reporte 42](docs/reportes/Reporte_42_Las_Pantallas_que_Nadie_Auditaba_Tres_Deslizadores_sin_Nombre_el_Selector_que_Cambia_Permisos_y_Dos_Pantallas_Fuera_de_Toda_Region.md) | Las pantallas que nadie auditaba (capítulo 44): el cliente audita su accesibilidad con `axe-core` en cada ejecución de la suite desde el capítulo 36, nivel AA de WCAG 2.1, y la cabecera de ese archivo decía «las **ocho** pantallas». Era verdad; lo que no decía es de cuántas. Hay **dieciocho** componentes con controles de formulario y **nueve no los había mirado ningún motor nunca**, con 39 de las 105 cajas. Es la misma forma que el capítulo 43 encontró en la tabla de pares de colores: una comprobación real, que mide bien, sobre **un inventario escrito a mano**. Y el defecto **seguía la lista**: la pantalla de acceso lleva escrito desde el 36 «`<main>` y no un `<div>`: es la pantalla entera»; el cambio obligatorio de contraseña y el alta del segundo factor también son la pantalla entera, no se montaban, y las dos seguían siendo un `<div>`. Dentro había dos infracciones **críticas** —tres deslizadores del simulador sin ningún nombre accesible y el selector que cambia el rol de una cuenta, tampoco— y un `aria-label` sobre un `div` sin rol, que **ARIA prohíbe**: el único dibujo del alta del segundo factor no tenía nombre, y la prueba que lo buscaba por ese nombre pasaba desde el capítulo 35, porque `getByLabelText` lee el atributo sin preguntar si ARIA lo admite ahí. Ninguna de las tres guardas que debían verlo lo vio, y por tres motivos distintos. Ahora la lista **sale del código**. 24 defectos reintroducidos, 24 detectados, y **tres de ellos los encontró el arnés dentro del control recién escrito**. |
+| **43** | [Reporte 43](docs/reportes/Reporte_43_El_Campo_que_el_Servidor_Nombraba_en_Ingles_Un_Punto_que_Contaba_Dos_de_Cinco_y_Seis_de_Nueve_Rechazos_sin_Traducir.md) | El campo que el servidor nombraba en inglés (capítulo 45): el punto 46 de la deuda técnica describía con precisión un mecanismo —un validador de modelo responde `loc: ['body']` y nunca puede señalar un campo— y decía «los **dos**». En los esquemas hay **cinco**, y los tres que el punto no contaba eran los únicos que tenían un defecto: `PUT /users/{id}` con `{"full_name": null}` contestaba «no se pueden dejar vacíos: **full_name**», el nombre de la columna de la base dentro de una frase en castellano. Es lo que el capítulo 43 le quitó a `parseApiError` —**del prefijo**, que es donde una expresión regular lo alcanza—. Y estaba ahí porque la regla estaba escrita tres funciones más arriba y **no se podía cumplir**: nadie dijo qué hacer cuando no hay `loc`. Ahora la frase se lee sola y los campos viajan en el `ctx`, donde el cliente los reparte con la etiqueta de cada pantalla. Al medirlo apareció algo mayor: de los **19** tipos de rechazo que las **17** puertas con cuerpo pueden contestar, el cliente traducía **11**, y la función que ve todas las pantallas que no reparten su 422 no consultaba la tabla que las otras cuatro sí usan —**seis de nueve** rechazos de los dos formularios del panel llegaban en inglés, con la traducción ya escrita en el archivo de al lado, porque la tabla estaba copiada en dos sitios y la copia sin tabla era la que lo veía todo—. 25 defectos reintroducidos, 25 detectados, y tres los encontró el arnés en el control recién escrito: **un umbral que baja a cero es la forma en que una guarda deja de mirar sin dejar de existir**. |
+| **44** | [Reporte 44](docs/reportes/Reporte_44_El_Reparto_que_Ordenaba_por_un_Campo_H6_Cerrado_la_Tanda_que_Ninguna_Prueba_de_un_Caso_Veia_y_el_Bloqueo_que_SQLite_Ignora.md) | El reparto que ordenaba por un campo (capítulo 46): cierra el punto 10 de §6.2 (H-6), el único punto que entró como **funcionalidad** y porque se encargó. El punto decía que la asignación automática era solo para las `HOT`, y contaba la mitad: lo que repartía **tampoco repartía**. `ORDER BY capacity DESC` ordena por la cartera **máxima declarada** en la ficha de cada cuenta, así que entregaba todas las fichas a la persona del número más alto hasta que alguien lo cambiara —y cada ficha salía con dueño, de modo que ninguna prueba de un solo caso podía verlo: lo que hay que medir es una **tanda**—. La otra mitad era peor de lo que su redacción sugería: sin asesor el motor de reglas **no tiene de quién hablar**, así que una ficha `WARM` no producía ni tarea, ni aviso, ni bandeja. Ahora se reparte por cartera **abierta** —la definición del motor, importada y no copiada— con el tiempo sin recibir como desempate; no se toca lo que ya tiene asesor ni lo que viene de una publicación con responsable, ni aunque ese responsable se haya dado de baja; y corre **una sola vez**, en el alta, probado por que la ficha no tenga todavía instantánea de score, que es lo que hace que una reasignación a mano no se deshaga **sin añadir ninguna columna**. Cada reparto deja en la bitácora la regla y entre cuántos candidatos, sin actor y sin confirmar. El bloqueo de fila que evita repartir dos veces el mismo hueco **no se puede ejercitar en la suite** —SQLite ignora `FOR UPDATE` en silencio—, así que se comprueba sobre la sentencia compilada contra PostgreSQL. 20 defectos reintroducidos, 20 detectados, y **19 por cada mitad**: el desempate perdido solo lo ve la suite y la regla copiada a mano solo la ve la guarda. |
+| **REV** | [Para quien revisa este repositorio](docs/Para_Quien_Revisa_Este_Repositorio.md) | El documento de entrada para quien llega de fuera a evaluarlo o a probarlo con agentes: por qué **un clon limpio no trae el modelo** y la pila arranca igual, cómo saber qué motor está puntuando, qué se defiende y sobre qué datos, y una tabla de **lo que parece un fallo y está decidido así**, con el sitio donde se decidió. |
+| **2FA** | [Guía del segundo factor](docs/Guia_del_Segundo_Factor.md) | Cómo activarlo, cómo entrar a partir de entonces, y **qué hacer cuando se pierde el teléfono**: con códigos de recuperación, con otra cuenta de administración, o —si no queda ninguna— con acceso al servidor. Incluye qué pasa si alguna vez se rota `SECRET_KEY`. |
+| **TÚNEL** | [Guía del túnel público](docs/Guia_del_Tunel_Publico.md) | Cómo encender y apagar la página de interés para gente de fuera, sin programar: cinco pasos, la comprobación que dice si quedó bien, qué revisar la primera semana y qué hacer si llega una oleada. Incluye la advertencia que cambia cómo se usa: **la dirección cambia en cada arranque**. |
+| **DIR** | [Poner la dirección de la empresa](docs/Poner_la_Direccion_de_la_Empresa.md) | Qué archivo se toca —y cuáles no— para publicar el sistema bajo un dominio propio: una sola variable, fuera del repositorio, la puerta a la que apunta el dominio, cómo se comprueba y qué hay que rehacer después en los posts ya publicados |
+| **DEMO** | [Guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md) | Los nueve pasos de la demostración segundo a segundo, con la frase que hay que decir mientras carga cada pantalla, los tiempos de servidor medidos y qué hacer si algo falla. |
+| **OPS** | [Si algo falla](docs/Si_Algo_Falla.md) | El documento de operación, escrito para quien no programa: levantar y apagar la pila con el lanzador, reiniciar el túnel y qué hacer cuando se pierde la dirección pública, restaurar un respaldo paso a paso, las cuentas de demostración, y una tabla de «síntoma → qué mirar → qué hacer» con diecisiete entradas. Todas sus órdenes se ejecutaron contra la pila antes de escribirlas. |
+| **RES** | [Informe técnico de la residencia](docs/Informe_Tecnico_de_Residencia.md) | Las cifras finales reales —pruebas, cobertura, capítulos, el modelo publicado con su intervalo— y las preguntas difíciles con su respuesta honesta, incluida la que más incomoda: por qué la cifra que se defiende no es el 0.9469 sino el **+0.052**. |
+| **FIN** | [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md) | Qué cuenta como fallo a partir de la congelación, y todo lo que queda abierto agrupado por de qué depende. Incluye lo que **no** se va a hacer, con el motivo. |
+
+---
+
+*Desarrollado para PluriOne S.A. de C.V. - Proyecto de Estadía Profesional en Ingeniería en Sistemas Computacionales.*
