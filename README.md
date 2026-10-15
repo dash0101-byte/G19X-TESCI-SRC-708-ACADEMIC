@@ -158,6 +158,41 @@ sobre esto.
 
 ---
 
+## Declaración de uso de inteligencia artificial
+
+Este proyecto se escribió **en pareja con un asistente de inteligencia artificial**, y queda
+dicho aquí en lugar de dejar que se deduzca del historial. (La «IA explicable» que aparece más
+abajo es otra cosa: un motor del producto que explica por qué una ficha puntuó lo que puntuó.)
+
+| Qué | Detalle |
+| :--- | :--- |
+| Herramienta | Claude Code, de Anthropic |
+| Modelos | Claude Opus 5 —la mayoría— y Claude Sonnet 5.5 |
+| Alcance | **Todas** las confirmaciones del historial llevan su línea de coautoría: no hay ninguna parte de este repositorio escrita sin ella |
+| En qué | Redactar código, pruebas, guardas y documentos, y ejecutar las comprobaciones |
+
+Esa tabla no hay que creérsela, se comprueba:
+
+```bash
+git log --format=%B | grep -c "Co-Authored-By: Claude"
+```
+
+**Lo que decidí yo.** El alcance del sistema y lo que entra en él; las dos congelaciones —la de
+funcionalidades del 24 de septiembre y la definitiva del 6 de octubre— y, con ellas, qué
+defectos se corrigen y qué se **anota** en lugar de corregirse, que es la lista de
+[§6.4](docs/Congelacion_y_Trabajo_Futuro.md); y qué sale del repositorio y qué no.
+
+**Y cómo se comprobó, que es lo que hace defendible lo anterior.** Nada se dio por bueno porque
+pareciera correcto. La disciplina de este repositorio existe justamente para no fiarse de lo
+que no se ha ejecutado: cada corrección pasa un **arnés de reintroducción** que vuelve a
+escribir el defecto y exige que algo se ponga rojo —si nada se pone rojo, la defensa no
+existe—, las listas que miden las guardas se **derivan del código** en lugar de escribirse a
+mano, y el veredicto de la integración continua se consulta con `scripts/guarda_del_ci.py`, que
+sale con **2** —y no con 0— cuando no ha podido mirar. Las cifras de este README salen de esas
+ejecuciones.
+
+---
+
 ## 🚀 Arquitectura y Tecnologías Clave (Stack Optimizado de Producción)
 
 El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosuficiencia operativa**. Se depuraron tecnologías redundantes, costosas o poco útiles (como Azure AI Search, llamadas remotas a endpoints de Azure ML, dependencias externas a Azure OpenAI y licencias privativas de Power BI), consolidando una arquitectura autocontenida, de latencia ultrabaja y costo recurrente $0 USD:
