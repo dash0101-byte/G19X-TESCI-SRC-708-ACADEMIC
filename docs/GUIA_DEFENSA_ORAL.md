@@ -57,12 +57,22 @@
 > *"En la prospección comercial B2B de talento TI, confiar exclusivamente en un modelo de Machine Learning introduce dos riesgos graves: el problema de **arranque en frío (Cold Start)** para nuevos segmentos o cargos emergentes y la **falta de determinismo en reglas de negocio estrictas** (como un Ideal Customer Profile o ICP).  
 > Al diseñar la ecuación $S_{\text{final}} = 0.60 \times S_{\text{ML}} + 0.40 \times S_{\text{Heurístico}}$, permití que el 60% capture las correlaciones sutiles y no lineales del comportamiento histórico mediante Gradient Boosting, mientras que el 40% garantiza que prospectos con alto encaje de cargo (ej. CTO) y presupuesto verificado reciban una base sólida de puntuación incluso si sus interacciones digitales son escasas. Esta combinación híbrida maximiza tanto la adaptabilidad estadística como el alineamiento estratégico de la empresa."*
 
+
+**Y si repreguntan por los pesos:**  
+> *“Ese 60/40 **no está clavado en el código**: son los valores por omisión de `HeuristicParams`, y el backend los sobrescribe desde `SCORE_WEIGHT_ML` y `SCORE_WEIGHT_HEURISTIC`. La configuración valida que **sumen 1.0**, que es lo que mantiene el resultado en la escala 0–100 sin recortes: `combine_scores` lleva la probabilidad del modelo de 0–1 a 0–100 y funde `peso_ml × ml + peso_heurístico × heurístico`.  
+> Y la ecuación vive en **un solo sitio**, `backend/app/core/scoring_rules.py`, por un defecto que ya nos costó: antes estaba **duplicada** en `ScoringService` y en `ml_pipeline/src/feature_engineering.py`, y las dos copias habían divergido justo en la vida media —el servicio la leía de la configuración y el pipeline la tenía fijada en 14.0—. Es decir: recalibrar el sistema movía la regla con la que se **evalúa** a los prospectos pero no la regla con la que se había **entrenado** el modelo. Por eso el módulo es deliberadamente puro, sin importar `settings` ni SQLAlchemy al cargarse: para que el pipeline de entrenamiento pueda reutilizarlo sin arrastrar la configuración del servicio web.”*
+
 ---
 
 ### Pregunta 3: ¿Cuál es el fundamento científico de la fórmula de decaimiento temporal $\gamma(\Delta t) = (0.5)^{\Delta t / 14}$ y por qué una vida media de 14 días?
 **Respuesta Modelo:**  
 > *"En los sistemas de ventas B2B, el interés y la propensión de compra de un prospecto no caen de forma lineal ni mediante escalones discretos arbitrarios, sino siguiendo una ley de desintegración exponencial análoga a la vida media física: $\gamma(\Delta t) = e^{-\lambda \Delta t}$.  
 > Tras analizar los ciclos de venta de consultoría y contratación de talento en PluriOne, determiné que el ciclo promedio de evaluación de proveedores es de dos semanas (14 días). Fijando $T_{1/2} = 14 \text{ días}$, la tasa de decaimiento es $\lambda = \frac{\ln(2)}{14} \approx 0.04951$. Esto asegura que en el día 0 el factor sea 1.0 (sin penalización), en el día 7 conserve el $70.7\%$, en el día 14 caiga exactamente al $50\%$ y en el día 28 al $25\%$. Esto refleja fielmente la urgencia de recontactar al cliente antes de que busque otra alternativa."*
+
+
+**Y si repreguntan a qué se le aplica:**  
+> *“Aquí está la mitad que suele faltar: **el decaimiento no se aplica a todo el score, solo a la fracción conductual**. De los 100 puntos del heurístico, 50 son firmográficos —25 de cargo, 15 de industria, 10 de tamaño— y **no envejecen**: un CTO de FinTech sigue siendo un CTO de FinTech aunque lleve un mes sin abrir un correo. Los otros 50 son comportamiento, y es a ese subtotal al que se le multiplica γ(Δt).  
+> De ahí se sigue algo que sorprende y que conviene decir antes de que lo encuentren: un prospecto **sin ninguna interacción registrada no pierde nada** por estar inactivo, porque el decaimiento solo atenúa comportamiento y no hay comportamiento que atenuar. Y la categoría no sale de la fórmula sino de los umbrales configurados: **HOT** desde 75, **WARM** desde 45, **COLD** por debajo.”*
 
 ---
 
