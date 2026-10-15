@@ -1,7 +1,8 @@
 --
 -- Sistema Inteligente de Lead Scoring (PluriOne) - volcado de la base de datos
 --
--- Alumno: Rosales Castillo Sebastian - Matricula: G19X-TESCI-SRC-708
+-- Alumno: Rosales Castillo Sebastian - No. de control: 223107211
+-- Codigo del proyecto academico: G19X-TESCI-SRC-708
 -- Institucion: Tecnologico de Estudios Superiores de Cuautitlan Izcalli (TESCI)
 --
 -- QUE TRAE: el esquema completo -en la revision de Alembic que lleva `alembic_version`- y

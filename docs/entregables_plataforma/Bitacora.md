@@ -1,6 +1,6 @@
 # Bitácora de actividades — Sistema Inteligente de Lead Scoring
 
-**Residente:** Rosales Castillo Sebastián · 223107211 · Ingeniería en Sistemas Computacionales
+**Residente:** Rosales Castillo Sebastián · **No. de control:** 223107211 · Ingeniería en Sistemas Computacionales
 **Empresa:** PluriOne S.A. de C.V. · **Asesor externo:** Ing. Edgar Loeffelmann Ibarra · **Asesora interna:** M. en DBC. Elizabeth Bravo Gómez
 **Periodo de la residencia:** 31/08/2026 – 29/01/2027 · **Corte de esta bitácora:** 13/10/2026
 

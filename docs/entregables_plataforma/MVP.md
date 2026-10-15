@@ -1,6 +1,6 @@
 # MVP — Sistema Inteligente de Lead Scoring
 
-**Empresa:** PluriOne S.A. de C.V. · **Residente:** Rosales Castillo Sebastián (223107211) · **Periodo:** 2026-2 (31/08/2026 – 29/01/2027)
+**Empresa:** PluriOne S.A. de C.V. · **Residente:** Rosales Castillo Sebastián (No. de control 223107211) · **Periodo:** 2026-2 (31/08/2026 – 29/01/2027)
 
 Complementa al [PRD](PRD.md): aquí se define **el mínimo que valida la hipótesis** y cómo ese mínimo creció hasta el producto entregado.
 

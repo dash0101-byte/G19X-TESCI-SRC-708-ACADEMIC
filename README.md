@@ -4,7 +4,8 @@
 **Representante Legal:** Lic. Xochicuahuitl Gleason Juárez  
 **Asesor Empresarial:** Juan Méndez Herrera  
 **Líder de Proyecto:** Edgar Loheffelmman  
-**Alumno Residente:** Rosales Castillo Sebastian · **Matrícula:** G19X-TESCI-SRC-708  
+**Alumno Residente:** Rosales Castillo Sebastián · **No. de control:** 223107211  
+**Código del proyecto académico:** G19X-TESCI-SRC-708 —el nombre de este repositorio—  
 **Institución:** Tecnológico de Estudios Superiores de Cuautitlán Izcalli (TESCI)  
 **Carrera:** Ingeniería en Sistemas Computacionales  
 **Periodo de Ejecución:** Estadía Profesional (2026)  
