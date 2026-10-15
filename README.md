@@ -191,8 +191,8 @@ mano, y el veredicto de la integración continua se consulta con `scripts/guarda
 sale con **2** —y no con 0— cuando no ha podido mirar. Las cifras de este README salen de esas
 ejecuciones.
 
----
-
+---
+
 ## 🚀 Arquitectura y Tecnologías Clave (Stack Optimizado de Producción)
 
 El sistema fue diseñado bajo el principio de **parsimonia tecnológica y autosuficiencia operativa**. Se depuraron tecnologías redundantes, costosas o poco útiles (como Azure AI Search, llamadas remotas a endpoints de Azure ML, dependencias externas a Azure OpenAI y licencias privativas de Power BI), consolidando una arquitectura autocontenida, de latencia ultrabaja y costo recurrente $0 USD:
