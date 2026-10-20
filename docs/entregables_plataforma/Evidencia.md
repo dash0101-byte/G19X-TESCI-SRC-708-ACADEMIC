@@ -2,7 +2,7 @@
 
 **Residente:** Rosales Castillo Sebastián · **No. de control:** 223107211 · **Empresa:** PluriOne S.A. de C.V. · **Corte:** 13/10/2026
 
-Este documento reúne **la evidencia que se puede comprobar**: cada afirmación trae el comando o el archivo que la respalda. Las capturas y el video de la demostración **no están incluidos aquí** porque requieren la pila en ejecución (ver §5).
+Este documento reúne **la evidencia que se puede comprobar**: cada afirmación trae el comando o el archivo que la respalda. Las **doce capturas** de la demostración están en [`capturas/`](capturas/), tomadas sobre un clon limpio con la pila levantada (ver §5); el video sigue pendiente.
 
 ---
 
@@ -61,30 +61,51 @@ Además, el **06-10-2026** se comprobó de extremo a extremo con un teléfono re
 | Documento técnico · Bitácora | `docs/entregables_plataforma/Documento_Tecnico.md` · `Bitacora.md` |
 | 44 reportes técnicos y memoria compilada | `docs/reportes/` · `docs/Memoria_Tecnica_Final_Lead_Scoring.md` |
 | Guía de defensa (28 preguntas con respuesta) | `docs/GUIA_DEFENSA_ORAL.md` |
-| Historial de trabajo | 87 confirmaciones del 22-09 al 13-10-2026 (`git log`) |
+| Historial de trabajo | 97 confirmaciones del 22-09 al 19-10-2026 (`git log`) |
 
-## 5. Capturas y video: qué falta y cómo obtenerlo
+## 5. Capturas de la demostración
 
-Docker Desktop no estaba en ejecución al generar este documento, por lo que **no hay capturas ni video**. Para producirlos:
+**Las doce capturas que pedía este apartado ya están**, en
+[`capturas/`](capturas/). Se tomaron el **19 de octubre de 2026** sobre un **clon limpio**
+del repositorio en la confirmación `5b28cde`, levantado siguiendo los cinco pasos de «Cómo
+ejecutarlo desde cero» del README —sin un solo atajo— y recorriendo después el
+[guion cronometrado](../Guion_Cronometrado_de_la_Demo.md).
 
-1. Levante la pila (ver [Guía de instalación](Guia_de_Instalacion.md)).
-2. Siga el [guion cronometrado](../Guion_Cronometrado_de_la_Demo.md) y capture estas pantallas, ya con sesión iniciada:
+| # | Captura | Qué se ve | Archivo | Tamaño |
+| :-: | :--- | :--- | :--- | :--- |
+| 1 | Inicio de sesión | Pantalla de entrada | [`01_inicio_de_sesion.png`](capturas/01_inicio_de_sesion.png) | 2880×1800 |
+| 2 | Pestaña «Hoy» | Tareas con su motivo | [`02_pestana_hoy.png`](capturas/02_pestana_hoy.png) | 2880×1800 |
+| 3 | Dashboard | KPIs, embudo y contador «sin asesor» | [`03_tablero_kpis_embudo.png`](capturas/03_tablero_kpis_embudo.png) | 2880×4404 |
+| 4 | Prospectos | Matriz con categorías HOT/WARM/COLD | [`04_prospectos_hot_warm_cold.png`](capturas/04_prospectos_hot_warm_cold.png) | 2880×3098 |
+| 5 | Ficha 360° | Puntuación, explicación y tarjeta «Llegó por» | [`05_ficha_360_puntuacion_y_llego_por.png`](capturas/05_ficha_360_puntuacion_y_llego_por.png) | 2880×3262 |
+| 6 | Simulador | Deslizadores y resultado | [`06_simulador.png`](capturas/06_simulador.png) | 2880×1800 |
+| 7 | Publicaciones | Enlace propio, textos por red y código QR | [`07_publicacion_redes_y_qr.png`](capturas/07_publicacion_redes_y_qr.png) | 2880×2774 |
+| 8 | Informe de publicación | Fila por red (WhatsApp / LinkedIn) | [`08_informe_de_publicacion_por_red.png`](capturas/08_informe_de_publicacion_por_red.png) | 2880×2242 |
+| 9 | Página pública de interés | Formulario sin texto libre | [`09_pagina_publica_de_interes.png`](capturas/09_pagina_publica_de_interes.png) | 2880×1800 |
+| 10 | Cierre de trato | Formulario con motivo de lista cerrada | [`10_cierre_de_trato.png`](capturas/10_cierre_de_trato.png) | 2880×3262 |
+| 11 | Desenlaces | Tabla por motivo y contador de reentrenamiento | [`11_desenlaces_por_motivo.png`](capturas/11_desenlaces_por_motivo.png) | 2880×2622 |
+| 12 | `/health` en el navegador | `"ml_model_loaded": true` | [`12_health_ml_model_loaded.png`](capturas/12_health_ml_model_loaded.png) | 2880×1800 |
 
-| # | Captura | Qué debe verse |
-| :-: | :--- | :--- |
-| 1 | Inicio de sesión | Pantalla de entrada |
-| 2 | Pestaña «Hoy» | Tareas con su motivo |
-| 3 | Dashboard | KPIs, embudo y contador «sin asesor» en cero |
-| 4 | Prospectos | Matriz con categorías HOT/WARM/COLD |
-| 5 | Ficha 360° | Puntuación, explicación y tarjeta «Llegó por» |
-| 6 | Simulador | Deslizadores y resultado |
-| 7 | Publicaciones | Enlace propio, textos por red y código QR |
-| 8 | Informe de publicación | Fila por red (WhatsApp / LinkedIn) |
-| 9 | Página pública de interés | Formulario sin texto libre |
-| 10 | Cierre de trato | Formulario con motivo de lista cerrada |
-| 11 | Desenlaces | Tabla por motivo y contador de reentrenamiento |
-| 12 | `/health` en el navegador | `"ml_model_loaded": true` |
+**Cinco de las doce no existían al sembrar la base.** Las pantallas de publicaciones,
+informe, página pública, cierre y desenlaces están vacías hasta que alguien crea una
+publicación, la reparte, un interesado deja sus datos y el trato se cierra. Así que las
+capturas no son una sesión de pantallazos sobre datos sembrados: son el recorrido de la
+demostración, en este orden —crear la publicación, repartirla por WhatsApp y LinkedIn,
+llegar por el enlace público, puntuar la ficha recién creada, cerrar el trato con un motivo
+de la lista cerrada y mirar el desenlace—.
 
-3. Para el video, grabe el recorrido de 4 min 30 s de la demostración (nueve pasos).
+**Cada captura espera una condición antes de dispararse**, y si no se cumple no se toma
+ninguna: la 5 exige que la ficha enseñe «Llegó por», la 12 exige que `/health` conteste
+literalmente `"ml_model_loaded": true`. Una captura de una pantalla a medio dibujar parece
+una prueba y no lo es.
 
-> **Datos de la demostración:** todos sintéticos. No capture pantallas con datos reales de PluriOne ni con credenciales visibles.
+**Lo que estas capturas prueban y lo que no.** Prueban que el sistema arranca desde un clon
+limpio y que las doce pantallas hacen lo que la documentación dice. **No** prueban quién
+levantó la pila: eso lo comprueba quien evalúa repitiendo los cinco pasos del README, que es
+para lo que están escritos y cronometrados.
+
+> **Datos de la demostración:** todos sintéticos, generados por `backend/scripts/seed_data.py`
+> y por el propio recorrido. No hay datos reales de PluriOne ni credenciales a la vista.
+
+**El video sigue pendiente**: el recorrido de 4 min 30 s de la demostración (nueve pasos),
+con el mismo guion.

@@ -128,4 +128,4 @@ Restricción de ingeniería: **coste recurrente de 0 USD**, sin cuentas externas
 | Métricas sobre datos sintéticos no predicen rendimiento comercial | Se defiende el aporte sobre la línea base, no el ROC-AUC; el sistema recoge ya los desenlaces reales |
 | Sin modelo en un clon limpio el sistema puntúa con el heurístico sin avisar | `/health` expone `ml_model_loaded`; cada puntuación guarda `hybrid+ml:<huella>` o `hybrid+heuristico` |
 | Enlace público muerto al cambiar el túnel | El sistema marca los enlaces desactualizados y avisa si la dirección configurada no responde |
-| Deuda menor acumulada tras la congelación | 58 puntos anotados y numerados; ninguno impide levantar la pila ni enseñar la demostración |
+| Deuda menor acumulada tras la congelación | 59 puntos anotados y numerados; ninguno impide levantar la pila ni enseñar la demostración |

@@ -118,7 +118,7 @@ sobre esto.
 
 | | |
 | :--- | :--- |
-| **Deuda menor anotada** | **58 puntos** en §6.4, de los que **16 están cerrados** y **42 siguen abiertos**: cifras escritas a mano que nada compara con lo que hay, controles que miden una ruta en vez de una propiedad, y un lanzador que no comprueba si el motor de Docker está vivo |
+| **Deuda menor anotada** | **59 puntos** en §6.4, de los que **16 están cerrados** y **43 siguen abiertos**: cifras escritas a mano que nada compara con lo que hay, controles que miden una ruta en vez de una propiedad, y un lanzador que no comprueba si el motor de Docker está vivo |
 | **Lo que no se va a hacer** | **12 decisiones** en §7, cada una con su motivo. No están pendientes: están decididas |
 | **Lo que el modelo no puede decir** | El ROC-AUC de 0.9469 se mide sobre datos **sintéticos**. Lo que se defiende es el aporte de **+0.052** sobre el heurístico en ese mismo conjunto. El rendimiento comercial solo podrá medirse con conversiones reales, que todavía no existen |
 | **Lo que la suite no puede ejercitar** | Corre sobre SQLite en memoria, así que lo que solo existe en PostgreSQL —`FOR UPDATE`, algunas restricciones— se comprueba sobre la **sentencia compilada** contra el dialecto real, nunca dándolo por bueno sin ejecutarlo |
@@ -141,7 +141,7 @@ sobre esto.
 | **Cómo se comprueba** | `curl -s http://127.0.0.1:8000/health` dice si puntúa el modelo o el heurístico (`ml_model_loaded`). `python -m pytest backend/tests -q` corre la suite; las **siete guardas de propiedades** y los **61 controles de configuración peligrosa** están en `.github/workflows/ci.yml`, que no usa ningún secreto y corre tal cual en un *fork*. El recorrido completo de la demostración, con tiempos, en el [guion cronometrado](docs/Guion_Cronometrado_de_la_Demo.md). |
 | **Qué se defiende** | No el ROC-AUC de 0.9469, que se mide sobre datos **sintéticos**, sino el **aporte de +0.052 (IC 95 % [+0.030, +0.076])** sobre el heurístico en el mismo conjunto. Las cifras verifican que el pipeline está íntegro; el rendimiento comercial solo puede medirse con conversiones reales que todavía no existen. |
 | **Qué está congelado** | Desde el **06-10-2026**, todo: entra un cambio solo si sin él la pila no se levanta o la demostración no se puede enseñar. Lo que queda abierto está escrito y clasificado en [Congelación y trabajo futuro](docs/Congelacion_y_Trabajo_Futuro.md), que es la autoridad sobre esto. |
-| **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **58 restos menores** de §6.4 —42 abiertos— y las **doce decisiones** de §7 «lo que no se va a hacer, y por qué». |
+| **Si algo parece un fallo** | Mire primero la tabla de [**lo que parece un fallo y está decidido así**](docs/Para_Quien_Revisa_Este_Repositorio.md#4-si-esto-parece-un-fallo) y las dos listas a las que apunta: los **59 restos menores** de §6.4 —43 abiertos— y las **doce decisiones** de §7 «lo que no se va a hacer, y por qué». |
 
 ---
 
