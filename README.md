@@ -168,14 +168,21 @@ abajo es otra cosa: un motor del producto que explica por qué una ficha puntuó
 | :--- | :--- |
 | Herramienta | Claude Code, de Anthropic |
 | Modelos | Claude Opus 5 —la mayoría— y Claude Sonnet 5.5 |
-| Alcance | **Todas** las confirmaciones del historial llevan su línea de coautoría: no hay ninguna parte de este repositorio escrita sin ella |
+| Alcance | **Todas** las confirmaciones del historial llevan su línea de coautoría. No «casi todas»: las dos órdenes de abajo tienen que devolver el mismo número |
 | En qué | Redactar código, pruebas, guardas y documentos, y ejecutar las comprobaciones |
 
-Esa tabla no hay que creérsela, se comprueba:
+Esa tabla no hay que creérsela, se comprueba. **La segunda orden cuenta commits, no líneas**, y las dos cifras tienen que coincidir:
 
 ```bash
-git log --format=%B | grep -c "Co-Authored-By: Claude"
+git rev-list --count HEAD
+git log --grep="co-authored-by: claude" -i --format=%H | wc -l
 ```
+
+> **Tres avisos para quien lo compruebe**, porque las tres cosas hacen que la cuenta salga distinta y una de ellas ya nos pasó:
+>
+> 1. **`git log --grep` es sensible a mayúsculas por omisión.** El trailer está escrito `Co-Authored-By`, así que buscarlo en minúsculas **sin `-i` devuelve cero**.
+> 2. **`git log --format=%B | grep -c` cuenta líneas, no commits.** Aquí coincide porque cada mensaje lleva una sola línea de coautoría, pero no es la misma medición y no hay que confundirlas. Esa orden estuvo publicada aquí por error hasta el 19 de octubre de 2026.
+> 3. **GitHub no pinta a Claude como coautor** en la página de cada commit, porque `noreply@anthropic.com` no es una cuenta de GitHub. La línea está en el mensaje y `git` la lee como trailer, pero la interfaz no la atribuye: contar lo que **se ve** da otro número que contar lo que **está escrito**.
 
 **Lo que decidí yo.** El alcance del sistema y lo que entra en él; las dos congelaciones —la de
 funcionalidades del 24 de septiembre y la definitiva del 6 de octubre— y, con ellas, qué
