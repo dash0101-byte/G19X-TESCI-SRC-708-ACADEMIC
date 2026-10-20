@@ -104,6 +104,16 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # saltados detrás. Se sube el pin a 2.9.0-r0, que es más nueva y sigue llevando el arreglo
 # de CVE-2026-93990. Los otros cuatro pines se comprobaron y siguen existiendo iguales.
 #
+# Y ESE MISMO DÍA SALTÓ LA OTRA, que se parece y no es la misma. Con la construcción
+# arreglada, el paso de Trivy —que hasta entonces no se alcanzaba— encontró `libx11`
+# **CVE-2026-88806** (desbordamiento de montículo a través de un servidor X malicioso) en
+# la 1.8.13-r0 que trae la base, con arreglo publicado en **1.8.14-r0**. Aquí Alpine no
+# retiró nada: lo que se movió es la base de datos del ESCÁNER, así que el aviso llega sin
+# que cambie ni una línea del repositorio y sobre una imagen que construye bien. De ahí el
+# sexto pin. Comprobado en el índice antes de fijarlo: 1.8.14-r0 es la vigente en v3.24/main
+# y sigue proveyendo `so:libX11.so.6=6.4.0`, del que dependen 486 paquetes —porque una
+# versión que existe no es todavía una versión instalable—.
+#
 # Y OJO CON LA ORDEN DE ARRIBA: `apk update` dentro del contenedor **no funciona en una red
 # con TLS interceptado** —apk no confía en el certificado, la actualización falla y
 # `apk policy` se limita a repetir lo que ya hay instalado en la imagen, que hace creer que
@@ -111,8 +121,17 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # leer el índice del repositorio con el almacén de certificados del sistema:
 #   https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz
 # Cada bloque trae `P:` nombre y `V:` versión; eso es la verdad y `apk policy` no.
+#
+# Y si hace falta preguntárselo a `apk` desde dentro del contenedor —la orden de más
+# arriba—, lo que estorba es el TRANSPORTE, no la firma: con
+#   sed -i 's|https://|http://|g' /etc/apk/repositories
+# el índice se descarga y `apk` sigue verificando cada paquete con sus propias claves. Es
+# el mismo razonamiento con el que el punto 73 de §6.4 construyó aquí pasando el
+# certificado del anfitrión como secreto de construcción: cambiar cómo viaja el índice no
+# cambia qué se instala.
 RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0' \
-    'libexpat=2.9.0-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0'
+    'libexpat=2.9.0-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0' \
+    'libx11=1.8.14-r0'
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fragmento con las cabeceras de seguridad, incluido desde cada `location`.
