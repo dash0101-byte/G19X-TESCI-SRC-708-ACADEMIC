@@ -389,7 +389,7 @@
 
 ---
 
-## 3. Las Diez Preguntas Incómodas (17 – 26)
+## 3. Las Doce Preguntas Incómodas (17 – 28)
 
 Las de la sección 2 preguntan **cómo está hecho** algo. Estas preguntan **por qué falta**
 algo, y son las que de verdad se pueden contestar mal.
@@ -757,6 +757,24 @@ tiene razón», no una improvisación.
 >
 > Un derecho a medias documentado y visible en la pantalla es peor que uno completo y mejor que
 > uno a medias que nadie sabe que lo está."*
+
+### Pregunta 27: El aporte del modelo sobre el heurístico es de +0.052. ¿No es muy poco para justificar todo un pipeline de Machine Learning?
+**Respuesta Modelo:**  
+> *“Es la pregunta correcta, y la respuesta empieza por aclarar contra qué se mide. El ROC-AUC de **0.9469** no se compara con el azar, porque el azar no es el rival: sobre el mismo conjunto, el **heurístico ICP alcanza 0.8950** y **ordenar por una sola columna** —`days_since_last_activity`— alcanza 0.9053. Contra el azar (0.5) cualquier cosa parece un logro; contra el heurístico, el modelo aporta **+0.052**. Esa es la cifra honesta y es la que defiendo.  
+> Y lo que la hace defendible no es su tamaño, es que **su intervalo de confianza no cruza el cero**: IC 95 % de **[+0.0296, +0.0761]** con 2000 remuestreos. Un aporte pequeño con el intervalo entero por encima de cero es un aporte **real**; uno grande con el intervalo cruzando el cero sería ruido. Prefiero el primero.  
+> ¿Por qué es pequeño? **Porque el heurístico es bueno**: lo escribimos con el perfil de cliente ideal de la empresa, no es una línea base de juguete. El trabajo del modelo no era sustituirlo sino capturar las correlaciones no lineales que las reglas no codifican, y por eso la fusión es 60/40 y no 100/0. Si el modelo aportara mucho más, lo que estaría diciendo es que el heurístico estaba mal.  
+> Esto no es una afirmación de buena voluntad: el entrenamiento tiene una **puerta** que exige **AUC ≥ 0.82** y **aporte ≥ +0.01** sobre el heurístico. Un modelo que no gane al heurístico sale con código 1 y **no sobrescribe el artefacto**. Y el umbral de 0.82 solo no bastaba, porque el heurístico ya lo pasa: por eso se mide también el aporte.  
+> El límite honesto: todo esto es sobre **datos sintéticos**, donde la etiqueta se genera con una fórmula conocida más ruido. Mide que el pipeline está íntegro y que el modelo aprende algo que las reglas no tienen. **No mide conversión comercial**, que solo se puede medir con desenlaces reales.”*
+
+---
+
+### Pregunta 28: El modelo entrenado no está en el repositorio. ¿Cómo se supone que alguien reproduzca sus resultados?
+**Respuesta Modelo:**  
+> *“No está a propósito, y el motivo es de seguridad antes que de tamaño: un `.joblib` es un *pickle*, y **un pickle ejecuta código al cargarse**. Un binario versionado en un repositorio público es procedencia desconocida para quien lo clone, así que `ml_pipeline/models/*.joblib` está en `.gitignore`.  
+> Lo que sí viaja es **cómo se vuelve a obtener**: el entrenamiento es un paso del arranque —`python ml_pipeline/src/train_model.py`— y en la integración continua se entrena y se pasa como artefacto a la construcción de la imagen. Y es **reproducible byte a byte**: `metrics.json` guarda la huella del artefacto —SHA-256 `98ed8bd1…9d2a63`—, la semilla, las filas y las versiones exactas de Python, scikit-learn, NumPy y pandas con las que se produjo. Dos entrenamientos separados por tres semanas dieron el mismo artefacto. No versionarlo no cuesta reproducibilidad porque se regenera idéntico.  
+> Y la parte que hay que decir antes de que la encuentren: **saltarse ese paso no da ningún síntoma.** En un clon sin modelo, el `COPY` del directorio no falla, el adaptador no encuentra el artefacto y **cae al heurístico** con un apunte de nivel `info`. Los seis contenedores se ponen verdes y el panel funciona igual, puntuando con la línea base contra la que el modelo se compara. Por eso el sistema **dice cuál está puntuando** en dos sitios: `GET /health` lo expone en `ml_model_loaded`, y la auditoría lo escribe en cada puntuación —`v1.0.0-hybrid+ml:98ed8bd1` frente a `v1.0.0-hybrid+heuristico`—. Si alguien revisa este repositorio y ve números distintos a los míos, lo primero que tiene que mirar es ese campo.”*
+
+---
 
 ---
 

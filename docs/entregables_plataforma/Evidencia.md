@@ -60,7 +60,7 @@ Además, el **06-10-2026** se comprobó de extremo a extremo con un teléfono re
 | Manual de usuario · Manual técnico · Guía de instalación | `docs/entregables_plataforma/` |
 | Documento técnico · Bitácora | `docs/entregables_plataforma/Documento_Tecnico.md` · `Bitacora.md` |
 | 44 reportes técnicos y memoria compilada | `docs/reportes/` · `docs/Memoria_Tecnica_Final_Lead_Scoring.md` |
-| Guía de defensa (26 preguntas con respuesta) | `docs/GUIA_DEFENSA_ORAL.md` |
+| Guía de defensa (28 preguntas con respuesta) | `docs/GUIA_DEFENSA_ORAL.md` |
 | Historial de trabajo | 87 confirmaciones del 22-09 al 13-10-2026 (`git log`) |
 
 ## 5. Capturas y video: qué falta y cómo obtenerlo
