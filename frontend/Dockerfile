@@ -96,9 +96,23 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # Van como pines y NO renovando la huella de la base, porque renovarla no los arregla: se
 # comprobó que `nginx:alpine` al día —`72ba…f1d3` a `df22…eac2`, Alpine 3.24.1 a 3.24.2— trae
 # exactamente las mismas versiones de los tres. La imagen va por detrás del REPOSITORIO, no del
-# arreglo: v3.24/main ya publica 2.8.5-r0, 10.49-r0 y 4.7.2-r0, que es lo que se fija aquí.
+# arreglo: v3.24/main publicaba 2.8.5-r0, 10.49-r0 y 4.7.2-r0, que es lo que se fijó aquí.
+#
+# EL 19 DE OCTUBRE DE 2026 SALTÓ ESA ALARMA, por primera vez y tal como estaba escrita
+# arriba: Alpine retiró `libexpat=2.8.5-r0` de v3.24/main y publicó **2.9.0-r0**, así
+# que la construcción del frontend murió con «unable to select packages» y dejó seis pasos
+# saltados detrás. Se sube el pin a 2.9.0-r0, que es más nueva y sigue llevando el arreglo
+# de CVE-2026-93990. Los otros cuatro pines se comprobaron y siguen existiendo iguales.
+#
+# Y OJO CON LA ORDEN DE ARRIBA: `apk update` dentro del contenedor **no funciona en una red
+# con TLS interceptado** —apk no confía en el certificado, la actualización falla y
+# `apk policy` se limita a repetir lo que ya hay instalado en la imagen, que hace creer que
+# la versión fijada no existe cuando lo que pasa es que no se pudo mirar—. La vía fiable es
+# leer el índice del repositorio con el almacén de certificados del sistema:
+#   https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz
+# Cada bloque trae `P:` nombre y `V:` versión; eso es la verdad y `apk policy` no.
 RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0' \
-    'libexpat=2.8.5-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0'
+    'libexpat=2.9.0-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0'
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fragmento con las cabeceras de seguridad, incluido desde cada `location`.
