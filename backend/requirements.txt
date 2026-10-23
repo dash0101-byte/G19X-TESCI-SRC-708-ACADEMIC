@@ -22,7 +22,17 @@ email-validator>=2.1.0
 # (`app/core/tarjeta.py`): 1200x630 en PNG, a partir del titulo y de la fuente que ya
 # trae el cliente. No se decodifica ninguna imagen de fuera, que es donde esta
 # historicamente la superficie de esta biblioteca.
-pillow>=11.0.0,<13.0.0
+#
+# EL 23 DE OCTUBRE DE 2026 EL TOPE MAYOR TUVO QUE SUBIR. pip-audit saco TRECE avisos
+# sobre la 12.3.0 —CVE-2026-112393, -112396, -96636 a -96644, -96778 y GHSA-78g4-xqwv-q3g8—,
+# todos con arreglo en **13.0.0**, que quedaba fuera de `<13.0.0`. No se publico una
+# version mala: se publicaron avisos sobre una que ya estaba instalada, asi que el CI se
+# puso rojo sin que el arbol cambiara. Subir el tope es la unica salida que no deja trece
+# avisos con arreglo disponible en una dependencia de produccion.
+#
+# Y aunque aqui solo se ESCRIBE, eso no exime de probarlo: la vista previa se comprueba
+# con `test_vista_previa_en_redes.py` sobre la version nueva antes de confirmar.
+pillow>=13.0.0,<14.0.0
 # Teléfonos en E.164: validar al guardar y normalizar lo existente (Fase 15).
 phonenumbers>=8.13.0
 # El código QR del alta del segundo factor (capítulo 35). Es la ÚNICA dependencia que

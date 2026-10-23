@@ -691,11 +691,21 @@ def test_el_motor_no_toca_el_score(db_session, equipo):
 
 
 def test_la_pasada_diaria_ejecuta_el_motor(db_session, equipo, capsys):
-    """El motor corre donde se dijo que correría: en la pasada que ya existía."""
+    """El motor corre donde se dijo que correría: en la pasada que ya existía.
+
+    OJO CON LA FECHA DEL PROSPECTO, y es la razón de que no se use `AHORA`. Esta es la
+    única prueba del archivo que entra por el guion de verdad, así que el motor mira el
+    reloj **real** y no el contexto que arma la prueba. Con la fecha fija de `AHORA`
+    —23-09-2026— el prospecto se salió de la ventana de `REGLA_DORMIDO_DIAS` (30 días)
+    el 23-10-2026 a las 07:00 UTC, y la prueba se puso roja sola, sin que nadie tocara
+    nada. Una fecha escrita a mano medida contra el reloj real es una bomba de relojería:
+    pasa todos los días hasta el que no.
+    """
     from scripts import retencion_historial
 
     asesor, _ = equipo
-    _prospecto(db_session, asesor)
+    _prospecto(db_session, asesor,
+               creado=datetime.datetime.now(UTC) - datetime.timedelta(hours=2))
 
     assert retencion_historial.main([]) == 0
 
