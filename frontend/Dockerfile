@@ -114,6 +114,14 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # y sigue proveyendo `so:libX11.so.6=6.4.0`, del que dependen 486 paquetes —porque una
 # versión que existe no es todavía una versión instalable—.
 #
+# Y EL SÉPTIMO, EL 23 DE OCTUBRE, por la misma puerta y por tercera vez: `brotli-libs`
+# **CVE-2026-111497** (escritura fuera de límites) en la 1.2.0-r1 de la base, con arreglo
+# en **1.2.1-r0**. Solo se vio al arreglar lo de delante: el paso de Trivy iba detrás de
+# dos auditorías de Python que morían antes, y un paso en rojo deja saltados a los de
+# atrás. Comprobado que 1.2.1-r0 sigue proveyendo los TRES sonames —`libbrotlicommon`,
+# `libbrotlidec` y `libbrotlienc`, los tres en `.so.1`—, que es lo que podría romper a
+# quien dependa de ella.
+#
 # Y OJO CON LA ORDEN DE ARRIBA: `apk update` dentro del contenedor **no funciona en una red
 # con TLS interceptado** —apk no confía en el certificado, la actualización falla y
 # `apk policy` se limita a repetir lo que ya hay instalado en la imagen, que hace creer que
@@ -131,7 +139,8 @@ FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5
 # cambia qué se instala.
 RUN apk add --no-cache 'libuuid=2.42.3-r1' 'xz-libs=5.8.4-r0' \
     'libexpat=2.9.0-r0' 'pcre2=10.49-r0' 'tiff=4.7.2-r0' \
-    'libx11=1.8.14-r0'
+    'libx11=1.8.14-r0' \
+    'brotli-libs=1.2.1-r0'
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Fragmento con las cabeceras de seguridad, incluido desde cada `location`.
