@@ -31,7 +31,7 @@ const ENLACE_BASE = 'http://localhost:3000/interes';
 
 const CUENTAS = {
   lider: {
-    id: 2, email: 'lider.ventas@plurione.com', full_name: 'Juan Méndez Herrera',
+    id: 2, email: 'lider.ventas@plurione.com', full_name: 'Ricardo Peñaloza Gómez',
     role: 'Sales_Lead', is_active: true, must_change_password: false,
   },
   asesor: {
@@ -345,7 +345,7 @@ describe('A. Marketing', () => {
   it('entra, crea la publicación y se lleva el texto con su enlace', async () => {
     const usuario = prepararUsuario();
     render(<App />);
-    await screen.findByText(/Juan Méndez/);
+    await screen.findByText(/Ricardo Peñaloza/);
 
     // Desde el capítulo 28 el panel abre en «Hoy»: lo primero que se ve es qué toca. Para
     // crear una publicación hay que ir a su pestaña, que es lo que hace cualquiera.
@@ -389,7 +389,7 @@ describe('A. Marketing', () => {
   it('reparte la misma publicación por dos redes, cada una con su enlace', async () => {
     const usuario = prepararUsuario();
     render(<App />);
-    await screen.findByText(/Juan Méndez/);
+    await screen.findByText(/Ricardo Peñaloza/);
     await usuario.click(screen.getByRole('button', { name: /Publicaciones/ }));
 
     const lista = await screen.findByRole('list', { name: 'Publicaciones' });
@@ -492,7 +492,7 @@ describe('C. Líder', () => {
   it('cuenta los que llegaron sin asesor, compara publicaciones y reparte', async () => {
     const usuario = prepararUsuario();
     render(<App />);
-    await screen.findByText(/Juan Méndez/);
+    await screen.findByText(/Ricardo Peñaloza/);
     await usuario.click(screen.getByRole('button', { name: /Publicaciones/ }));
 
     // Tarea 1: cuántos han llegado por una publicación y siguen sin asesor. El contador

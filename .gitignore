@@ -91,3 +91,7 @@ docs/evaluacion_seguimiento.xlsx
 
 # Informe de cobertura del cliente: se regenera con `npm run test:coverage`.
 frontend/coverage/
+
+# Las grabaciones de la demostración. Pesan cientos de MB y GitHub rechaza
+# cualquier archivo por encima de 100 MB: el video se entrega por la plataforma.
+media/

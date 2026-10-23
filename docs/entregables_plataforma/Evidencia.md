@@ -66,10 +66,18 @@ Además, el **06-10-2026** se comprobó de extremo a extremo con un teléfono re
 ## 5. Capturas de la demostración
 
 **Las doce capturas que pedía este apartado ya están**, en
-[`capturas/`](capturas/). Se tomaron el **19 de octubre de 2026** sobre un **clon limpio**
-del repositorio en la confirmación `5b28cde`, levantado siguiendo los cinco pasos de «Cómo
-ejecutarlo desde cero» del README —sin un solo atajo— y recorriendo después el
-[guion cronometrado](../Guion_Cronometrado_de_la_Demo.md).
+[`capturas/`](capturas/). Se tomaron por primera vez el **19 de octubre de 2026** sobre un
+**clon limpio** del repositorio en la confirmación `5b28cde`, levantado siguiendo los cinco
+pasos de «Cómo ejecutarlo desde cero» del README —sin un solo atajo— y recorriendo después
+el [guion cronometrado](../Guion_Cronometrado_de_la_Demo.md).
+
+**Y se rehicieron el 23 de octubre de 2026**, sobre el árbol de esta misma confirmación y
+con las imágenes reconstruidas, por un motivo que no es cosmético: dos de las siete cuentas
+de demostración llevaban el **nombre de personas reales del proyecto** —el líder de proyecto
+y el asesor empresarial—, y ese nombre salía en la barra superior de casi todas las
+pantallas. Una cosa es acreditar a alguien, que es lo correcto y se sigue haciendo en la
+portada de este entregable, y otra darle de alta una cuenta inventada con su rol y su hash
+de contraseña. Las cuentas pasaron a nombres inventados y las capturas se tomaron otra vez.
 
 | # | Captura | Qué se ve | Archivo | Tamaño |
 | :-: | :--- | :--- | :--- | :--- |

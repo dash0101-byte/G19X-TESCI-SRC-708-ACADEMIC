@@ -30,7 +30,7 @@ from app.models.entities import (
 SEED_USERS = [
     {
         "email": "admin.ti@plurione.com",
-        "full_name": "Edgar Loheffelmman",
+        "full_name": "Mónica Arredondo Vela",
         "role": "System_Admin",
         "env_var": "SEED_ADMIN_PASSWORD",
         # Administra el sistema; no atiende cartera.
@@ -39,7 +39,7 @@ SEED_USERS = [
     },
     {
         "email": "lider.ventas@plurione.com",
-        "full_name": "Juan Méndez Herrera",
+        "full_name": "Ricardo Peñaloza Gómez",
         "role": "Sales_Lead",
         "env_var": "SEED_SALES_LEAD_PASSWORD",
         "es_asesor": True,
