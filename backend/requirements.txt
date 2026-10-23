@@ -14,7 +14,7 @@ python-multipart>=0.0.9
 # JWT con PyJWT y no python-jose (capítulo 23): python-jose arrastraba `ecdsa`, con un aviso
 # sin arreglo (PYSEC-2026-1325) que obligaba a pip-audit a ignorarlo. Aquí solo se firma con
 # HMAC, que PyJWT hace sin dependencias.
-PyJWT>=2.10.0,<3.0.0
+PyJWT>=2.15.1,<3.0.0
 # bcrypt directo: passlib 1.7.4 es incompatible con bcrypt>=5 (falla al leer __about__).
 bcrypt>=4.1.0,<6.0.0
 email-validator>=2.1.0
