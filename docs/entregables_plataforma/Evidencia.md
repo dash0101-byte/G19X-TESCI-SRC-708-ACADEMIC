@@ -1,8 +1,8 @@
 # Evidencia del trabajo — Sistema Inteligente de Lead Scoring
 
-**Residente:** Rosales Castillo Sebastián · **No. de control:** 223107211 · **Empresa:** PluriOne S.A. de C.V. · **Corte:** 13/10/2026
+**Residente:** Rosales Castillo Sebastián · **No. de control:** 223107211 · **Empresa:** PluriOne S.A. de C.V. · **Corte:** 29/10/2026
 
-Este documento reúne **la evidencia que se puede comprobar**: cada afirmación trae el comando o el archivo que la respalda. Las **doce capturas** de la demostración están en [`capturas/`](capturas/), tomadas sobre un clon limpio con la pila levantada (ver §5); el video sigue pendiente.
+Este documento reúne **la evidencia que se puede comprobar**: cada afirmación trae el comando o el archivo que la respalda. Las **doce capturas** de la demostración están en [`capturas/`](capturas/), tomadas sobre un clon limpio con la pila levantada (ver §5), y los **dos videos** —la instalación desde cero y el recorrido de la demostración— ya están grabados y entregados (§5).
 
 ---
 
@@ -61,9 +61,9 @@ Además, el **06-10-2026** se comprobó de extremo a extremo con un teléfono re
 | Documento técnico · Bitácora | `docs/entregables_plataforma/Documento_Tecnico.md` · `Bitacora.md` |
 | 44 reportes técnicos y memoria compilada | `docs/reportes/` · `docs/Memoria_Tecnica_Final_Lead_Scoring.md` |
 | Guía de defensa (28 preguntas con respuesta) | `docs/GUIA_DEFENSA_ORAL.md` |
-| Historial de trabajo | 97 confirmaciones del 22-09 al 19-10-2026 (`git log`) |
+| Historial de trabajo | 101 confirmaciones del 22-09 al 23-10-2026, **las 101 con línea de coautoría** (`git log`) |
 
-## 5. Capturas de la demostración
+## 5. Capturas y video de la demostración
 
 **Las doce capturas que pedía este apartado ya están**, en
 [`capturas/`](capturas/). Se tomaron por primera vez el **19 de octubre de 2026** sobre un
@@ -115,5 +115,17 @@ para lo que están escritos y cronometrados.
 > **Datos de la demostración:** todos sintéticos, generados por `backend/scripts/seed_data.py`
 > y por el propio recorrido. No hay datos reales de PluriOne ni credenciales a la vista.
 
-**El video sigue pendiente**: el recorrido de 4 min 30 s de la demostración (nueve pasos),
-con el mismo guion.
+### Los dos videos
+
+**Están grabados y entregados**, con la voz del residente, y responden a las dos cosas
+que las capturas no pueden probar: que la pila se levanta desde un clon limpio siguiendo
+el README, y que la demostración se recorre entera de principio a fin.
+
+| Video | Qué enseña | Dura | Pesa | Dónde está |
+| :--- | :--- | :---: | :---: | :--- |
+| **Instalación limpia** | Los cinco pasos de «Cómo ejecutarlo desde cero» sobre un clon recién hecho, cronometrados con `Get-Date` al principio y al final, y el `"ml_model_loaded": true` del cierre | 18:12 | 35,4 MB | [Plataforma, documento 372](https://todoacademy.net/documentos/version/372) |
+| **Funcionamiento** | El recorrido de la demostración: crear la publicación, repartirla por LinkedIn y WhatsApp, llegar por el enlace público, la ficha puntuada, el reparto, el cierre con motivo y los desenlaces | 7:06 | 36,2 MB | [Plataforma, documento 378](https://todoacademy.net/documentos/version/378) |
+
+**Lo único que se les hizo después de grabar** fue subir el volumen —el micrófono grabó a −58,8 dB de media, unos treinta y cinco por debajo de lo normal— y, en el de la demostración, acelerarlo a **1,25×** para acercarlo al tiempo pedido. Ni un corte, ni un montaje, ni una toma pegada a otra: lo que se ve es lo que pasó, en el orden en que pasó.
+
+Los dos enlaces son de la plataforma de seguimiento y piden sesión. Los archivos viven además en `media/` del árbol de trabajo, que está en `.gitignore`: GitHub rechaza archivos de más de 100 MB y un repositorio no es sitio para dos videos de 36 MB.

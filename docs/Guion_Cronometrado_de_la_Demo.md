@@ -214,6 +214,17 @@ WhatsApp**.
 
 ### Paso 8 — Cerrar diciendo por qué · 25 s
 
+> ⚠️ **Este paso no sale de noche, y conviene saberlo antes de encender la cámara.**
+> El formulario limita la fecha de cierre al **día local** de quien lo rellena y el
+> servidor la compara contra el alta del prospecto, que guarda en **UTC**. En UTC−6, a
+> partir de las **18:00**, esas dos fechas son días distintos y el servidor contesta
+> `422`. Como este paso cierra el prospecto que el **paso 3** acaba de crear, una
+> demostración dada de noche se queda sin final. **La salida:** basta con que la ficha
+> del paso 3 se **cree antes de las 18:00** —lo de después puede hacerse a cualquier
+> hora del mismo día local—; o cerrar un prospecto dado de alta un día anterior. Está
+> anotado como **punto 79** de §6.4 y no se corrige: mover cualquiera de las dos
+> comprobaciones cambia lo que la API ya contesta a un cliente que existe.
+
 **En la ficha, intentar poner «Ganado» en el selector de etapa.** El sistema se niega.
 Después, el botón de cierre: motivo de la lista, fecha y tramo.
 
