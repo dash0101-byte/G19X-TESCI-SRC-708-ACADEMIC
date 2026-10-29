@@ -61,7 +61,7 @@ Además, el **06-10-2026** se comprobó de extremo a extremo con un teléfono re
 | Documento técnico · Bitácora | `docs/entregables_plataforma/Documento_Tecnico.md` · `Bitacora.md` |
 | 44 reportes técnicos y memoria compilada | `docs/reportes/` · `docs/Memoria_Tecnica_Final_Lead_Scoring.md` |
 | Guía de defensa (28 preguntas con respuesta) | `docs/GUIA_DEFENSA_ORAL.md` |
-| Historial de trabajo | 101 confirmaciones del 22-09 al 23-10-2026, **las 101 con línea de coautoría** (`git log`) |
+| Historial de trabajo | **102 confirmaciones** del 22-09 al 29-10-2026, **todas con línea de coautoría**. La cifra no hay que creérsela y por eso envejece sola: `git rev-list --count HEAD` la dice, y `git log --grep="co-authored-by: claude" -i --format=%H \| wc -l` tiene que devolver **el mismo número** |
 
 ## 5. Capturas y video de la demostración
 
